@@ -1,4 +1,4 @@
-.PHONY: build debug run clean install brand release dist
+.PHONY: build debug run clean install release dist
 
 build:
 	./scripts/build-app.sh release
@@ -15,10 +15,7 @@ install: build
 	cp -R build/OpenNotchi.app /Applications/
 
 clean:
-	rm -rf .build build
-
-brand:
-	swift Brand/generate.swift
+	rm -rf .build build dist
 
 # Universal (arm64 + x86_64) release build packaged into dist/
 dist:

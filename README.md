@@ -1,4 +1,4 @@
-<p align="center"><img src="Brand/logo/lockup-light.png" alt="OpenNotchi" width="420"></p>
+<p align="center"><img src="brand/logo/lockup-light.png" alt="OpenNotchi" width="420"></p>
 
 # OpenNotchi
 
@@ -48,13 +48,18 @@ on first launch go to **System Settings → Privacy & Security** and click
 
 ## Build & run
 
+All commands run from the repo root (`make help` lists them):
+
 ```bash
-make run        # debug build, bundle to build/OpenNotchi.app, and launch
-make build      # release build
-make install    # release build, copy to /Applications
+make run        # debug build of the app, then launch it
+make app        # release build
+make install    # release build, copied to /Applications
+make dist       # universal .dmg + .zip in apps/macos/dist
+make web        # landing page at http://localhost:5173
+make brand      # regenerate icon, logo and web assets
 ```
 
-You can also open `Package.swift` in Xcode to edit the code. Run through
+You can also open `apps/macos/Package.swift` in Xcode to edit the code. Run through
 `make run` rather than Xcode, though: the app needs its `Info.plist` (from the
 `.app` bundle) for the Automation permission prompt.
 
@@ -66,26 +71,39 @@ Ad-hoc signed debug builds may ask again after a rebuild.
 
 Other tools can drive the notch with a distributed notification named
 `io.github.opennotchi.command` whose object is `open`, `close`, `toggle`, or a
-tab name (`home`, `tray`, `clipboard`, `timer`, `mirror`).
+tab name (`home`, `lyrics`, `tray`, `clipboard`, `timer`, `mirror`), or
+`settings`.
 
 ## Project layout
 
+This is a small monorepo:
+
 ```
-Sources/OpenNotchi/
-├── App/        entry point, AppDelegate, menu bar item, settings window
-├── Notch/      floating panel, notch shape, hover/open state
-├── Views/      SwiftUI: root, header, home (player), tray, settings
-├── Media/      MediaProvider protocol + Spotify / Apple Music (AppleScript)
-├── System/     battery monitor (IOKit), global hotkey (Carbon)
-├── Features/   clipboard, timer, calendar, camera
-├── Tray/       tray storage, AirDrop
-└── Settings/   persisted preferences
+OpenNotchi/
+├── apps/
+│   ├── macos/          the app (Swift Package)
+│   │   ├── Sources/OpenNotchi/
+│   │   │   ├── App/       entry point, AppDelegate, menu bar, brand mark
+│   │   │   ├── Notch/     floating panel, notch shape, hover/open state
+│   │   │   ├── Views/     SwiftUI: home, lyrics, tray, clipboard, timer, settings
+│   │   │   ├── Media/     Spotify / Apple Music, artwork colors, lyrics
+│   │   │   ├── Theme/     themes, accents, borders
+│   │   │   ├── Features/  clipboard, timer, calendar, camera
+│   │   │   ├── System/    battery (IOKit), global hotkey (Carbon)
+│   │   │   ├── Tray/      tray storage, AirDrop
+│   │   │   └── Settings/  persisted preferences
+│   │   ├── Resources/     Info.plist, AppIcon.icns
+│   │   └── scripts/       build, package, release
+│   └── website/        landing page (React, Vite, Tailwind, shadcn/ui)
+├── brand/              brand guide and asset generator
+├── .github/workflows/  CI and release
+└── CHANGELOG.md
 ```
 
 ### Adding a media source
 
-Implement `MediaProvider` (see `Media/SpotifyProvider.swift`) and add it to
-`MediaManager.providers`.
+Implement `MediaProvider` (see `apps/macos/Sources/OpenNotchi/Media/SpotifyProvider.swift`)
+and add it to `MediaManager.providers`.
 
 ## Roadmap
 
@@ -103,19 +121,19 @@ in [CHANGELOG.md](CHANGELOG.md). To cut a release:
 1. Add a `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md` and commit it.
 2. Run `make release VERSION=X.Y.Z`.
 
-This bumps the version in `Resources/Info.plist`, tags `vX.Y.Z` and pushes.
+This bumps the version in `apps/macos/Resources/Info.plist`, tags `vX.Y.Z` and pushes.
 GitHub Actions then builds a universal (Apple Silicon + Intel) app and publishes
 `OpenNotchi.dmg` / `.zip` on the release. `make dist` builds the same files
-locally into `dist/`.
+locally into `apps/macos/dist/`.
 
 ## Website
 
-The landing page lives in [website/](website/) (React, Tailwind, shadcn/ui) and
-deploys to Vercel.
+The landing page lives in [apps/website/](apps/website/) (React, Tailwind,
+shadcn/ui) and deploys to Vercel with Root Directory `apps/website`.
 
 ## Brand
 
-Logo, colors and usage rules are in [Brand/BRAND.md](Brand/BRAND.md). Run
+Logo, colors and usage rules are in [brand/BRAND.md](brand/BRAND.md). Run
 `make brand` to regenerate every asset.
 
 ## License

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  macos:
+    name: macOS app
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: apps/macos
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use the newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$XCODE" ]; then sudo xcode-select -s "$XCODE"; fi
+      - name: Build
+        run: ./scripts/build-app.sh release
+
+  website:
+    name: Website
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/website
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/website/package-lock.json
+      - run: npm ci
+      - run: npm run build

@@ -58,10 +58,11 @@ Monochrome only. Contrast and depth come from greys, light and shadow, not hue.
 
 ## Regenerating
 
-Every asset comes from `Brand/generate.swift`:
+Every asset comes from `brand/generate.swift`. From the repo root:
 
 ```bash
 make brand
 ```
 
-This rewrites the PNG/SVG files here and `Resources/AppIcon.icns`.
+This rewrites the PNG/SVG files here, `apps/macos/Resources/AppIcon.icns` and the
+icons and social card in `apps/website/public/`.

@@ -1,7 +1,7 @@
 import AppKit
 
 /// The OpenNotchi mark (notch with waveform cut out), drawn in code so the
-/// menu bar icon stays crisp at any scale. Geometry matches Brand/generate.swift.
+/// menu bar icon stays crisp at any scale. Geometry matches brand/generate.swift.
 enum BrandMark {
     static func menuBarImage() -> NSImage {
         let image = NSImage(size: NSSize(width: 20, height: 14), flipped: true) { rect in

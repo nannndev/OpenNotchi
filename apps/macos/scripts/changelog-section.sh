@@ -8,4 +8,4 @@ awk -v v="$VERSION" '
     $0 ~ "^## \\[" v "\\]" { found = 1; next }
     found && /^## \[/ { exit }
     found { print }
-' CHANGELOG.md
+' ../../CHANGELOG.md

@@ -1,6 +1,7 @@
 // Generates every OpenNotchi brand asset from one set of shapes and colors.
-// Usage: swift Brand/generate.swift   (run from the repo root, or `make brand`)
-// Writes PNG + SVG into Brand/ and Resources/AppIcon.icns.
+// Usage: make brand   (or: swift brand/generate.swift, from anywhere)
+// Writes PNG + SVG into brand/, the app icon into apps/macos/Resources/AppIcon.icns,
+// and the web assets into apps/website/public/.
 
 import AppKit
 import CoreGraphics
@@ -509,9 +510,10 @@ func lockupSVG(dark: Bool, width: CGFloat) -> String {
 
 // MARK: - Main
 
-let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+// Paths are relative to this file, so the script works from any directory.
+let brandDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+let root = brandDir.deletingLastPathComponent()
 let fm = FileManager.default
-let brandDir = root.appendingPathComponent("Brand")
 let iconDir = brandDir.appendingPathComponent("icon")
 let logoDir = brandDir.appendingPathComponent("logo")
 let optionsDir = iconDir.appendingPathComponent("options")
@@ -566,7 +568,7 @@ for base in [16, 32, 128, 256, 512] {
 }
 let iconutil = Process()
 iconutil.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
-iconutil.arguments = ["-c", "icns", iconset.path, "-o", root.appendingPathComponent("Resources/AppIcon.icns").path]
+iconutil.arguments = ["-c", "icns", iconset.path, "-o", root.appendingPathComponent("apps/macos/Resources/AppIcon.icns").path]
 try! iconutil.run(); iconutil.waitUntilExit()
 
 // Mark
@@ -606,4 +608,17 @@ let pill = "Music · Lyrics · AirDrop · Clipboard · Timer"
 drawText(og, pill, x: (1200 - textWidth(pill, font: pillFont)) / 2, baseline: 520, font: pillFont, color: Brand.ash.cg())
 savePNG(og, socialDir.appendingPathComponent("og.png"))
 
-print("Brand assets written to Brand/ and Resources/AppIcon.icns")
+// Web assets for the landing page.
+let publicDir = root.appendingPathComponent("apps/website/public")
+try? fm.createDirectory(at: publicDir, withIntermediateDirectories: true)
+for (name, px) in [("icon.png", 512), ("apple-touch-icon.png", 180)] {
+    let c = makeContext(px, px); drawIcon(c, size: CGFloat(px))
+    savePNG(c, publicDir.appendingPathComponent(name))
+}
+for (source, name) in [(socialDir.appendingPathComponent("og.png"), "og.png"), (logoDir.appendingPathComponent("mark.svg"), "favicon.svg")] {
+    let target = publicDir.appendingPathComponent(name)
+    try? fm.removeItem(at: target)
+    try! fm.copyItem(at: source, to: target)
+}
+
+print("Brand assets written to brand/, apps/macos/Resources/AppIcon.icns and apps/website/public/")
