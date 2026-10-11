@@ -1,0 +1,304 @@
+import SwiftUI
+
+enum SettingsPane: String, CaseIterable, Identifiable {
+    case general = "General"
+    case appearance = "Appearance"
+    case features = "Features"
+    case media = "Media"
+    case about = "About"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .general: return "gearshape.fill"
+        case .appearance: return "paintpalette.fill"
+        case .features: return "square.grid.2x2.fill"
+        case .media: return "music.note"
+        case .about: return "info.circle.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .general: return .gray
+        case .appearance: return .pink
+        case .features: return .blue
+        case .media: return .red
+        case .about: return .indigo
+        }
+    }
+}
+
+struct SettingsView: View {
+    @AppStorage("settingsPane") private var pane: SettingsPane = .general
+
+    var body: some View {
+        HStack(spacing: 0) {
+            List(SettingsPane.allCases, selection: $pane) { item in
+                Label {
+                    Text(item.rawValue)
+                } icon: {
+                    Image(systemName: item.icon)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(item.tint.gradient))
+                }
+                .padding(.vertical, 2)
+                .tag(item)
+            }
+            .listStyle(.sidebar)
+            .frame(width: 180)
+
+            Divider()
+
+            Group {
+                switch pane {
+                case .general: GeneralPane()
+                case .appearance: AppearancePane()
+                case .features: FeaturesPane()
+                case .media: MediaPane()
+                case .about: AboutPane()
+                }
+            }
+            .formStyle(.grouped)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(width: 680, height: 500)
+    }
+}
+
+private struct GeneralPane: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Launch at login", isOn: $settings.launchAtLogin)
+                Toggle("Show menu bar icon", isOn: $settings.showMenuBarIcon)
+            }
+            Section("Behavior") {
+                Toggle("Haptic feedback when opening", isOn: $settings.hapticsEnabled)
+                Toggle("Show live activity beside the notch", isOn: $settings.showLiveActivity)
+                LabeledContent("Hover delay") {
+                    HStack {
+                        Slider(value: $settings.hoverDelay, in: 0...1, step: 0.05)
+                        Text(String(format: "%.2fs", settings.hoverDelay))
+                            .monospacedDigit()
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+            }
+            Section("Shortcut") {
+                Toggle("Toggle the notch with ⌥⌘N", isOn: $settings.hotKeyEnabled)
+            }
+        }
+    }
+}
+
+private struct AppearancePane: View {
+    @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var media: MediaManager
+
+    private let columns = [GridItem(.adaptive(minimum: 110), spacing: 12)]
+
+    var body: some View {
+        Form {
+            Section("Theme") {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(NotchTheme.allCases) { theme in
+                        ThemeCard(theme: theme, isSelected: settings.theme == theme) {
+                            settings.theme = theme
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+                if !NotchTheme.liquidGlassAvailable,
+                   settings.theme == .liquidGlass || settings.theme == .liquidGlassClear {
+                    Text("Liquid Glass needs macOS 26 or later. Using Frosted instead.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if settings.theme == .adaptive || settings.theme == .albumArt {
+                    Text("Changes with the artwork of the song that's playing.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Accent color") {
+                HStack(spacing: 10) {
+                    ForEach(AccentChoice.allCases) { choice in
+                        AccentSwatch(choice: choice, isSelected: settings.accent == choice) {
+                            settings.accent = choice
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+                Text(settings.accent.displayName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Shape & border") {
+                Picker("Border", selection: $settings.borderStyle) {
+                    ForEach(BorderStyle.allCases) { Text($0.displayName).tag($0) }
+                }
+                if settings.borderStyle != .none {
+                    LabeledContent("Border width") {
+                        HStack {
+                            Slider(value: $settings.borderWidth, in: 0.5...4, step: 0.5)
+                            Text(String(format: "%.1f", settings.borderWidth))
+                                .monospacedDigit()
+                                .frame(width: 30, alignment: .trailing)
+                        }
+                    }
+                }
+                LabeledContent("Corner radius") {
+                    HStack {
+                        Slider(value: $settings.cornerRadius, in: 12...48, step: 2)
+                        Text("\(Int(settings.cornerRadius))")
+                            .monospacedDigit()
+                            .frame(width: 30, alignment: .trailing)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ThemeCard: View {
+    @EnvironmentObject private var media: MediaManager
+    let theme: NotchTheme
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                ZStack {
+                    // Busy backdrop so glass and frosted themes read as translucent.
+                    LinearGradient(colors: [.orange, .pink, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    NotchBackground(
+                        theme: theme,
+                        isOpen: true,
+                        shape: RoundedRectangle(cornerRadius: 10),
+                        artwork: media.artwork,
+                        palette: media.palette
+                    )
+                    .padding(6)
+                    HStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 3).fill(.white.opacity(0.85)).frame(width: 16, height: 16)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Capsule().fill(.white.opacity(0.85)).frame(width: 34, height: 4)
+                            Capsule().fill(.white.opacity(0.45)).frame(width: 24, height: 4)
+                        }
+                    }
+                }
+                .frame(height: 62)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(isSelected ? Color.accentColor : .primary.opacity(0.12), lineWidth: isSelected ? 2.5 : 1)
+                )
+
+                Text(theme.displayName)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct AccentSwatch: View {
+    let choice: AccentChoice
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if choice == .artwork {
+                    Circle().fill(AngularGradient(colors: [.red, .yellow, .green, .blue, .purple, .red], center: .center))
+                        .overlay(Image(systemName: "music.note").font(.system(size: 9, weight: .bold)).foregroundStyle(.white))
+                } else {
+                    Circle().fill(choice.color)
+                }
+            }
+            .frame(width: 22, height: 22)
+            .overlay(Circle().stroke(.primary.opacity(0.2), lineWidth: 1))
+            .overlay(
+                Circle()
+                    .stroke(Color.primary, lineWidth: 2)
+                    .padding(-4)
+                    .opacity(isSelected ? 1 : 0)
+            )
+        }
+        .buttonStyle(.plain)
+        .help(choice.displayName)
+    }
+}
+
+private struct FeaturesPane: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section("Tabs") {
+                Toggle("Lyrics", isOn: $settings.lyricsEnabled)
+                Toggle("Clipboard history", isOn: $settings.clipboardEnabled)
+                Toggle("Timer", isOn: $settings.timerTabEnabled)
+                Toggle("Mirror (camera)", isOn: $settings.mirrorTabEnabled)
+            }
+            Section("Home") {
+                Toggle("Today's events next to the player", isOn: $settings.calendarEnabled)
+                Toggle("Show the current lyric line under the title", isOn: $settings.lyricsOnHome)
+                    .disabled(!settings.lyricsEnabled)
+            }
+            Section {
+                Text("Lyrics come from LRCLIB (lrclib.net), a free open lyrics database. Only the song title, artist, album and length are sent.")
+                Text("Clipboard history skips anything password managers mark as concealed.")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct MediaPane: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section("Sources") {
+                Toggle("Apple Music", isOn: $settings.appleMusicEnabled)
+                Toggle("Spotify", isOn: $settings.spotifyEnabled)
+            }
+            Section {
+                Text("macOS asks for permission to control each app the first time it's used. You can change this in System Settings → Privacy & Security → Automation.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct AboutPane: View {
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "rectangle.topthird.inset.filled")
+                .font(.system(size: 44))
+                .foregroundStyle(.tint)
+            Text("OpenNotchi")
+                .font(.title2.bold())
+            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")")
+                .foregroundStyle(.secondary)
+            Text("Free and open source under the MIT license.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}

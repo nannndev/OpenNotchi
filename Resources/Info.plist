@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>OpenNotchi</string>
+    <key>CFBundleDisplayName</key>
+    <string>OpenNotchi</string>
+    <key>CFBundleIdentifier</key>
+    <string>io.github.opennotchi</string>
+    <key>CFBundleExecutable</key>
+    <string>OpenNotchi</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>OpenNotchi controls Spotify and Apple Music to show what's playing and let you play, pause and skip tracks from the notch.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>OpenNotchi shows a camera preview in the Mirror tab so you can check how you look.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>OpenNotchi shows today's upcoming events next to the music player.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>OpenNotchi shows today's upcoming events next to the music player.</string>
+</dict>
+</plist>

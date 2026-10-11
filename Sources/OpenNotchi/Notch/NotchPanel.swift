@@ -1,0 +1,51 @@
+import AppKit
+import SwiftUI
+
+/// Borderless, transparent panel that floats above the menu bar on every Space.
+/// Fully transparent pixels let clicks pass through to whatever is underneath.
+final class NotchPanel: NSPanel {
+    init(contentRect: NSRect) {
+        super.init(
+            contentRect: contentRect,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = false
+        isMovable = false
+        level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+        isReleasedWhenClosed = false
+        hidesOnDeactivate = false
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
+/// Hosting view that reacts to the first click even when the panel isn't key.
+final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+extension NSScreen {
+    /// Size of the physical camera housing, or nil when the screen has none.
+    var notchSize: CGSize? {
+        guard safeAreaInsets.top > 0,
+              let left = auxiliaryTopLeftArea,
+              let right = auxiliaryTopRightArea else { return nil }
+        return CGSize(width: frame.width - left.width - right.width, height: safeAreaInsets.top)
+    }
+
+    var menuBarHeight: CGFloat {
+        let h = frame.maxY - visibleFrame.maxY
+        return h > 0 ? h : 24
+    }
+
+    /// The built-in display if it has a notch, otherwise the main screen.
+    static var preferredNotchScreen: NSScreen? {
+        screens.first(where: { $0.notchSize != nil }) ?? main
+    }
+}
