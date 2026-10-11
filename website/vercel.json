@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/(.*\\.(png|svg))",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
+    }
+  ],
+  "redirects": [
+    { "source": "/download", "destination": "https://github.com/nannndev/OpenNotchi/releases/latest/download/OpenNotchi.dmg", "permanent": false },
+    { "source": "/github", "destination": "https://github.com/nannndev/OpenNotchi", "permanent": false }
+  ]
+}

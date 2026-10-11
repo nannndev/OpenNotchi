@@ -288,11 +288,11 @@ private struct MediaPane: View {
 private struct AboutPane: View {
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: "rectangle.topthird.inset.filled")
-                .font(.system(size: 44))
-                .foregroundStyle(.tint)
-            Text("OpenNotchi")
-                .font(.title2.bold())
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 96, height: 96)
+            (Text("Open") + Text("Notchi").foregroundColor(.secondary))
+                .font(.system(size: 24, weight: .bold, design: .rounded))
             Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")")
                 .foregroundStyle(.secondary)
             Text("Free and open source under the MIT license.")

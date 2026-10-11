@@ -56,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "rectangle.topthird.inset.filled", accessibilityDescription: "OpenNotchi")
+        item.button?.image = BrandMark.menuBarImage()
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Toggle Notch  ⌥⌘N", action: #selector(toggleNotch), keyEquivalent: "").target = self

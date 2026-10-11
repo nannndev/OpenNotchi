@@ -1,3 +1,5 @@
+<p align="center"><img src="Brand/logo/lockup-light.png" alt="OpenNotchi" width="420"></p>
+
 # OpenNotchi
 
 A free, open-source "dynamic notch" for macOS: hover the MacBook notch to get
@@ -31,6 +33,13 @@ alternative to paid apps like NotchNook and Alcove.
   adjustable width and corner radius
 - **Battery** level and charging state
 - Settings: launch at login, hover delay, haptics, per-feature toggles, media sources
+
+## Download
+
+Grab the latest `.dmg` from the [Releases page](https://github.com/nannndev/OpenNotchi/releases/latest),
+open it and drag OpenNotchi into Applications. The app isn't notarized yet, so
+on first launch go to **System Settings → Privacy & Security** and click
+**Open Anyway**.
 
 ## Requirements
 
@@ -85,6 +94,29 @@ Implement `MediaProvider` (see `Media/SpotifyProvider.swift`) and add it to
 - [ ] Customizable shortcut
 - [ ] Multi-display support
 - [ ] Signed & notarized releases, Homebrew cask
+
+## Releases & versioning
+
+OpenNotchi uses [Semantic Versioning](https://semver.org/); changes are listed
+in [CHANGELOG.md](CHANGELOG.md). To cut a release:
+
+1. Add a `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md` and commit it.
+2. Run `make release VERSION=X.Y.Z`.
+
+This bumps the version in `Resources/Info.plist`, tags `vX.Y.Z` and pushes.
+GitHub Actions then builds a universal (Apple Silicon + Intel) app and publishes
+`OpenNotchi.dmg` / `.zip` on the release. `make dist` builds the same files
+locally into `dist/`.
+
+## Website
+
+The landing page lives in [website/](website/) (React, Tailwind, shadcn/ui) and
+deploys to Vercel.
+
+## Brand
+
+Logo, colors and usage rules are in [Brand/BRAND.md](Brand/BRAND.md). Run
+`make brand` to regenerate every asset.
 
 ## License
 

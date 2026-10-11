@@ -4,3 +4,7 @@ build/
 .swiftpm/
 DerivedData/
 *.xcodeproj/xcuserdata/
+dist/
+website/.vercel/
+.vercel/
+.claude/
