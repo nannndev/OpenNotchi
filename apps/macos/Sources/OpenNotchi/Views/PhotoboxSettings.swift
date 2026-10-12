@@ -4,7 +4,8 @@ import SwiftUI
 struct PhotoboxSettings: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var media: MediaManager
-    @State private var previews: [StripStyle: NSImage] = [:]
+    @ObservedObject private var cache = StripPreviews.shared
+    private var previews: [StripStyle: NSImage] { cache.images }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -49,7 +50,9 @@ struct PhotoboxSettings: View {
         Text("Take a strip from the Mirror tab with the photobox button. Strips are saved to Pictures › OpenNotchi and added to the Tray.")
             .font(.caption)
             .foregroundStyle(.secondary)
-            .task(id: renderKey) { await render() }
+            .onAppear(perform: render)
+            .onChange(of: settings.stripCaption) { render() }
+            .onChange(of: media.info?.title) { render() }
     }
 
     private func thumbnail(_ style: StripStyle) -> some View {
@@ -79,30 +82,11 @@ struct PhotoboxSettings: View {
         .buttonStyle(.plain)
     }
 
-    private var renderKey: String {
-        "\(settings.stripCaption)|\(media.info?.title ?? "")"
-    }
-
-    /// Renders all styles off the main thread; re-runs when the text or the song changes.
-    private func render() async {
-        try? await Task.sleep(for: .milliseconds(250)) // debounce typing
-        guard !Task.isCancelled else { return }
-        let info = StripInfo(
-            caption: settings.stripCaption,
+    private func render() {
+        cache.update(caption: settings.stripCaption, info: StripInfo(
             songTitle: media.info?.title ?? "Midnight Drive",
             artist: media.info?.artist ?? "The Placeholders",
             artwork: media.artwork
-        )
-        let rendered = await Task.detached(priority: .userInitiated) { () -> [StripStyle: NSImage] in
-            let photos = PhotoStripComposer.samplePhotos
-            var result: [StripStyle: NSImage] = [:]
-            for style in StripStyle.allCases {
-                guard let cg = PhotoStripComposer.compose(photos, style: style, info: info) else { continue }
-                result[style] = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
-            }
-            return result
-        }.value
-        guard !Task.isCancelled else { return }
-        previews = rendered
+        ))
     }
 }

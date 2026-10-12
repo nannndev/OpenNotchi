@@ -55,7 +55,7 @@ final class NotchWindowController: NSObject {
 
         // Clicks in other apps close the notch (works without Accessibility permission).
         clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.viewModel.close()
+            self?.viewModel.clickedOutside()
         }
 
         DistributedNotificationCenter.default().addObserver(

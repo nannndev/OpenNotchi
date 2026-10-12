@@ -89,9 +89,23 @@ final class NotchViewModel: ObservableObject {
             let work = DispatchWorkItem { [weak self] in self?.open() }
             pending = work
             DispatchQueue.main.asyncAfter(deadline: .now() + settings.hoverDelay, execute: work)
-        } else if !isDropTargeted {
+        } else if !isDropTargeted && !staysOpenOnHoverExit {
             scheduleClose(after: 0.12)
         }
+    }
+
+    /// The Mirror tab stays open when the pointer leaves; a click elsewhere closes it.
+    private var staysOpenOnHoverExit: Bool {
+        isOpen && tab == .mirror && settings.mirrorStaysOpen
+    }
+
+    /// Set while something must not be interrupted, like a photobox countdown.
+    @Published var holdOpen = false
+
+    /// A click in another app closes the notch, unless it's being held open.
+    func clickedOutside() {
+        guard !holdOpen else { return }
+        close()
     }
 
     func open() {

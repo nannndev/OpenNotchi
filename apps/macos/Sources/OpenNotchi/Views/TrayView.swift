@@ -174,7 +174,8 @@ private struct TrayItemView: View {
         }
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { NSWorkspace.shared.open(url) }
-        .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
+        // A file URL, so it can be dropped on the AirDrop zone as well as in Finder and other apps.
+        .onDrag { NSItemProvider(object: url as NSURL) }
         .contextMenu {
             Button("Open") { NSWorkspace.shared.open(url) }
             Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }

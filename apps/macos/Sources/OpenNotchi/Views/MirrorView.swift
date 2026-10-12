@@ -9,6 +9,8 @@ struct MirrorView: View {
     /// Photos taken so far in a photobox session; nil when taking single photos.
     @State private var boothShots: [CGImage]?
     @State private var boothBusy = false
+    @State private var choosingStrip = false
+    @EnvironmentObject private var vm: NotchViewModel
     @State private var captureRequest = 0
     @State private var countdown: Int?
     @State private var flash = false
@@ -93,15 +95,28 @@ struct MirrorView: View {
             .overlay(alignment: .trailing) {
                 VStack(spacing: 10) {
                     ShutterButton(action: { startCountdown() })
-                    PhotoboxButton(action: startPhotobox)
+                    PhotoboxButton { withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { choosingStrip = true } }
                 }
                 .padding(.trailing, 12)
-                .opacity(isHovering && countdown == nil && boothShots == nil ? 1 : 0)
+                .opacity(isHovering && countdown == nil && boothShots == nil && !choosingStrip ? 1 : 0)
+            }
+            .overlay {
+                if choosingStrip {
+                    StripPicker(
+                        onStart: {
+                            withAnimation { choosingStrip = false }
+                            startPhotobox()
+                        },
+                        onClose: { withAnimation { choosingStrip = false } }
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                }
             }
             .overlay(alignment: .bottom) {
                 MirrorControls()
                     .padding(8)
-                    .opacity(isHovering ? 1 : 0)
+                    .opacity(isHovering && !choosingStrip ? 1 : 0)
             }
             .shadow(color: settings.mirrorRingLight ? .white.opacity(0.35) : .clear, radius: 12)
             .onHover { inside in
@@ -111,6 +126,8 @@ struct MirrorView: View {
 
             ResizeHandle()
         }
+        .onChange(of: choosingStrip || boothBusy || countdown != nil) { _, busy in vm.holdOpen = busy }
+        .onDisappear { vm.holdOpen = false }
     }
 
     @ViewBuilder
@@ -200,6 +217,100 @@ struct MirrorView: View {
                 if savedPhoto == url { savedPhoto = nil }
             }
         }
+    }
+}
+
+/// Pick a strip style right in the mirror, then start the photobox.
+private struct StripPicker: View {
+    @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var media: MediaManager
+    @ObservedObject private var previews = StripPreviews.shared
+    let onStart: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .bottom, spacing: 10) {
+                        ForEach(StripStyle.allCases) { style in
+                            chip(style).id(style)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                }
+                .onAppear { proxy.scrollTo(settings.stripStyle, anchor: .center) }
+            }
+
+            VStack(spacing: 8) {
+                Button(action: onStart) {
+                    Label("Start", systemImage: "camera.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(.white))
+                        .foregroundStyle(.black)
+                }
+                .buttonStyle(.plain)
+                Button {
+                    StripCaptionPrompt.ask(settings)
+                } label: {
+                    Label(settings.stripCaption.isEmpty ? "Text" : "“\(settings.stripCaption)”", systemImage: "character.cursor.ibeam")
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                        .frame(maxWidth: 110)
+                }
+                .buttonStyle(.plain)
+                Button(action: onClose) {
+                    Text("Cancel").font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.trailing, 14)
+        }
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.black.opacity(0.72))
+        .onAppear {
+            previews.update(caption: settings.stripCaption, info: StripInfo(
+                songTitle: media.info?.title ?? "Midnight Drive",
+                artist: media.info?.artist ?? "The Placeholders",
+                artwork: media.artwork
+            ))
+        }
+        .onChange(of: settings.stripCaption) { _, caption in
+            previews.update(caption: caption, info: StripInfo(songTitle: media.info?.title ?? "Midnight Drive", artist: media.info?.artist ?? "The Placeholders", artwork: media.artwork))
+        }
+    }
+
+    private func chip(_ style: StripStyle) -> some View {
+        let selected = settings.stripStyle == style
+        return Button {
+            withAnimation(.spring(response: 0.3)) { settings.stripStyle = style }
+        } label: {
+            VStack(spacing: 4) {
+                Group {
+                    if let image = previews.images[style] {
+                        Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
+                    } else {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(LinearGradient(colors: style.swatch, startPoint: .top, endPoint: .bottom))
+                            .aspectRatio(style.isGrid ? 1 : 0.33, contentMode: .fit)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .padding(2)
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(.white, lineWidth: selected ? 2 : 0))
+                .scaleEffect(selected ? 1.06 : 1)
+                Text(style.displayName)
+                    .font(.system(size: 9, weight: selected ? .bold : .medium))
+                    .foregroundStyle(selected ? .white : .secondary)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .frame(maxHeight: .infinity, alignment: .bottom)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -380,7 +491,7 @@ private struct MirrorControls: View {
                 .pickerStyle(.inline)
                 Divider()
                 Button(settings.stripCaption.isEmpty ? "Custom Text…" : "Text: “\(settings.stripCaption)”…") {
-                    askForCaption()
+                    StripCaptionPrompt.ask(settings)
                 }
             } label: {
                 RoundedRectangle(cornerRadius: 3)
@@ -423,24 +534,6 @@ private struct MirrorControls: View {
         .padding(.vertical, 6)
         .background(Capsule().fill(.black.opacity(0.55)))
         .background(Capsule().fill(.ultraThinMaterial))
-    }
-
-    /// Small text prompt; the notch panel itself is a poor place to type.
-    private func askForCaption() {
-        let alert = NSAlert()
-        alert.messageText = "Text on your photobox strip"
-        alert.informativeText = "Leave it empty to use each style's own title."
-        let field = NSTextField(string: settings.stripCaption)
-        field.placeholderString = "e.g. bestie day out ✨"
-        field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = field
-        NSApp.activate(ignoringOtherApps: true)
-        if alert.runModal() == .alertFirstButtonReturn {
-            settings.stripCaption = String(field.stringValue.prefix(40))
-        }
     }
 
     private func toggle(isOn: Binding<Bool>, on: String, off: String, tint: Color, help: String) -> some View {

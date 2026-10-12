@@ -30,12 +30,17 @@ and the project uses [Semantic Versioning](https://semver.org/).
   Neon, Pastel Grid, Love and Now Playing), saved and dropped into the Tray.
   Write your own text on the strip, or keep each style's title
 - Mirror pane in Settings with live previews of every photobox style
+- The photobox button opens a style picker right in the mirror, with live
+  previews, your strip text and a Start button
+- The Mirror tab stays open when the pointer leaves it (click elsewhere to
+  close), and never closes in the middle of a countdown
 
 - AirDrop progress: the AirDrop zone shows "Pick a device", a progress ring
   while sending and a check when done, also beside the closed notch
 - Tray items show real thumbnails (photos, PDFs, videos) instead of file icons
 
 ### Fixed
+- Dragging a Tray item onto the AirDrop zone did nothing
 - AirDrop window closing by itself or never finishing, because the sharing
   service was released right after it opened
 

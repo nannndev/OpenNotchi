@@ -334,6 +334,7 @@ private struct MirrorPane: View {
                 Picker("Background", selection: $settings.mirrorBackground) {
                     ForEach(MirrorBackground.allCases) { Text($0.displayName).tag($0) }
                 }
+                Toggle("Keep the notch open while using the Mirror", isOn: $settings.mirrorStaysOpen)
                 Toggle("Ring light", isOn: $settings.mirrorRingLight)
                 Toggle("Hand gestures: ✌️ photo, 👍 confetti, ✋ ring light", isOn: $settings.mirrorGestures)
                 Text("Gestures and backgrounds are recognized on your Mac with Apple's Vision framework. Nothing leaves your Mac, and the camera only runs while the Mirror tab is open.")

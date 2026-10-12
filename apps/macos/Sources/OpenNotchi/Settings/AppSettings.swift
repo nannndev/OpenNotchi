@@ -82,6 +82,7 @@ final class AppSettings: ObservableObject {
     @Published var mirrorBackground: MirrorBackground { didSet { defaults.set(mirrorBackground.rawValue, forKey: "mirrorBackground") } }
     /// Text on photobox strips; empty uses each style's own title.
     @Published var stripCaption: String { didSet { defaults.set(stripCaption, forKey: "stripCaption") } }
+    @Published var mirrorStaysOpen: Bool { didSet { defaults.set(mirrorStaysOpen, forKey: "mirrorStaysOpen") } }
     @Published var stripStyle: StripStyle { didSet { defaults.set(stripStyle.rawValue, forKey: "stripStyle") } }
     @Published var mirrorGestures: Bool { didSet { defaults.set(mirrorGestures, forKey: "mirrorGestures") } }
     @Published var mirrorCameraID: String { didSet { defaults.set(mirrorCameraID, forKey: "mirrorCameraID") } }
@@ -157,6 +158,7 @@ final class AppSettings: ObservableObject {
             "mirrorBackground": MirrorBackground.none.rawValue,
             "stripStyle": StripStyle.classic.rawValue,
             "stripCaption": "",
+            "mirrorStaysOpen": true,
             "mirrorGestures": true,
             "meetingReminderMinutes": 5,
             "meetingRemindersOnlyWithLink": false,
@@ -212,6 +214,7 @@ final class AppSettings: ObservableObject {
         mirrorBackground = MirrorBackground(rawValue: defaults.string(forKey: "mirrorBackground") ?? "") ?? .none
         stripStyle = StripStyle(rawValue: defaults.string(forKey: "stripStyle") ?? "") ?? .classic
         stripCaption = defaults.string(forKey: "stripCaption") ?? ""
+        mirrorStaysOpen = defaults.bool(forKey: "mirrorStaysOpen")
         mirrorGestures = defaults.bool(forKey: "mirrorGestures")
         meetingReminderMinutes = defaults.integer(forKey: "meetingReminderMinutes")
         meetingRemindersOnlyWithLink = defaults.bool(forKey: "meetingRemindersOnlyWithLink")
