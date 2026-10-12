@@ -8,13 +8,19 @@ struct NotchRootView: View {
     @EnvironmentObject private var settings: AppSettings
 
     private var showActivity: Bool {
-        !vm.isOpen && settings.showLiveActivity && (timer.isActive || (media.info?.isPlaying ?? false))
+        guard !vm.isOpen else { return false }
+        if vm.peek != nil { return true }
+        return settings.showLiveActivity && (timer.isActive || (media.info?.isPlaying ?? false))
     }
 
     private var bodySize: CGSize {
         if vm.isOpen { return vm.openSize }
         var size = vm.notchSize
-        if showActivity { size.width += 2 * (size.height + 8) }
+        if showActivity {
+            // HUD peeks need room for a level bar on the right.
+            let side = vm.peek?.isHUD == true ? size.height + 48 : size.height + 8
+            size.width += 2 * side
+        }
         return size
     }
 
@@ -69,12 +75,14 @@ struct NotchRootView: View {
         .animation(.easeInOut(duration: 0.6), value: accent)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: vm.isOpen)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showActivity)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: vm.peek?.isHUD)
     }
 }
 
 /// Compact "live activity" shown beside the physical notch.
-/// A running timer takes priority over music.
+/// Priority: a peek (charger, device, HUD), then a running timer, then music.
 struct ClosedActivityView: View {
+    @EnvironmentObject private var vm: NotchViewModel
     @EnvironmentObject private var media: MediaManager
     @EnvironmentObject private var timer: TimerManager
     @Environment(\.notchAccent) private var accent
@@ -82,7 +90,9 @@ struct ClosedActivityView: View {
 
     var body: some View {
         HStack {
-            if timer.isActive {
+            if let peek = vm.peek {
+                PeekView(peek: peek, height: height)
+            } else if timer.isActive {
                 Image(systemName: timer.isRunning ? "timer" : "pause.fill")
                     .font(.system(size: height * 0.45, weight: .semibold))
                     .foregroundStyle(accent.highlight)
@@ -102,6 +112,75 @@ struct ClosedActivityView: View {
             }
         }
         .frame(height: height)
+    }
+}
+
+/// Left icon + right detail for a peek. Content transitions between peeks.
+private struct PeekView: View {
+    let peek: Peek
+    let height: CGFloat
+    @Environment(\.notchAccent) private var accent
+
+    var body: some View {
+        Group {
+            switch peek {
+            case .charging(let level):
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: height * 0.45, weight: .semibold))
+                    .foregroundStyle(.green)
+                    .frame(width: height - 10)
+                Spacer()
+                Text("\(level)%")
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.green)
+
+            case .device(let name, let symbol, let battery):
+                Image(systemName: symbol)
+                    .font(.system(size: height * 0.45, weight: .medium))
+                    .frame(width: height - 10)
+                    .help(name)
+                Spacer()
+                if let battery {
+                    Text("\(battery)%")
+                        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(battery <= 20 ? .red : .white)
+                } else {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: height * 0.42))
+                        .foregroundStyle(.green)
+                }
+
+            case .volume(let level, let muted):
+                Image(systemName: muted || level == 0 ? "speaker.slash.fill" : level < 0.34 ? "speaker.wave.1.fill" : level < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill")
+                    .font(.system(size: height * 0.4, weight: .medium))
+                    .frame(width: height - 4, alignment: .leading)
+                Spacer()
+                LevelBar(level: muted ? 0 : level, color: accent.color)
+
+            case .brightness(let level):
+                Image(systemName: level < 0.5 ? "sun.min.fill" : "sun.max.fill")
+                    .font(.system(size: height * 0.42, weight: .medium))
+                    .frame(width: height - 4, alignment: .leading)
+                Spacer()
+                LevelBar(level: level, color: accent.color)
+            }
+        }
+        .transition(.opacity)
+    }
+}
+
+private struct LevelBar: View {
+    let level: Float
+    let color: Color
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Capsule().fill(.white.opacity(0.2))
+            Capsule().fill(color)
+                .frame(width: 56 * CGFloat(min(max(level, 0), 1)))
+        }
+        .frame(width: 56, height: 5)
+        .animation(.spring(response: 0.25, dampingFraction: 0.9), value: level)
     }
 }
 

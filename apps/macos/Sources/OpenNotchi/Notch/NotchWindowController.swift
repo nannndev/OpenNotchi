@@ -18,6 +18,7 @@ final class NotchWindowController: NSObject {
         timer: TimerManager,
         calendar: CalendarManager,
         lyrics: LyricsManager,
+        weather: WeatherManager,
         settings: AppSettings
     ) {
         viewModel = NotchViewModel(settings: settings)
@@ -32,6 +33,7 @@ final class NotchWindowController: NSObject {
             .environmentObject(timer)
             .environmentObject(calendar)
             .environmentObject(lyrics)
+            .environmentObject(weather)
             .environmentObject(settings)
         let hosting = FirstMouseHostingView(rootView: root)
         hosting.frame = NSRect(origin: .zero, size: Self.windowSize)
@@ -69,6 +71,11 @@ final class NotchWindowController: NSObject {
         case "close": viewModel.close()
         case "toggle": viewModel.toggle()
         case "settings": AppDelegate.shared?.showSettings()
+        // Previews for the live activities, handy when designing them.
+        case "peek-charging": viewModel.showPeek(.charging(level: 76))
+        case "peek-airpods": viewModel.showPeek(.device(name: "AirPods Pro", symbol: "airpodspro", battery: 82))
+        case "peek-volume": viewModel.showPeek(.volume(level: 0.62, muted: false))
+        case "peek-brightness": viewModel.showPeek(.brightness(level: 0.4))
         case "home": viewModel.tab = .home; viewModel.open()
         case "lyrics": viewModel.tab = .lyrics; viewModel.open()
         case "tray": viewModel.tab = .tray; viewModel.open()
@@ -85,6 +92,10 @@ final class NotchWindowController: NSObject {
 
     func open() {
         viewModel.open()
+    }
+
+    func showPeek(_ peek: Peek) {
+        viewModel.showPeek(peek)
     }
 
     func reposition() {

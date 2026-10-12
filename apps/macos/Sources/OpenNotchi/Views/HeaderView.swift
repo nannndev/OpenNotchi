@@ -5,6 +5,7 @@ struct HeaderView: View {
     @EnvironmentObject private var tray: TrayStore
     @EnvironmentObject private var battery: BatteryMonitor
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var weather: WeatherManager
 
     var body: some View {
         HStack(spacing: 4) {
@@ -20,6 +21,11 @@ struct HeaderView: View {
             Color.clear.frame(width: vm.hasPhysicalNotch ? vm.notchSize.width : 0)
 
             Spacer()
+
+            if settings.weatherEnabled, let snapshot = weather.snapshot {
+                WeatherBadge(snapshot: snapshot, place: settings.weatherPlace)
+                    .padding(.trailing, 8)
+            }
 
             if battery.hasBattery {
                 BatteryView(level: battery.level, isCharging: battery.isCharging, isPluggedIn: battery.isPluggedIn)
@@ -75,6 +81,22 @@ private struct TabButton: View {
         .buttonStyle(.plain)
         .help(tab.rawValue)
         .animation(.spring(response: 0.3), value: isSelected)
+    }
+}
+
+private struct WeatherBadge: View {
+    let snapshot: WeatherSnapshot
+    let place: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: snapshot.symbol)
+                .symbolRenderingMode(.multicolor)
+                .font(.system(size: 13))
+            Text("\(Int(snapshot.temperature.rounded()))°")
+                .font(.system(size: 13, weight: .medium).monospacedDigit())
+        }
+        .help("\(place) · H \(Int(snapshot.high.rounded()))° L \(Int(snapshot.low.rounded()))°")
     }
 }
 

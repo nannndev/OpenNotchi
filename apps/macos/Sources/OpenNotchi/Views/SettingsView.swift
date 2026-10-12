@@ -65,7 +65,7 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 680, height: 500)
+        .frame(width: 700, height: 560)
     }
 }
 
@@ -91,7 +91,10 @@ private struct GeneralPane: View {
                 }
             }
             Section("Shortcut") {
-                Toggle("Toggle the notch with ⌥⌘N", isOn: $settings.hotKeyEnabled)
+                Toggle("Global shortcut to toggle the notch", isOn: $settings.hotKeyEnabled)
+                if settings.hotKeyEnabled {
+                    LabeledContent("Shortcut") { HotKeyRecorder() }
+                }
             }
         }
     }
@@ -243,6 +246,7 @@ private struct AccentSwatch: View {
 
 private struct FeaturesPane: View {
     @EnvironmentObject private var settings: AppSettings
+    @State private var accessibilityGranted = MediaKeyInterceptor.isTrusted
 
     var body: some View {
         Form {
@@ -257,12 +261,35 @@ private struct FeaturesPane: View {
                 Toggle("Show the current lyric line under the title", isOn: $settings.lyricsOnHome)
                     .disabled(!settings.lyricsEnabled)
             }
+            Section("Live activities") {
+                Toggle("Charger connected", isOn: $settings.chargingPeekEnabled)
+                Toggle("AirPods and Bluetooth devices", isOn: $settings.devicePeekEnabled)
+                Toggle("Volume & brightness HUD in the notch", isOn: $settings.hudEnabled)
+                if settings.hudEnabled && !accessibilityGranted {
+                    HStack {
+                        Label("Needs Accessibility permission to catch the volume and brightness keys.", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Spacer()
+                        Button("Open Settings") {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+            Section("Weather") {
+                WeatherSettings()
+            }
             Section {
-                Text("Lyrics come from LRCLIB (lrclib.net), a free open lyrics database. Only the song title, artist, album and length are sent.")
+                Text("Lyrics come from LRCLIB and weather from Open-Meteo, both free and open. Only the song details and your chosen location are sent.")
                 Text("Clipboard history skips anything password managers mark as concealed.")
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+        }
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
+            accessibilityGranted = MediaKeyInterceptor.isTrusted
         }
     }
 }
@@ -286,6 +313,8 @@ private struct MediaPane: View {
 }
 
 private struct AboutPane: View {
+    @EnvironmentObject private var updater: Updater
+
     var body: some View {
         VStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage)
@@ -298,6 +327,17 @@ private struct AboutPane: View {
             Text("Free and open source under the MIT license.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+
+            if updater.isAvailable {
+                VStack(spacing: 8) {
+                    Button("Check for Updates…") { updater.checkForUpdates() }
+                        .disabled(!updater.canCheckForUpdates)
+                    Toggle("Check for updates automatically", isOn: $updater.automaticallyChecks)
+                        .toggleStyle(.checkbox)
+                        .font(.callout)
+                }
+                .padding(.top, 12)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

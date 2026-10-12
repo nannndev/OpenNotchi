@@ -41,6 +41,10 @@ final class NotchViewModel: ObservableObject {
 
     let openSize = CGSize(width: 680, height: 200)
 
+    /// Current peek beside the closed notch, cleared after its duration.
+    @Published private(set) var peek: Peek?
+    private var peekWork: DispatchWorkItem?
+
     private let settings: AppSettings
     private var isHovering = false
     private var pending: DispatchWorkItem?
@@ -75,9 +79,19 @@ final class NotchViewModel: ObservableObject {
         pending?.cancel()
         guard !isOpen else { return }
         isOpen = true
+        peek = nil
         if settings.hapticsEnabled {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
+    }
+
+    func showPeek(_ peek: Peek) {
+        guard !isOpen else { return }
+        self.peek = peek
+        peekWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.peek = nil }
+        peekWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + peek.duration, execute: work)
     }
 
     func toggle() {

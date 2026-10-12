@@ -32,5 +32,17 @@
     <string>OpenNotchi shows today's upcoming events next to the music player.</string>
     <key>NSCalendarsUsageDescription</key>
     <string>OpenNotchi shows today's upcoming events next to the music player.</string>
+    <key>SUFeedURL</key>
+    <string>https://github.com/nannndev/OpenNotchi/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>wWvUMmtf/QRYgWLgsE0MRvMzIkl8YsNMxdDKsaUPzoY=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>OpenNotchi shows your AirPods and other Bluetooth devices in the notch when they connect.</string>
+    <key>NSLocationUsageDescription</key>
+    <string>OpenNotchi uses your location only when you choose "Use my location" for the weather.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>OpenNotchi uses your location only when you choose "Use my location" for the weather.</string>
 </dict>
 </plist>

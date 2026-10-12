@@ -1,5 +1,5 @@
 import AppKit
-import Carbon.HIToolbox
+import Combine
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -13,10 +13,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let timer = TimerManager()
     let calendar = CalendarManager()
     private(set) lazy var lyrics = LyricsManager(media: media, settings: settings)
+    private(set) lazy var weather = WeatherManager(settings: settings)
+    let updater = Updater()
+
+    private let bluetooth = BluetoothMonitor()
+    private let mediaKeys = MediaKeyInterceptor()
+    private var hudRetryTimer: Timer?
     private var hotKey: HotKey?
+    private var cancellables: Set<AnyCancellable> = []
 
     private var notchController: NotchWindowController?
     private var statusItem: NSStatusItem?
+    private var toggleMenuItem: NSMenuItem?
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -28,10 +36,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             timer: timer,
             calendar: calendar,
             lyrics: lyrics,
+            weather: weather,
             settings: settings
         )
         setupStatusItem()
         updateHotKey()
+        setupPeeks()
+        updateSystemMonitors()
 
         NotificationCenter.default.addObserver(
             self,
@@ -45,11 +56,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchController?.reposition()
     }
 
-    /// ⌥⌘N toggles the notch.
+    // MARK: - Shortcut
+
+    /// Registers the user's toggle shortcut (⌥⌘N by default).
     func updateHotKey() {
         hotKey = settings.hotKeyEnabled
-            ? HotKey(keyCode: kVK_ANSI_N, modifiers: cmdKey | optionKey) { [weak self] in self?.notchController?.toggle() }
+            ? HotKey(keyCode: settings.hotKeyCode, modifiers: settings.hotKeyModifiers) { [weak self] in self?.notchController?.toggle() }
             : nil
+        toggleMenuItem?.title = settings.hotKeyEnabled ? "Toggle Notch  \(settings.hotKeyDisplay)" : "Toggle Notch"
+    }
+
+    /// Releases the shortcut while a new one is being recorded.
+    func suspendHotKey() {
+        hotKey = nil
+    }
+
+    // MARK: - Live activities
+
+    private func setupPeeks() {
+        // Charger plugged in.
+        battery.$isPluggedIn
+            .removeDuplicates()
+            .dropFirst()
+            .filter { $0 }
+            .sink { [weak self] _ in
+                guard let self, self.settings.chargingPeekEnabled else { return }
+                self.notchController?.showPeek(.charging(level: self.battery.level))
+            }
+            .store(in: &cancellables)
+
+        bluetooth.onConnect = { [weak self] name, symbol, battery in
+            self?.notchController?.showPeek(.device(name: name, symbol: symbol, battery: battery))
+        }
+
+        mediaKeys.handler = { [weak self] key in
+            self?.handleMediaKey(key) ?? false
+        }
+    }
+
+    /// Starts or stops the Bluetooth and media key monitors to match Settings.
+    func updateSystemMonitors() {
+        settings.devicePeekEnabled ? bluetooth.start() : bluetooth.stop()
+
+        hudRetryTimer?.invalidate()
+        hudRetryTimer = nil
+        guard settings.hudEnabled else {
+            mediaKeys.stop()
+            return
+        }
+        if !mediaKeys.start() {
+            MediaKeyInterceptor.requestPermission()
+            // Start as soon as the user grants Accessibility access.
+            hudRetryTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+                if self?.mediaKeys.start() == true { timer.invalidate() }
+            }
+        }
+    }
+
+    /// Adjusts volume or brightness and shows the HUD. Returns false to let macOS handle the key.
+    private func handleMediaKey(_ key: MediaKey) -> Bool {
+        let step: Float = 1 / 16
+        switch key {
+        case .volumeUp, .volumeDown:
+            guard var volume = SystemAudio.volume else { return false }
+            volume = (volume + (key == .volumeUp ? step : -step)).clamped(to: 0...1)
+            SystemAudio.volume = volume
+            if SystemAudio.isMuted && key == .volumeUp { SystemAudio.isMuted = false }
+            notchController?.showPeek(.volume(level: volume, muted: SystemAudio.isMuted))
+        case .mute:
+            SystemAudio.isMuted.toggle()
+            notchController?.showPeek(.volume(level: SystemAudio.volume ?? 0, muted: SystemAudio.isMuted))
+        case .brightnessUp, .brightnessDown:
+            guard var level = DisplayBrightness.level else { return false }
+            level = (level + (key == .brightnessUp ? step : -step)).clamped(to: 0...1)
+            DisplayBrightness.level = level
+            notchController?.showPeek(.brightness(level: level))
+        }
+        return true
     }
 
     // MARK: - Menu bar
@@ -59,8 +142,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.image = BrandMark.menuBarImage()
 
         let menu = NSMenu()
-        menu.addItem(withTitle: "Toggle Notch  ⌥⌘N", action: #selector(toggleNotch), keyEquivalent: "").target = self
+        let toggle = menu.addItem(withTitle: "Toggle Notch", action: #selector(toggleNotch), keyEquivalent: "")
+        toggle.target = self
+        toggleMenuItem = toggle
         menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
+        if updater.isAvailable {
+            menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
+        }
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit OpenNotchi", action: #selector(quit), keyEquivalent: "q").target = self
         item.menu = menu
@@ -79,6 +167,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 rootView: SettingsView()
                     .environmentObject(settings)
                     .environmentObject(media)
+                    .environmentObject(weather)
+                    .environmentObject(updater)
             )
             let window = NSWindow(contentViewController: hosting)
             window.title = "OpenNotchi Settings"
@@ -102,7 +192,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchController?.toggle()
     }
 
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates()
+    }
+
     @objc func quit() {
         NSApp.terminate(nil)
+    }
+}
+
+private extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }

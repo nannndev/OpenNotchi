@@ -44,6 +44,16 @@ jobs:
       - name: Package
         run: ./scripts/package.sh "${TAG#v}"
 
+      - name: Sign update and write appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [ -n "$SPARKLE_PRIVATE_KEY" ]; then
+            ./scripts/appcast.sh "${TAG#v}"
+          else
+            echo "::warning::SPARKLE_PRIVATE_KEY secret is not set; skipping the auto-update feed."
+          fi
+
       - name: Release notes
         run: |
           ./scripts/changelog-section.sh "${TAG#v}" > notes.md

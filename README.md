@@ -27,7 +27,13 @@ alternative to paid apps like NotchNook and Alcove.
 - **Timer**: Pomodoro-style presets, countdown shown beside the notch while closed,
   sound + notification when done
 - **Mirror**: quick camera preview
-- **Global shortcut** ⌥⌘N to toggle the notch; clicking elsewhere closes it
+- **Live activities**: charger connected, AirPods / Bluetooth devices with
+  battery, and an optional volume & brightness HUD in the notch
+- **Weather** in the notch header (Open-Meteo, no API key): search a city or
+  use your location
+- **Auto-update** via Sparkle, from GitHub Releases
+- **Global shortcut** (⌥⌘N by default, customizable) to toggle the notch;
+  clicking elsewhere closes it
 - **Themes**: Liquid Glass (macOS 26+), Liquid Glass Clear, Frosted, Music
   Adaptive (colors from the current cover), Album Art (blurred cover), Midnight,
   Aurora, Classic Black
@@ -75,7 +81,8 @@ Ad-hoc signed debug builds may ask again after a rebuild.
 Other tools can drive the notch with a distributed notification named
 `io.github.opennotchi.command` whose object is `open`, `close`, `toggle`, or a
 tab name (`home`, `lyrics`, `tray`, `clipboard`, `timer`, `mirror`), or
-`settings`.
+`settings`. `peek-charging`, `peek-airpods`, `peek-volume` and
+`peek-brightness` preview the live activities.
 
 ## Project layout
 
@@ -111,8 +118,6 @@ and add it to `MediaManager.providers`.
 ## Roadmap
 
 - [ ] Browser / YouTube playback (system-wide Now Playing)
-- [ ] Volume & brightness HUD replacement
-- [ ] Customizable shortcut
 - [ ] Multi-display support
 - [ ] Signed & notarized releases, Homebrew cask
 
@@ -125,6 +130,9 @@ in [CHANGELOG.md](CHANGELOG.md). To cut a release:
 2. Run `make release VERSION=X.Y.Z`.
 
 This bumps the version in `apps/macos/Resources/Info.plist`, tags `vX.Y.Z` and pushes.
+Releases are signed for Sparkle auto-update with the EdDSA key stored in the
+`SPARKLE_PRIVATE_KEY` repository secret (public key: `SUPublicEDKey` in
+Info.plist).
 GitHub Actions then builds a universal (Apple Silicon + Intel) app and publishes
 `OpenNotchi.dmg` / `.zip` on the release. `make dist` builds the same files
 locally into `apps/macos/dist/`.

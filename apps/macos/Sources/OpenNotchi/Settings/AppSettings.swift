@@ -35,6 +35,28 @@ final class AppSettings: ObservableObject {
     @Published var cornerRadius: Double { didSet { defaults.set(cornerRadius, forKey: "cornerRadius"); AppDelegate.shared?.previewNotch() } }
     @Published var lyricsEnabled: Bool { didSet { defaults.set(lyricsEnabled, forKey: "lyricsEnabled") } }
     @Published var lyricsOnHome: Bool { didSet { defaults.set(lyricsOnHome, forKey: "lyricsOnHome") } }
+    @Published var chargingPeekEnabled: Bool { didSet { defaults.set(chargingPeekEnabled, forKey: "chargingPeekEnabled") } }
+    @Published var devicePeekEnabled: Bool {
+        didSet {
+            defaults.set(devicePeekEnabled, forKey: "devicePeekEnabled")
+            AppDelegate.shared?.updateSystemMonitors()
+        }
+    }
+    @Published var hudEnabled: Bool {
+        didSet {
+            defaults.set(hudEnabled, forKey: "hudEnabled")
+            AppDelegate.shared?.updateSystemMonitors()
+        }
+    }
+    @Published var weatherEnabled: Bool { didSet { defaults.set(weatherEnabled, forKey: "weatherEnabled") } }
+    @Published var useFahrenheit: Bool { didSet { defaults.set(useFahrenheit, forKey: "useFahrenheit") } }
+    @Published private(set) var weatherPlace: String
+    private(set) var weatherLatitude: Double
+    private(set) var weatherLongitude: Double
+    /// Carbon key code, Carbon modifier mask and display string of the toggle shortcut.
+    @Published private(set) var hotKeyCode: Int
+    @Published private(set) var hotKeyModifiers: Int
+    @Published private(set) var hotKeyDisplay: String
     @Published var hotKeyEnabled: Bool {
         didSet {
             defaults.set(hotKeyEnabled, forKey: "hotKeyEnabled")
@@ -70,6 +92,15 @@ final class AppSettings: ObservableObject {
             "spotifyEnabled": true,
             "appleMusicEnabled": true,
             "hotKeyEnabled": true,
+            "chargingPeekEnabled": true,
+            "devicePeekEnabled": true,
+            "hudEnabled": false,
+            "weatherEnabled": true,
+            "useFahrenheit": Locale.current.measurementSystem == .us,
+            "weatherPlace": "",
+            "hotKeyCode": 45,       // kVK_ANSI_N
+            "hotKeyModifiers": 2304, // cmdKey | optionKey
+            "hotKeyDisplay": "⌥⌘N",
             "borderStyle": BorderStyle.none.rawValue,
             "borderWidth": 1.5,
             "cornerRadius": 30.0,
@@ -89,6 +120,17 @@ final class AppSettings: ObservableObject {
         spotifyEnabled = defaults.bool(forKey: "spotifyEnabled")
         appleMusicEnabled = defaults.bool(forKey: "appleMusicEnabled")
         hotKeyEnabled = defaults.bool(forKey: "hotKeyEnabled")
+        chargingPeekEnabled = defaults.bool(forKey: "chargingPeekEnabled")
+        devicePeekEnabled = defaults.bool(forKey: "devicePeekEnabled")
+        hudEnabled = defaults.bool(forKey: "hudEnabled")
+        weatherEnabled = defaults.bool(forKey: "weatherEnabled")
+        useFahrenheit = defaults.bool(forKey: "useFahrenheit")
+        weatherPlace = defaults.string(forKey: "weatherPlace") ?? ""
+        weatherLatitude = defaults.double(forKey: "weatherLatitude")
+        weatherLongitude = defaults.double(forKey: "weatherLongitude")
+        hotKeyCode = defaults.integer(forKey: "hotKeyCode")
+        hotKeyModifiers = defaults.integer(forKey: "hotKeyModifiers")
+        hotKeyDisplay = defaults.string(forKey: "hotKeyDisplay") ?? "⌥⌘N"
         borderStyle = BorderStyle(rawValue: defaults.string(forKey: "borderStyle") ?? "") ?? .none
         borderWidth = defaults.double(forKey: "borderWidth")
         cornerRadius = defaults.double(forKey: "cornerRadius")
@@ -101,6 +143,25 @@ final class AppSettings: ObservableObject {
         mirrorTabEnabled = defaults.bool(forKey: "mirrorTabEnabled")
         calendarEnabled = defaults.bool(forKey: "calendarEnabled")
         launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    func setWeatherPlace(name: String, latitude: Double, longitude: Double) {
+        weatherLatitude = latitude
+        weatherLongitude = longitude
+        defaults.set(latitude, forKey: "weatherLatitude")
+        defaults.set(longitude, forKey: "weatherLongitude")
+        defaults.set(name, forKey: "weatherPlace")
+        weatherPlace = name // published last so observers see the new coordinates
+    }
+
+    func setHotKey(code: Int, modifiers: Int, display: String) {
+        hotKeyCode = code
+        hotKeyModifiers = modifiers
+        hotKeyDisplay = display
+        defaults.set(code, forKey: "hotKeyCode")
+        defaults.set(modifiers, forKey: "hotKeyModifiers")
+        defaults.set(display, forKey: "hotKeyDisplay")
+        AppDelegate.shared?.updateHotKey()
     }
 
     var visibleTabs: [NotchTab] {

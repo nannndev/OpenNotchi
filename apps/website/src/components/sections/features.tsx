@@ -1,5 +1,5 @@
 import { motion } from "motion/react"
-import { CalendarDays, Clipboard, Inbox, MessageSquareQuote, Music, Palette, Timer, Wifi, type LucideIcon } from "lucide-react"
+import { CloudSun, Clipboard, Inbox, MessageSquareQuote, Music, Palette, Sparkles, Wifi, type LucideIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
@@ -8,9 +8,9 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   { icon: Inbox, title: "File tray", body: "Drop files on the notch to park them, then drag them out wherever you need." },
   { icon: Wifi, title: "AirDrop", body: "Drop a file on the AirDrop zone and it's on its way to a nearby device." },
   { icon: Clipboard, title: "Clipboard history", body: "Search and re-copy recent text and images. Password-manager copies are skipped." },
-  { icon: Timer, title: "Timer", body: "Pomodoro presets with a countdown that stays visible beside the closed notch." },
-  { icon: CalendarDays, title: "Calendar & battery", body: "Today's next events and your battery level, at a glance." },
-  { icon: Palette, title: "Make it yours", body: "Liquid Glass, music-adaptive colors and more themes, plus borders and corner radius." },
+  { icon: Sparkles, title: "Live activities", body: "Timers, charging, AirPods battery and a volume & brightness HUD, right beside the notch." },
+  { icon: CloudSun, title: "Weather & calendar", body: "Today's weather, your next events and battery level, at a glance." },
+  { icon: Palette, title: "Make it yours", body: "Liquid Glass and music-adaptive themes, custom shortcut, and updates that install themselves." },
 ]
 
 const THEMES = [

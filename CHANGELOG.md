@@ -6,6 +6,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Auto-update with Sparkle: "Check for Updates…" in the menu bar and Settings,
+  plus automatic background checks
+- Live activities beside the notch when a charger or AirPods / Bluetooth
+  device connects, with battery level when the device reports it
+- Optional volume and brightness HUD in the notch (needs Accessibility access)
+- Weather in the notch header from Open-Meteo: search a city or use your
+  location, Celsius or Fahrenheit
+- Customizable global shortcut (default ⌥⌘N)
+
 ## [0.1.0] - 2026-10-12
 
 First public release.
