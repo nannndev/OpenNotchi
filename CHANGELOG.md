@@ -27,7 +27,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   playing behind you, gently pulsing while music plays
 - Photobox: four shots with a countdown, laid out as a strip in one of twelve
   styles (Classic, Midnight, Film, Polaroid, Y2K, Sakura, Retro, Newspaper,
-  Neon, Pastel Grid, Love and Now Playing), saved and dropped into the Tray
+  Neon, Pastel Grid, Love and Now Playing), saved and dropped into the Tray.
+  Write your own text on the strip, or keep each style's title
 
 ### Changed
 - The location in Settings is shared by weather and prayer times

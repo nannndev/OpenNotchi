@@ -283,6 +283,15 @@ private struct FeaturesPane: View {
                     }
                 }
             }
+            Section("Photobox") {
+                Picker("Strip style", selection: $settings.stripStyle) {
+                    ForEach(StripStyle.allCases) { Text($0.displayName).tag($0) }
+                }
+                TextField("Text on the strip", text: $settings.stripCaption, prompt: Text("Style's own title"))
+                Text("Open the Mirror tab and press the photobox button, or pick a style from the strip swatch there.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("Reminders") {
                 MeetingReminderSettings()
             }

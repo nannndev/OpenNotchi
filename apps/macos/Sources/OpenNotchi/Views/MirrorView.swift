@@ -170,7 +170,7 @@ struct MirrorView: View {
             let shots = boothShots ?? []
             withAnimation { boothShots = nil }
             let style = settings.stripStyle
-            let info = StripInfo(date: .now, songTitle: media.info?.title, artist: media.info?.artist, artwork: media.artwork)
+            let info = StripInfo(caption: settings.stripCaption, date: .now, songTitle: media.info?.title, artist: media.info?.artist, artwork: media.artwork)
             let url = await Task.detached(priority: .userInitiated) {
                 PhotoStripComposer.compose(shots, style: style, info: info).flatMap { MirrorPhotos.save($0, name: "Photobox") }
             }.value
@@ -378,6 +378,10 @@ private struct MirrorControls: View {
                     ForEach(StripStyle.allCases) { Text($0.displayName).tag($0) }
                 }
                 .pickerStyle(.inline)
+                Divider()
+                Button(settings.stripCaption.isEmpty ? "Custom Text…" : "Text: “\(settings.stripCaption)”…") {
+                    askForCaption()
+                }
             } label: {
                 RoundedRectangle(cornerRadius: 3)
                     .fill(LinearGradient(colors: settings.stripStyle.swatch, startPoint: .top, endPoint: .bottom))
@@ -419,6 +423,24 @@ private struct MirrorControls: View {
         .padding(.vertical, 6)
         .background(Capsule().fill(.black.opacity(0.55)))
         .background(Capsule().fill(.ultraThinMaterial))
+    }
+
+    /// Small text prompt; the notch panel itself is a poor place to type.
+    private func askForCaption() {
+        let alert = NSAlert()
+        alert.messageText = "Text on your photobox strip"
+        alert.informativeText = "Leave it empty to use each style's own title."
+        let field = NSTextField(string: settings.stripCaption)
+        field.placeholderString = "e.g. bestie day out ✨"
+        field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            settings.stripCaption = String(field.stringValue.prefix(40))
+        }
     }
 
     private func toggle(isOn: Binding<Bool>, on: String, off: String, tint: Color, help: String) -> some View {

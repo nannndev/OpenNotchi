@@ -48,6 +48,8 @@ enum StripStyle: String, CaseIterable, Identifiable {
 
 /// What's printed on the strip besides the photos.
 struct StripInfo {
+    /// The user's own text; replaces the style's title when set.
+    var caption: String?
     var date = Date.now
     var songTitle: String?
     var artist: String?
@@ -305,7 +307,7 @@ enum PhotoStripComposer {
             let font = NSFont(name: "Courier New Bold", size: 22) ?? .monospacedSystemFont(ofSize: 22, weight: .bold)
             for (i, cell) in cells.dropLast().enumerated() {
                 draw("\(i + 1)  ▸  \(i + 1)A", font: font, color: color, at: CGPoint(x: cell.minX, y: cell.maxY + 1))
-                drawRotated("OPENNOTCHI 400", font: font, color: color.withAlphaComponent(0.8), center: CGPoint(x: canvas.width - 105, y: cell.midY))
+                drawRotated("FILM 400  ▸", font: font, color: color.withAlphaComponent(0.8), center: CGPoint(x: canvas.width - 105, y: cell.midY))
             }
         case .neon:
             for _ in 0..<14 {
@@ -357,53 +359,61 @@ enum PhotoStripComposer {
         }
         let center = rect.midX
         var y = rect.minY + 50
+        let custom = info.caption?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        func title(_ fallback: String) -> String { custom ?? fallback }
+        maxTextWidth = rect.width - 60
 
         switch style {
         case .classic:
-            y += centered("OpenNotchi", font: rounded(64, .heavy), color: NSColor(white: 0.12, alpha: 1), x: center, y: y)
+            y += centered(title("photobooth"), font: rounded(64, .heavy), color: NSColor(white: 0.12, alpha: 1), x: center, y: y)
             centered(dateString("dd · MM · yyyy"), font: .systemFont(ofSize: 30, weight: .medium), color: NSColor(white: 0.45, alpha: 1), x: center, y: y + 14)
         case .midnight:
-            let open = NSAttributedString(string: "Open", attributes: [.font: rounded(64, .heavy), .foregroundColor: NSColor.white])
-            let notchi = NSAttributedString(string: "Notchi", attributes: [.font: rounded(64, .heavy), .foregroundColor: NSColor(white: 0.55, alpha: 1)])
-            let total = open.size().width + notchi.size().width
-            open.draw(at: CGPoint(x: center - total / 2, y: y))
-            notchi.draw(at: CGPoint(x: center - total / 2 + open.size().width, y: y))
+            // The one style that carries the app's wordmark.
+            if let custom {
+                centered(custom, font: rounded(64, .heavy), color: .white, x: center, y: y)
+            } else {
+                let open = NSAttributedString(string: "Open", attributes: [.font: rounded(64, .heavy), .foregroundColor: NSColor.white])
+                let notchi = NSAttributedString(string: "Notchi", attributes: [.font: rounded(64, .heavy), .foregroundColor: NSColor(white: 0.55, alpha: 1)])
+                let total = open.size().width + notchi.size().width
+                open.draw(at: CGPoint(x: center - total / 2, y: y))
+                notchi.draw(at: CGPoint(x: center - total / 2 + open.size().width, y: y))
+            }
             centered(dateString("dd.MM.yyyy  ·  HH:mm"), font: .monospacedDigitSystemFont(ofSize: 28, weight: .medium), color: NSColor(white: 0.5, alpha: 1), x: center, y: y + 100)
         case .film:
             let font = NSFont(name: "Courier New Bold", size: 44) ?? .monospacedSystemFont(ofSize: 44, weight: .bold)
-            y += centered("OPENNOTCHI  400", font: font, color: NSColor(red: 0.91, green: 0.64, blue: 0.23, alpha: 1), x: center, y: y)
+            y += centered(title("FILM  400"), font: font, color: NSColor(red: 0.91, green: 0.64, blue: 0.23, alpha: 1), x: center, y: y)
             centered(dateString("yy  MM  dd"), font: font.withSize(30), color: NSColor(red: 1, green: 0.45, blue: 0.2, alpha: 1), x: center, y: y + 14)
         case .polaroid:
             let ink = NSColor(red: 0.17, green: 0.23, blue: 0.4, alpha: 1)
-            y += centered("good times ✌️", font: NSFont(name: "Marker Felt Wide", size: 66) ?? NSFont(name: "Noteworthy-Bold", size: 60) ?? rounded(60, .bold), color: ink, x: center, y: y)
+            y += centered(title("good times ✌️"), font: NSFont(name: "Marker Felt Wide", size: 66) ?? NSFont(name: "Noteworthy-Bold", size: 60) ?? rounded(60, .bold), color: ink, x: center, y: y)
             centered(dateString("d MMMM yyyy"), font: NSFont(name: "Noteworthy-Bold", size: 32) ?? .systemFont(ofSize: 30), color: ink.withAlphaComponent(0.7), x: center, y: y + 8)
         case .y2k:
-            y += centered("✦ OpenNotchi ✦", font: rounded(70, .black), color: .white, x: center, y: y, shadow: NSColor(red: 0.4, green: 0.2, blue: 0.8, alpha: 0.6))
+            y += centered(custom.map { "✦ \($0) ✦" } ?? "✦ besties ✦", font: rounded(70, .black), color: .white, x: center, y: y, shadow: NSColor(red: 0.4, green: 0.2, blue: 0.8, alpha: 0.6))
             centered(dateString("MM/dd/yyyy"), font: rounded(32, .bold), color: .white.withAlphaComponent(0.9), x: center, y: y + 10)
         case .sakura:
             let pink = NSColor(red: 0.83, green: 0.42, blue: 0.55, alpha: 1)
-            y += centered("sakura days", font: NSFont(name: "Snell Roundhand Bold", size: 84) ?? rounded(64, .bold), color: pink, x: center, y: y - 10)
+            y += centered(title("sakura days"), font: NSFont(name: "Snell Roundhand Bold", size: 84) ?? rounded(64, .bold), color: pink, x: center, y: y - 10)
             centered(dateString("yyyy.MM.dd"), font: rounded(30, .semibold), color: pink.withAlphaComponent(0.75), x: center, y: y)
         case .retro:
             let brown = NSColor(red: 0.48, green: 0.23, blue: 0.12, alpha: 1)
-            centered("GROOVY", font: NSFont(name: "Futura-CondensedExtraBold", size: 92) ?? rounded(80, .black), color: brown, x: center, y: y - 30)
+            centered(title("GROOVY"), font: NSFont(name: "Futura-CondensedExtraBold", size: 92) ?? rounded(80, .black), color: brown, x: center, y: y - 30)
             centered(dateString("MMM d, yyyy").uppercased(), font: NSFont(name: "Futura-Medium", size: 28) ?? .systemFont(ofSize: 28), color: brown.withAlphaComponent(0.8), x: center, y: y + 80)
         case .newspaper:
             NSColor.black.setFill()
             NSBezierPath(rect: CGRect(x: rect.minX + 30, y: rect.minY + 30, width: rect.width - 60, height: 4)).fill()
-            y += centered("THE DAILY NOTCH", font: NSFont(name: "Didot-Bold", size: 78) ?? NSFont(name: "Times New Roman Bold", size: 76) ?? .boldSystemFont(ofSize: 70), color: .black, x: center, y: y)
+            y += centered(title("THE DAILY MOOD").uppercased(), font: NSFont(name: "Didot-Bold", size: 78) ?? NSFont(name: "Times New Roman Bold", size: 76) ?? .boldSystemFont(ofSize: 70), color: .black, x: center, y: y)
             NSBezierPath(rect: CGRect(x: rect.minX + 30, y: y + 6, width: rect.width - 60, height: 1.5)).fill()
             centered(dateString("EEEE, MMMM d, yyyy").uppercased() + "  ·  NO. 1  ·  FREE", font: NSFont(name: "Times New Roman", size: 24) ?? .systemFont(ofSize: 24), color: NSColor(white: 0.2, alpha: 1), x: center, y: y + 20)
         case .neon:
             let pink = NSColor(red: 1, green: 0.3, blue: 0.8, alpha: 1)
-            y += centered("OpenNotchi", font: rounded(74, .heavy), color: pink, x: center, y: y, shadow: pink)
+            y += centered(title("main character"), font: rounded(74, .heavy), color: pink, x: center, y: y, shadow: pink)
             centered(dateString("dd.MM.yyyy"), font: rounded(30, .bold), color: .cyan, x: center, y: y + 10, shadow: .cyan)
         case .pastel:
             let green = NSColor(red: 0.12, green: 0.42, blue: 0.33, alpha: 1)
-            y += centered("notchi moments", font: rounded(62, .heavy), color: green, x: center, y: y - 10)
+            y += centered(title("core memories"), font: rounded(62, .heavy), color: green, x: center, y: y - 10)
             centered(dateString("dd MMM yyyy").lowercased(), font: rounded(30, .semibold), color: green.withAlphaComponent(0.7), x: center, y: y + 6)
         case .love:
-            y += centered("with love", font: NSFont(name: "Snell Roundhand Bold", size: 92) ?? rounded(70, .bold), color: .white, x: center, y: y - 16)
+            y += centered(title("with love"), font: NSFont(name: "Snell Roundhand Bold", size: 92) ?? rounded(70, .bold), color: .white, x: center, y: y - 16)
             centered(dateString("dd · MM · yyyy"), font: rounded(30, .semibold), color: .white.withAlphaComponent(0.85), x: center, y: y)
         case .album:
             let thumb: CGFloat = 130
@@ -419,19 +429,17 @@ enum PhotoStripComposer {
                 NSGraphicsContext.restoreGraphicsState()
             }
             let textX = startX + (info.artwork == nil ? 0 : thumb + 30)
-            draw("♪ NOW PLAYING", font: rounded(22, .bold), color: .white.withAlphaComponent(0.7), at: CGPoint(x: textX, y: y + 4))
+            draw(custom ?? "♪ NOW PLAYING", font: rounded(22, .bold), color: .white.withAlphaComponent(0.7), at: CGPoint(x: textX, y: y + 4), maxWidth: rect.width - thumb - 100)
             draw(text, font: titleFont, color: .white, at: CGPoint(x: textX, y: y + 34), maxWidth: titleWidth)
             draw(sub, font: rounded(28, .medium), color: .white.withAlphaComponent(0.75), at: CGPoint(x: textX, y: y + 92), maxWidth: titleWidth)
         }
 
-        // Small credit on styles whose title isn't the app name.
-        if ![.classic, .midnight, .y2k, .neon].contains(style) {
-            let color: NSColor = [.film, .love, .album, .retro].contains(style) ? .white.withAlphaComponent(0.5) : .black.withAlphaComponent(0.35)
-            centered("OpenNotchi", font: rounded(18, .bold), color: color, x: rect.midX, y: rect.maxY - 36)
-        }
     }
 
     // MARK: - Drawing helpers
+
+    /// Widest a footer line may be; set per strip.
+    private static var maxTextWidth: CGFloat = .greatestFiniteMagnitude
 
     private static func rounded(_ size: CGFloat, _ weight: NSFont.Weight) -> NSFont {
         let base = NSFont.systemFont(ofSize: size, weight: weight)
@@ -458,7 +466,12 @@ enum PhotoStripComposer {
     /// Draws centered text and returns its height.
     @discardableResult
     private static func centered(_ text: String, font: NSFont, color: NSColor, x: CGFloat, y: CGFloat, shadow: NSColor? = nil) -> CGFloat {
-        let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
+        var string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
+        // Long custom text shrinks to fit the strip.
+        if string.size().width > maxTextWidth {
+            let smaller = font.withSize(font.pointSize * maxTextWidth / string.size().width)
+            string = NSAttributedString(string: text, attributes: [.font: smaller, .foregroundColor: color])
+        }
         let size = string.size()
         let draw = { string.draw(at: CGPoint(x: x - size.width / 2, y: y)) }
         if let shadow {
@@ -499,4 +512,8 @@ private struct SeededRandom: RandomNumberGenerator {
         state ^= state << 17
         return state
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
