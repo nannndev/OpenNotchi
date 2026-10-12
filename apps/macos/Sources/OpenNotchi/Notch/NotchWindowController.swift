@@ -3,7 +3,7 @@ import SwiftUI
 
 final class NotchWindowController: NSObject {
     /// The panel is larger than the open notch so the drop shadow isn't clipped.
-    private static let windowSize = CGSize(width: 780, height: 300)
+    private static let windowSize = CGSize(width: 780, height: NotchViewModel.maxOpenHeight + 60)
 
     private let panel: NotchPanel
     private let viewModel: NotchViewModel

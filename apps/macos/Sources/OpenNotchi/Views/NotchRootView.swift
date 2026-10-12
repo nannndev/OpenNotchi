@@ -81,6 +81,8 @@ struct NotchRootView: View {
         .environment(\.notchAccent, accent)
         .animation(.easeInOut(duration: 0.6), value: accent)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: vm.isOpen)
+        // Follow the pointer directly while resizing; animate tab switches that change the height.
+        .animation(vm.isResizing ? nil : .spring(response: 0.38, dampingFraction: 0.86), value: vm.openSize.height)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showActivity)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: vm.peek?.isHUD)
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: vm.peek?.isBanner)

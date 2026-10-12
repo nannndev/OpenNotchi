@@ -39,7 +39,20 @@ final class NotchViewModel: ObservableObject {
         }
     }
 
-    let openSize = CGSize(width: 680, height: 200)
+    static let openWidth: CGFloat = 680
+    static let defaultOpenHeight: CGFloat = 200
+    /// The Mirror tab can be dragged taller, up to this height.
+    static let maxOpenHeight: CGFloat = 470
+
+    var openSize: CGSize {
+        let height = tab == .mirror && settings.mirrorTabEnabled
+            ? min(max(settings.mirrorHeight, Self.defaultOpenHeight), Self.maxOpenHeight)
+            : Self.defaultOpenHeight
+        return CGSize(width: Self.openWidth, height: height)
+    }
+
+    /// True while the bottom edge is being dragged, so the notch doesn't close if the pointer slips outside.
+    @Published var isResizing = false
 
     /// Current peek beside the closed notch, cleared after its duration.
     @Published private(set) var peek: Peek?
@@ -132,7 +145,7 @@ final class NotchViewModel: ObservableObject {
     private func scheduleClose(after delay: TimeInterval) {
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            guard let self, !self.isHovering, !self.isDropTargeted else { return }
+            guard let self, !self.isHovering, !self.isDropTargeted, !self.isResizing else { return }
             self.close()
         }
         pending = work

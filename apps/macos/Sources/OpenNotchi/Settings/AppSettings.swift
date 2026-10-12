@@ -75,6 +75,11 @@ final class AppSettings: ObservableObject {
     @Published var clipboardEnabled: Bool { didSet { defaults.set(clipboardEnabled, forKey: "clipboardEnabled") } }
     @Published var timerTabEnabled: Bool { didSet { defaults.set(timerTabEnabled, forKey: "timerTabEnabled") } }
     @Published var mirrorTabEnabled: Bool { didSet { defaults.set(mirrorTabEnabled, forKey: "mirrorTabEnabled") } }
+    /// Height of the open notch on the Mirror tab, set by dragging its bottom edge.
+    @Published var mirrorHeight: Double { didSet { defaults.set(mirrorHeight, forKey: "mirrorHeight") } }
+    @Published var mirrorEffect: MirrorEffect { didSet { defaults.set(mirrorEffect.rawValue, forKey: "mirrorEffect") } }
+    @Published var mirrorRingLight: Bool { didSet { defaults.set(mirrorRingLight, forKey: "mirrorRingLight") } }
+    @Published var mirrorCameraID: String { didSet { defaults.set(mirrorCameraID, forKey: "mirrorCameraID") } }
     @Published var calendarEnabled: Bool { didSet { defaults.set(calendarEnabled, forKey: "calendarEnabled") } }
     /// Minutes before a calendar event to show the reminder; 0 turns it off.
     @Published var meetingReminderMinutes: Int { didSet { defaults.set(meetingReminderMinutes, forKey: "meetingReminderMinutes") } }
@@ -140,6 +145,10 @@ final class AppSettings: ObservableObject {
             "timerTabEnabled": true,
             "mirrorTabEnabled": true,
             "calendarEnabled": true,
+            "mirrorHeight": 200.0,
+            "mirrorEffect": MirrorEffect.natural.rawValue,
+            "mirrorRingLight": false,
+            "mirrorCameraID": "",
             "meetingReminderMinutes": 5,
             "meetingRemindersOnlyWithLink": false,
             "reminderSound": false,
@@ -187,6 +196,10 @@ final class AppSettings: ObservableObject {
         timerTabEnabled = defaults.bool(forKey: "timerTabEnabled")
         mirrorTabEnabled = defaults.bool(forKey: "mirrorTabEnabled")
         calendarEnabled = defaults.bool(forKey: "calendarEnabled")
+        mirrorHeight = defaults.double(forKey: "mirrorHeight")
+        mirrorEffect = MirrorEffect(rawValue: defaults.string(forKey: "mirrorEffect") ?? "") ?? .natural
+        mirrorRingLight = defaults.bool(forKey: "mirrorRingLight")
+        mirrorCameraID = defaults.string(forKey: "mirrorCameraID") ?? ""
         meetingReminderMinutes = defaults.integer(forKey: "meetingReminderMinutes")
         meetingRemindersOnlyWithLink = defaults.bool(forKey: "meetingRemindersOnlyWithLink")
         reminderSound = defaults.bool(forKey: "reminderSound")

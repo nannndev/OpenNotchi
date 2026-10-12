@@ -16,10 +16,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
   sent) with Kemenag, MWL, ISNA, Egypt, Umm al-Qura, JAKIM and Diyanet methods
   and Hanafi Asr. Imsak and an iftar message during Ramadan
 - Optional sound with reminders
+- Mirror: drag the bottom edge to make it taller (double-click to toggle),
+  seven looks (Natural, Vivid, Warm, Cool, Film, Mono, Dreamy), a ring light
+  that brightens your face, and a camera picker
 
 ### Changed
 - The location in Settings is shared by weather and prayer times
 - Reminders that arrive while the notch is open show once it closes
+- Mirror runs at the camera's best resolution (up to 1080p) and renders at
+  full Retina sharpness
 
 ## [0.3.0] - 2026-10-12
 
