@@ -82,6 +82,8 @@ final class AppSettings: ObservableObject {
     @Published var mirrorBackground: MirrorBackground { didSet { defaults.set(mirrorBackground.rawValue, forKey: "mirrorBackground") } }
     /// Text on photobox strips; empty uses each style's own title.
     @Published var stripCaption: String { didSet { defaults.set(stripCaption, forKey: "stripCaption") } }
+    @Published var stripShots: Int { didSet { defaults.set(stripShots, forKey: "stripShots") } }
+    @Published var stripFormat: StripFormat { didSet { defaults.set(stripFormat.rawValue, forKey: "stripFormat") } }
     @Published var mirrorStaysOpen: Bool { didSet { defaults.set(mirrorStaysOpen, forKey: "mirrorStaysOpen") } }
     @Published var stripStyle: StripStyle { didSet { defaults.set(stripStyle.rawValue, forKey: "stripStyle") } }
     @Published var mirrorGestures: Bool { didSet { defaults.set(mirrorGestures, forKey: "mirrorGestures") } }
@@ -159,6 +161,8 @@ final class AppSettings: ObservableObject {
             "stripStyle": StripStyle.classic.rawValue,
             "stripCaption": "",
             "mirrorStaysOpen": true,
+            "stripShots": 4,
+            "stripFormat": StripFormat.strip.rawValue,
             "mirrorGestures": true,
             "meetingReminderMinutes": 5,
             "meetingRemindersOnlyWithLink": false,
@@ -215,6 +219,8 @@ final class AppSettings: ObservableObject {
         stripStyle = StripStyle(rawValue: defaults.string(forKey: "stripStyle") ?? "") ?? .classic
         stripCaption = defaults.string(forKey: "stripCaption") ?? ""
         mirrorStaysOpen = defaults.bool(forKey: "mirrorStaysOpen")
+        stripShots = StripShots.choices.contains(defaults.integer(forKey: "stripShots")) ? defaults.integer(forKey: "stripShots") : 4
+        stripFormat = StripFormat(rawValue: defaults.string(forKey: "stripFormat") ?? "") ?? .strip
         mirrorGestures = defaults.bool(forKey: "mirrorGestures")
         meetingReminderMinutes = defaults.integer(forKey: "meetingReminderMinutes")
         meetingRemindersOnlyWithLink = defaults.bool(forKey: "meetingRemindersOnlyWithLink")

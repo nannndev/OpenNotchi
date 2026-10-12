@@ -60,6 +60,46 @@ enum StripStyle: String, CaseIterable, Identifiable {
     var isGrid: Bool { self == .pastel }
 }
 
+/// Output shape: the classic tall strip, or a fixed size for a social post or story.
+enum StripFormat: String, CaseIterable, Identifiable {
+    case strip, story, post, square
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .strip: return "Photo strip"
+        case .story: return "Story 9:16"
+        case .post: return "Post 4:5"
+        case .square: return "Square 1:1"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .strip: return "rectangle.split.1x2"
+        case .story: return "iphone"
+        case .post: return "rectangle.portrait"
+        case .square: return "square"
+        }
+    }
+
+    /// Height ÷ width, or nil when the height grows with the number of photos.
+    var heightRatio: CGFloat? {
+        switch self {
+        case .strip: return nil
+        case .story: return 16 / 9
+        case .post: return 5 / 4
+        case .square: return 1
+        }
+    }
+}
+
+/// Photos per photobox session.
+enum StripShots {
+    static let choices = [1, 2, 3, 4, 6]
+}
+
 /// What's printed on the strip besides the photos.
 struct StripInfo {
     /// The user's own text; replaces the style's title when set.
@@ -120,9 +160,11 @@ enum PhotoStripComposer {
         return ctx.makeImage()
     }
 
-    static func compose(_ photos: [CGImage], style: StripStyle, info: StripInfo) -> CGImage? {
+    /// Lays out every photo given (one per cell) in `format`.
+    static func compose(_ photos: [CGImage], style: StripStyle, format: StripFormat = .strip, info: StripInfo) -> CGImage? {
         guard !photos.isEmpty else { return nil }
         let photos = photos.map { filtered($0, style: style) }
+        let count = photos.count
 
         let width: CGFloat = 1200
         let side: CGFloat
@@ -133,24 +175,33 @@ enum PhotoStripComposer {
         default: side = 70
         }
         let header: CGFloat = style == .social ? 150 : 0
-        let footer = footerHeight(style)
+        var footer = footerHeight(style)
         let gap: CGFloat = style == .film ? 26 : style == .social ? 6 : 34
+        var footerScale: CGFloat = 1.3
         var cells: [CGRect] = []
         let height: CGFloat
-        if style.isGrid {
-            let cellW = (width - 2 * side - gap) / 2
-            let cellH = cellW * 3 / 4
-            for i in 0..<4 {
-                cells.append(CGRect(x: side + CGFloat(i % 2) * (cellW + gap), y: header + side + CGFloat(i / 2) * (cellH + gap), width: cellW, height: cellH))
-            }
-            height = header + side + 2 * cellH + gap + footer
+
+        if let ratio = format.heightRatio {
+            // Fixed canvas: the footer gives up space if needed, then the photos share the rest in the
+            // grid whose cells come closest to the camera's 4:3.
+            height = (width * ratio).rounded()
+            let fit = min(1, height * 0.3 / footer)
+            footer *= fit
+            footerScale *= fit
+            let area = CGRect(x: side, y: header + side, width: width - 2 * side, height: height - header - footer - side - (style == .social ? 0 : 10))
+            let columns = (1...min(3, count)).filter { count % $0 == 0 }.min { a, b in
+                abs(log(cellAspect(area, count: count, columns: a, gap: gap) / (4 / 3))) < abs(log(cellAspect(area, count: count, columns: b, gap: gap) / (4 / 3)))
+            } ?? 1
+            cells = grid(area, count: count, columns: columns, gap: gap)
         } else {
-            let cellW = width - 2 * side
+            // Classic strip: 4:3 photos, one column (two for grid styles), as tall as it needs to be.
+            let columns = style.isGrid && count % 2 == 0 ? 2 : 1
+            let rows = count / columns
+            let cellW = (width - 2 * side - CGFloat(columns - 1) * gap) / CGFloat(columns)
             let cellH = cellW * 3 / 4
-            for i in 0..<4 {
-                cells.append(CGRect(x: side, y: header + side + CGFloat(i) * (cellH + gap), width: cellW, height: cellH))
-            }
-            height = header + side + 4 * cellH + 3 * gap + footer
+            let area = CGRect(x: side, y: header + side, width: width - 2 * side, height: CGFloat(rows) * cellH + CGFloat(rows - 1) * gap)
+            cells = grid(area, count: count, columns: columns, gap: gap)
+            height = area.maxY + footer
         }
         let canvas = CGRect(x: 0, y: 0, width: width, height: height)
         let footerRect = CGRect(x: 0, y: height - footer, width: width, height: footer)
@@ -177,7 +228,6 @@ enum PhotoStripComposer {
         drawDecorations(style, canvas: canvas, avoid: cells + [textArea])
 
         // Footer text is laid out at a base size and scaled up so it reads well on a phone.
-        let footerScale: CGFloat = 1.3
         cg.saveGState()
         cg.translateBy(x: footerRect.midX, y: footerRect.minY)
         cg.scaleBy(x: footerScale, y: footerScale)
@@ -192,6 +242,22 @@ enum PhotoStripComposer {
         cg.restoreGState()
 
         return cg.makeImage()
+    }
+
+    private static func grid(_ area: CGRect, count: Int, columns: Int, gap: CGFloat) -> [CGRect] {
+        let rows = max(1, count / columns)
+        let w = (area.width - CGFloat(columns - 1) * gap) / CGFloat(columns)
+        let h = (area.height - CGFloat(rows - 1) * gap) / CGFloat(rows)
+        return (0..<count).map { i in
+            CGRect(x: area.minX + CGFloat(i % columns) * (w + gap), y: area.minY + CGFloat(i / columns) * (h + gap), width: w, height: h)
+        }
+    }
+
+    private static func cellAspect(_ area: CGRect, count: Int, columns: Int, gap: CGFloat) -> CGFloat {
+        let rows = max(1, count / columns)
+        let w = (area.width - CGFloat(columns - 1) * gap) / CGFloat(columns)
+        let h = (area.height - CGFloat(rows - 1) * gap) / CGFloat(rows)
+        return max(w, 1) / max(h, 1)
     }
 
     // MARK: - Photos
@@ -972,8 +1038,8 @@ final class StripPreviews: ObservableObject {
     private var task: Task<Void, Never>?
 
     /// Re-renders when the caption or the song changes; cheap to call repeatedly.
-    func update(caption: String, info: StripInfo) {
-        let newKey = "\(caption)|\(info.songTitle ?? "")|\(info.artist ?? "")"
+    func update(caption: String, info: StripInfo, shots: Int = 4, format: StripFormat = .strip) {
+        let newKey = "\(caption)|\(info.songTitle ?? "")|\(info.artist ?? "")|\(shots)|\(format.rawValue)"
         guard newKey != key else { return }
         key = newKey
         task?.cancel()
@@ -984,8 +1050,10 @@ final class StripPreviews: ObservableObject {
             info.caption = caption
             let rendered = await Task.detached(priority: .userInitiated) { [info] () -> [StripStyle: NSImage] in
                 var result: [StripStyle: NSImage] = [:]
+                let samples = PhotoStripComposer.samplePhotos
+                let photos = (0..<shots).map { samples[$0 % samples.count] }
                 for style in StripStyle.allCases {
-                    guard let full = PhotoStripComposer.compose(PhotoStripComposer.samplePhotos, style: style, info: info),
+                    guard let full = PhotoStripComposer.compose(photos, style: style, format: format, info: info),
                           let small = Self.downscaled(full, width: 400) else { continue }
                     result[style] = NSImage(cgImage: small, size: NSSize(width: small.width, height: small.height))
                 }

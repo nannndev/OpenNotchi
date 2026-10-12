@@ -82,7 +82,7 @@ struct MirrorView: View {
             .overlay(alignment: .top) {
                 if let shots = boothShots {
                     HStack(spacing: 6) {
-                        ForEach(0..<4, id: \.self) { i in
+                        ForEach(0..<settings.stripShots, id: \.self) { i in
                             Circle()
                                 .fill(i < shots.count ? Color.white : Color.white.opacity(0.3))
                                 .frame(width: 8, height: 8)
@@ -187,14 +187,16 @@ struct MirrorView: View {
         NSSound(named: "Tink")?.play()
     }
 
-    /// Four shots with a countdown before each, then a strip in the chosen style.
+    /// The chosen number of shots with a countdown before each, then a strip in the chosen style and format.
     private func startPhotobox() {
         guard countdown == nil, !boothBusy else { return }
         boothBusy = true
         boothShots = []
         Task { @MainActor in
-            for i in 0..<4 {
+            let total = settings.stripShots
+            for i in 0..<total {
                 await countdownAndShoot(from: i == 0 ? 3 : 2)
+                if media.isDemo { captured(PhotoStripComposer.samplePhotos[i % PhotoStripComposer.samplePhotos.count]) }
                 // Wait for the frame to come back from the camera.
                 for _ in 0..<20 where (boothShots?.count ?? 0) <= i {
                     try? await Task.sleep(for: .milliseconds(50))
@@ -204,9 +206,10 @@ struct MirrorView: View {
             let shots = boothShots ?? []
             withAnimation { boothShots = nil }
             let style = settings.stripStyle
+            let format = settings.stripFormat
             let info = StripInfo(caption: settings.stripCaption, media: media)
             let url = await Task.detached(priority: .userInitiated) {
-                PhotoStripComposer.compose(shots, style: style, info: info).flatMap { MirrorPhotos.save($0, name: "Photobox") }
+                PhotoStripComposer.compose(shots, style: style, format: format, info: info).flatMap { MirrorPhotos.save($0, name: "Photobox") }
             }.value
             boothBusy = false
             if let url { photoSaved(url) }
@@ -246,61 +249,107 @@ private struct StripPicker: View {
     let onClose: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Thumbnails are sized to the mirror's height so whole strips and their names stay visible.
-            GeometryReader { geo in
-                ScrollViewReader { proxy in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(alignment: .bottom, spacing: 12) {
-                            ForEach(StripStyle.allCases) { style in
-                                chip(style, height: max(40, geo.size.height - 30)).id(style)
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .frame(height: geo.size.height)
+        VStack(spacing: 8) {
+            // Format, number of photos and text on one line, so the strips get the rest of the height.
+            HStack(spacing: 10) {
+                Menu {
+                    Picker("Format", selection: $settings.stripFormat) {
+                        ForEach(StripFormat.allCases) { Label($0.displayName, systemImage: $0.icon).tag($0) }
                     }
-                    .onAppear { proxy.scrollTo(settings.stripStyle, anchor: .center) }
+                    .pickerStyle(.inline)
+                } label: {
+                    Label(settings.stripFormat.displayName, systemImage: settings.stripFormat.icon)
+                        .font(.system(size: 11, weight: .semibold))
                 }
-            }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(.white.opacity(0.14)))
+                .help("Size of the picture: a classic strip, or ready for a story or post")
 
-            VStack(spacing: 8) {
-                Button(action: onStart) {
-                    Label("Start", systemImage: "camera.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(.white))
-                        .foregroundStyle(.black)
+                HStack(spacing: 3) {
+                    Image(systemName: "photo.on.rectangle").font(.system(size: 10)).foregroundStyle(.secondary)
+                    ForEach(StripShots.choices, id: \.self) { n in
+                        Button {
+                            settings.stripShots = n
+                        } label: {
+                            Text("\(n)")
+                                .font(.system(size: 11, weight: .bold).monospacedDigit())
+                                .frame(width: 22, height: 22)
+                                .background(Circle().fill(settings.stripShots == n ? Color.white : Color.white.opacity(0.12)))
+                                .foregroundStyle(settings.stripShots == n ? .black : .white)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.plain)
+                .help("Number of photos")
+
                 // Typed right here: a separate window would open behind the tall notch.
                 TextField("Your text", text: $settings.stripCaption)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11, weight: .medium))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 5)
-                    .frame(width: 120)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(.white.opacity(0.14)))
+                    .frame(maxWidth: 170)
+                    .background(Capsule().fill(.white.opacity(0.14)))
                     .onChange(of: settings.stripCaption) { _, value in
                         if value.count > 40 { settings.stripCaption = String(value.prefix(40)) }
                     }
                     .onSubmit(onStart)
-                Button(action: onClose) {
-                    Text("Cancel").font(.system(size: 11)).foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+
+                Spacer(minLength: 0)
             }
-            .padding(.trailing, 14)
+            .padding(.horizontal, 14)
+
+            HStack(spacing: 12) {
+                // Thumbnails are sized to the mirror's height so whole strips and their names stay visible.
+                GeometryReader { geo in
+                    ScrollViewReader { proxy in
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(alignment: .bottom, spacing: 12) {
+                                ForEach(StripStyle.allCases) { style in
+                                    chip(style, height: max(30, geo.size.height - 22)).id(style)
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .frame(height: geo.size.height)
+                        }
+                        .onAppear { proxy.scrollTo(settings.stripStyle, anchor: .center) }
+                    }
+                }
+
+                VStack(spacing: 8) {
+                    Button(action: onStart) {
+                        Label("Start", systemImage: "camera.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Capsule().fill(.white))
+                            .foregroundStyle(.black)
+                    }
+                    .buttonStyle(.plain)
+                    Button(action: onClose) {
+                        Text("Cancel").font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.trailing, 14)
+            }
         }
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.black.opacity(0.72))
         .onExitCommand(perform: onClose)
-        .onAppear { previews.update(caption: settings.stripCaption, info: StripInfo(media: media, sample: true)) }
-        .onChange(of: settings.stripCaption) { _, caption in
-            previews.update(caption: caption, info: StripInfo(media: media, sample: true))
-        }
+        .onAppear(perform: refreshPreviews)
+        .onChange(of: settings.stripCaption) { refreshPreviews() }
+        .onChange(of: settings.stripShots) { refreshPreviews() }
+        .onChange(of: settings.stripFormat) { refreshPreviews() }
+    }
+
+    private func refreshPreviews() {
+        previews.update(caption: settings.stripCaption, info: StripInfo(media: media, sample: true), shots: settings.stripShots, format: settings.stripFormat)
     }
 
     private func chip(_ style: StripStyle, height: CGFloat) -> some View {

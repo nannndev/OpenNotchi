@@ -35,7 +35,7 @@ struct PhotoboxSettings: View {
                         .frame(width: 300, height: 190, alignment: .bottom)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.primary.opacity(0.1)))
-                    Text("Preview with sample photos. Your strip is 1200 px wide, made for stories.")
+                    Text("Preview with sample photos. Pictures are 1200 px wide; Story, Post and Square are sized for Instagram.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -43,6 +43,13 @@ struct PhotoboxSettings: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
 
+        Picker("Format", selection: $settings.stripFormat) {
+            ForEach(StripFormat.allCases) { Label($0.displayName, systemImage: $0.icon).tag($0) }
+        }
+        Picker("Photos", selection: $settings.stripShots) {
+            ForEach(StripShots.choices, id: \.self) { Text("\($0)").tag($0) }
+        }
+        .pickerStyle(.segmented)
         TextField("Text on the strip", text: $settings.stripCaption, prompt: Text("Style's own title"))
             .onChange(of: settings.stripCaption) { _, value in
                 if value.count > 40 { settings.stripCaption = String(value.prefix(40)) }
@@ -52,6 +59,8 @@ struct PhotoboxSettings: View {
             .foregroundStyle(.secondary)
             .onAppear(perform: render)
             .onChange(of: settings.stripCaption) { render() }
+            .onChange(of: settings.stripShots) { render() }
+            .onChange(of: settings.stripFormat) { render() }
             .onChange(of: media.info?.title) { render() }
     }
 
@@ -83,6 +92,6 @@ struct PhotoboxSettings: View {
     }
 
     private func render() {
-        cache.update(caption: settings.stripCaption, info: StripInfo(media: media, sample: true))
+        cache.update(caption: settings.stripCaption, info: StripInfo(media: media, sample: true), shots: settings.stripShots, format: settings.stripFormat)
     }
 }

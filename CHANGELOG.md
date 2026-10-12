@@ -34,6 +34,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   previews, your strip text and a Start button
 - Six trending photobox styles: Receipt, Social Post, Player (with the song
   that's playing), Scrapbook, Coquette and Retro PC
+- Photobox takes 1, 2, 3, 4 or 6 photos, and makes a classic strip or a
+  picture sized for a Story (9:16), a Post (4:5) or a Square (1:1); the photos
+  are arranged in the grid that fits best
 - The Mirror tab stays open when the pointer leaves it (click elsewhere to
   close), and never closes in the middle of a countdown
 
