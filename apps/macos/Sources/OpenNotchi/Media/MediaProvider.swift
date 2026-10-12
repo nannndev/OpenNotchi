@@ -17,6 +17,9 @@ protocol MediaProvider: AnyObject {
 }
 
 extension MediaProvider {
+    /// Whether to offer this app as a launcher when nothing is playing.
+    var showsInLauncher: Bool { true }
+
     var appURL: URL? { NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) }
     var isInstalled: Bool { appURL != nil }
     var isRunning: Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty }

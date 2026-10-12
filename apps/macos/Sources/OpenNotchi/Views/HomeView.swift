@@ -10,7 +10,7 @@ struct HomeView: View {
         let showLyrics = settings.lyricsEnabled && settings.homeLyricsMode && media.info != nil
 
         HStack(spacing: NotchLayout.columnSpacing) {
-            ArtworkView(image: media.artwork, cornerRadius: 16)
+            artwork
                 .frame(width: 112, height: 112)
                 .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
                 .overlay(alignment: .bottomTrailing) {
@@ -74,6 +74,24 @@ private struct LyricsToggle: View {
         .help(isOn ? "Show player" : "Show lyrics")
         .onHover { hovering = $0 }
         .animation(.spring(response: 0.25), value: hovering)
+    }
+}
+
+extension HomeView {
+    /// Album art, or a live muted copy of the YouTube video when one is playing.
+    @ViewBuilder
+    var artwork: some View {
+        if settings.videoPreviewEnabled, let info = media.info, let videoID = info.videoID {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                VideoPreview(videoID: videoID, position: info.position(at: context.date), isPlaying: info.isPlaying)
+            }
+            .background(ArtworkView(image: media.artwork, cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            // Keeps clicks for the notch (the web view would swallow them).
+            .overlay(Color.clear.contentShape(Rectangle()))
+        } else {
+            ArtworkView(image: media.artwork, cornerRadius: 16)
+        }
     }
 }
 

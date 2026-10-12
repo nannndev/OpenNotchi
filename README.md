@@ -13,8 +13,10 @@ alternative to paid apps like NotchNook and Alcove.
 
 - **Notch that expands on hover**, matching the physical camera housing (falls
   back to a pill on displays without a notch)
-- **Now Playing** for **Spotify** and **Apple Music**: artwork, title/artist,
-  seekable progress bar, play/pause/next/previous
+- **Now Playing** for **Spotify**, **Apple Music** and **YouTube / YouTube Music**
+  in Chrome, Brave, Edge, Arc and Safari: artwork, title/artist, seekable
+  progress bar, play/pause/next/previous
+- **Live video preview** of the YouTube video right in the notch
 - **Synced lyrics** from [LRCLIB](https://lrclib.net) (free, no API key): a
   Lyrics tab that follows the song, plus the current line under the title on Home
 - **Live activity** while closed: artwork and waveform beside the notch
@@ -72,7 +74,9 @@ You can also open `apps/macos/Package.swift` in Xcode to edit the code. Run thro
 `make run` rather than Xcode, though: the app needs its `Info.plist` (from the
 `.app` bundle) for the Automation permission prompt.
 
-On first use macOS asks to let OpenNotchi control Spotify / Music. If you said
+On first use macOS asks to let OpenNotchi control Spotify / Music (and your
+browser, for YouTube). For YouTube, also turn on **Allow JavaScript from Apple
+Events** in the browser (Chrome: View → Developer; Safari: Develop menu). If you said
 no, re-enable it in **System Settings → Privacy & Security → Automation**.
 Ad-hoc signed debug builds may ask again after a rebuild.
 
@@ -117,7 +121,6 @@ and add it to `MediaManager.providers`.
 
 ## Roadmap
 
-- [ ] Browser / YouTube playback (system-wide Now Playing)
 - [ ] Multi-display support
 - [ ] Signed & notarized releases, Homebrew cask
 

@@ -18,6 +18,8 @@ final class AppSettings: ObservableObject {
     }
     @Published var spotifyEnabled: Bool { didSet { defaults.set(spotifyEnabled, forKey: "spotifyEnabled") } }
     @Published var appleMusicEnabled: Bool { didSet { defaults.set(appleMusicEnabled, forKey: "appleMusicEnabled") } }
+    @Published var youtubeEnabled: Bool { didSet { defaults.set(youtubeEnabled, forKey: "youtubeEnabled") } }
+    @Published var videoPreviewEnabled: Bool { didSet { defaults.set(videoPreviewEnabled, forKey: "videoPreviewEnabled") } }
     @Published var theme: NotchTheme {
         didSet {
             defaults.set(theme.rawValue, forKey: "theme")
@@ -93,6 +95,8 @@ final class AppSettings: ObservableObject {
             "showMenuBarIcon": true,
             "spotifyEnabled": true,
             "appleMusicEnabled": true,
+            "youtubeEnabled": true,
+            "videoPreviewEnabled": true,
             "hotKeyEnabled": true,
             "chargingPeekEnabled": true,
             "devicePeekEnabled": true,
@@ -122,6 +126,8 @@ final class AppSettings: ObservableObject {
         showMenuBarIcon = defaults.bool(forKey: "showMenuBarIcon")
         spotifyEnabled = defaults.bool(forKey: "spotifyEnabled")
         appleMusicEnabled = defaults.bool(forKey: "appleMusicEnabled")
+        youtubeEnabled = defaults.bool(forKey: "youtubeEnabled")
+        videoPreviewEnabled = defaults.bool(forKey: "videoPreviewEnabled")
         hotKeyEnabled = defaults.bool(forKey: "hotKeyEnabled")
         chargingPeekEnabled = defaults.bool(forKey: "chargingPeekEnabled")
         devicePeekEnabled = defaults.bool(forKey: "devicePeekEnabled")
@@ -183,7 +189,7 @@ final class AppSettings: ObservableObject {
         switch bundleID {
         case SpotifyProvider.bundleID: return spotifyEnabled
         case AppleMusicProvider.bundleID: return appleMusicEnabled
-        default: return true
+        default: return youtubeEnabled // browser YouTube providers
         }
     }
 }

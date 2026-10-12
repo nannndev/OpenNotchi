@@ -6,6 +6,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- YouTube and YouTube Music in Chrome, Brave, Edge, Arc and Safari: title,
+  channel, thumbnail, progress and playback controls
+- Live video preview: a muted copy of the YouTube video plays in the notch,
+  in sync with the browser, while the notch is open
+
 ## [0.2.0] - 2026-10-12
 
 ### Added

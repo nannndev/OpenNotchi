@@ -11,6 +11,8 @@ struct NowPlayingInfo: Equatable {
     var isPlaying: Bool
     var artworkURL: URL?
     var sourceID: String
+    /// YouTube video ID when the source is a YouTube video (used for the live preview).
+    var videoID: String? = nil
     var timestamp = Date()
 
     var trackKey: String { "\(sourceID)|\(title)|\(artist)|\(album)" }

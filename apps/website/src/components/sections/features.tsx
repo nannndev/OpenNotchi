@@ -3,7 +3,7 @@ import { CloudSun, Clipboard, Inbox, MessageSquareQuote, Music, Palette, Sparkle
 import { Card, CardContent } from "@/components/ui/card"
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
-  { icon: Music, title: "Now Playing", body: "Spotify and Apple Music with artwork, a seekable progress bar and controls." },
+  { icon: Music, title: "Now Playing", body: "Spotify, Apple Music and YouTube, with a live video preview, seekable progress and controls." },
   { icon: MessageSquareQuote, title: "Synced lyrics", body: "Lines light up as they're sung. Tap one to jump there in the song." },
   { icon: Inbox, title: "File tray", body: "Drop files on the notch to park them, then drag them out wherever you need." },
   { icon: Wifi, title: "AirDrop", body: "Drop a file on the AirDrop zone and it's on its way to a nearby device." },

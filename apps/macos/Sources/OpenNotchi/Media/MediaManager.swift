@@ -9,7 +9,7 @@ final class MediaManager: ObservableObject {
     }
     @Published private(set) var palette: ArtworkPalette?
 
-    let providers: [MediaProvider] = [AppleMusicProvider(), SpotifyProvider()]
+    let providers: [MediaProvider] = [AppleMusicProvider(), SpotifyProvider()] + BrowserYouTubeProvider.all
 
     private let settings: AppSettings
     private var timer: Timer?
@@ -40,8 +40,14 @@ final class MediaManager: ObservableObject {
         refresh()
     }
 
+    /// Music apps offered as launchers when nothing is playing.
     var installedProviders: [MediaProvider] {
-        providers.filter(\.isInstalled)
+        providers.filter { $0.showsInLauncher && $0.isInstalled }
+    }
+
+    /// Browsers with a YouTube tab that refused to run JavaScript.
+    var browsersNeedingJavaScript: [String] {
+        BrowserYouTubeProvider.all.filter { $0.isRunning && $0.needsJavaScriptPermission }.map(\.displayName)
     }
 
     @objc private func playerStateChanged() {
