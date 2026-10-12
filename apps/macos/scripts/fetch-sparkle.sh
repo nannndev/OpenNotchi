@@ -14,7 +14,7 @@ fi
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-echo "Downloading Sparkle $VERSION…"
+echo "Downloading Sparkle ${VERSION}..."
 curl -fsSL -o "$TMP/sparkle.zip" "https://github.com/sparkle-project/Sparkle/releases/download/$VERSION/Sparkle-for-Swift-Package-Manager.zip"
 echo "$SHA256  $TMP/sparkle.zip" | shasum -a 256 -c - >/dev/null
 
