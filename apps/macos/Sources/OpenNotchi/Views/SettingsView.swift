@@ -267,9 +267,14 @@ private struct FeaturesPane: View {
                 Toggle("Volume & brightness HUD in the notch", isOn: $settings.hudEnabled)
                 if settings.hudEnabled && !accessibilityGranted {
                     HStack {
-                        Label("Needs Accessibility permission to catch the volume and brightness keys.", systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label("Needs Accessibility permission to catch the volume and brightness keys.", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            // Unsigned builds look like a new app to macOS after every update.
+                            Text("Already switched on? Select OpenNotchi, remove it with −, then add it again with +.")
+                                .foregroundStyle(.secondary)
+                        }
+                        .font(.caption)
                         Spacer()
                         Button("Open Settings") {
                             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
