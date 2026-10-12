@@ -5,6 +5,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case appearance = "Appearance"
     case features = "Features"
     case media = "Media"
+    case mirror = "Mirror"
     case about = "About"
 
     var id: String { rawValue }
@@ -15,6 +16,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: return "paintpalette.fill"
         case .features: return "square.grid.2x2.fill"
         case .media: return "music.note"
+        case .mirror: return "camera.fill"
         case .about: return "info.circle.fill"
         }
     }
@@ -25,6 +27,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: return .pink
         case .features: return .blue
         case .media: return .red
+        case .mirror: return .teal
         case .about: return .indigo
         }
     }
@@ -59,6 +62,7 @@ struct SettingsView: View {
                 case .appearance: AppearancePane()
                 case .features: FeaturesPane()
                 case .media: MediaPane()
+                case .mirror: MirrorPane()
                 case .about: AboutPane()
                 }
             }
@@ -283,15 +287,6 @@ private struct FeaturesPane: View {
                     }
                 }
             }
-            Section("Photobox") {
-                Picker("Strip style", selection: $settings.stripStyle) {
-                    ForEach(StripStyle.allCases) { Text($0.displayName).tag($0) }
-                }
-                TextField("Text on the strip", text: $settings.stripCaption, prompt: Text("Style's own title"))
-                Text("Open the Mirror tab and press the photobox button, or pick a style from the strip swatch there.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
             Section("Reminders") {
                 MeetingReminderSettings()
             }
@@ -320,6 +315,31 @@ private struct FeaturesPane: View {
         }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
             accessibilityGranted = MediaKeyInterceptor.isTrusted
+        }
+    }
+}
+
+private struct MirrorPane: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section("Photobox") {
+                PhotoboxSettings()
+            }
+            Section("Mirror") {
+                Picker("Look", selection: $settings.mirrorEffect) {
+                    ForEach(MirrorEffect.allCases) { Text($0.displayName).tag($0) }
+                }
+                Picker("Background", selection: $settings.mirrorBackground) {
+                    ForEach(MirrorBackground.allCases) { Text($0.displayName).tag($0) }
+                }
+                Toggle("Ring light", isOn: $settings.mirrorRingLight)
+                Toggle("Hand gestures: ✌️ photo, 👍 confetti, ✋ ring light", isOn: $settings.mirrorGestures)
+                Text("Gestures and backgrounds are recognized on your Mac with Apple's Vision framework. Nothing leaves your Mac, and the camera only runs while the Mirror tab is open.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }

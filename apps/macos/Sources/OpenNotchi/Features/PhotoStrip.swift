@@ -60,6 +60,23 @@ struct StripInfo {
 enum PhotoStripComposer {
     private static let ciContext = CIContext()
 
+    /// Placeholder portraits for previews: soft silhouettes on colorful backdrops.
+    static let samplePhotos: [CGImage] = [(0.02, 0.08), (0.55, 0.62), (0.9, 0.97), (0.33, 0.42)].compactMap { hues in
+        let w = 800, h = 600
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let gradient = CGGradient(colorsSpace: space, colors: [
+                  NSColor(hue: hues.0, saturation: 0.45, brightness: 0.95, alpha: 1).cgColor,
+                  NSColor(hue: hues.1, saturation: 0.6, brightness: 0.55, alpha: 1).cgColor,
+              ] as CFArray, locations: nil) else { return nil }
+        ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: h), end: CGPoint(x: w, y: 0), options: [])
+        ctx.setFillColor(NSColor(white: 1, alpha: 0.85).cgColor)
+        ctx.fillEllipse(in: CGRect(x: 310, y: 230, width: 180, height: 210))  // head
+        ctx.fillEllipse(in: CGRect(x: 200, y: -170, width: 400, height: 380)) // shoulders
+        return ctx.makeImage()
+    }
+
     static func compose(_ photos: [CGImage], style: StripStyle, info: StripInfo) -> CGImage? {
         guard !photos.isEmpty else { return nil }
         let photos = photos.map { filtered($0, style: style) }

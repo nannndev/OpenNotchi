@@ -29,6 +29,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   styles (Classic, Midnight, Film, Polaroid, Y2K, Sakura, Retro, Newspaper,
   Neon, Pastel Grid, Love and Now Playing), saved and dropped into the Tray.
   Write your own text on the strip, or keep each style's title
+- Mirror pane in Settings with live previews of every photobox style
 
 ### Changed
 - The location in Settings is shared by weather and prayer times
