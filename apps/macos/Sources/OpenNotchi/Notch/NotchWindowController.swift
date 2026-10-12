@@ -71,11 +71,24 @@ final class NotchWindowController: NSObject {
     static let commandNotification = Notification.Name("io.github.opennotchi.command")
 
     @objc private func handleCommand(_ note: Notification) {
+        // "theme-aurora", "border-rainbow": switch looks without opening Settings (demos, screenshots).
+        if let command = note.object as? String {
+            if command.hasPrefix("theme-"), let theme = NotchTheme(rawValue: String(command.dropFirst(6))) {
+                AppSettings.shared.theme = theme
+                return
+            }
+            if command.hasPrefix("border-"), let border = BorderStyle(rawValue: String(command.dropFirst(7))) {
+                AppSettings.shared.borderStyle = border
+                return
+            }
+        }
         switch note.object as? String {
         case "open": viewModel.open()
         case "close": viewModel.close()
         case "toggle": viewModel.toggle()
         case "settings": AppDelegate.shared?.showSettings()
+        case "pin": viewModel.pinned = true
+        case "unpin": viewModel.pinned = false
         case "demo-on": AppDelegate.shared?.media.startDemo()
         case "demo-off": AppDelegate.shared?.media.stopDemo()
         // Previews for the live activities, handy when designing them.

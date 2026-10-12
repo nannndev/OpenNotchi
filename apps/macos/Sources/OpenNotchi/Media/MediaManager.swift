@@ -78,12 +78,20 @@ final class MediaManager: ObservableObject {
     /// A soft monochrome "album cover" drawn in code.
     private static func demoArtwork() -> NSImage {
         NSImage(size: NSSize(width: 600, height: 600), flipped: false) { rect in
-            NSGradient(colors: [NSColor(white: 0.32, alpha: 1), NSColor(white: 0.05, alpha: 1)])?
-                .draw(in: rect, angle: -60)
-            NSGradient(colors: [NSColor(white: 1, alpha: 0.85), NSColor(white: 1, alpha: 0)])?
-                .draw(fromCenter: NSPoint(x: 420, y: 450), radius: 0, toCenter: NSPoint(x: 420, y: 450), radius: 170, options: [])
-            NSGradient(colors: [NSColor(white: 0.6, alpha: 0.5), NSColor(white: 0.6, alpha: 0)])?
-                .draw(fromCenter: NSPoint(x: 160, y: 140), radius: 0, toCenter: NSPoint(x: 160, y: 140), radius: 260, options: [])
+            // A night drive into the sunset: colorful, so the album-art theme has something to show.
+            NSGradient(colors: [
+                NSColor(red: 0.12, green: 0.08, blue: 0.32, alpha: 1),
+                NSColor(red: 0.55, green: 0.12, blue: 0.42, alpha: 1),
+                NSColor(red: 0.98, green: 0.45, blue: 0.25, alpha: 1),
+            ])?.draw(in: rect, angle: -90)
+            NSGradient(colors: [NSColor(red: 1, green: 0.85, blue: 0.45, alpha: 1), NSColor(red: 1, green: 0.55, blue: 0.3, alpha: 0)])?
+                .draw(fromCenter: NSPoint(x: 300, y: 190), radius: 0, toCenter: NSPoint(x: 300, y: 190), radius: 150, options: [])
+            NSColor(red: 0.08, green: 0.05, blue: 0.2, alpha: 1).setFill()
+            NSBezierPath(rect: NSRect(x: 0, y: 0, width: 600, height: 120)).fill()
+            NSColor(red: 1, green: 0.8, blue: 0.5, alpha: 0.9).setFill()
+            for x in stride(from: 40.0, to: 600, by: 90) {
+                NSBezierPath(rect: NSRect(x: x, y: 58, width: 46, height: 6)).fill() // road markings
+            }
             return true
         }
     }

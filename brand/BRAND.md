@@ -85,3 +85,20 @@ real album art, videos or personal data. To refresh it:
    `brand/social/og.png`. Bump `?v=` on the `og:image` URL in
    `apps/website/index.html` so feeds fetch the new image.
 5. Post `demo-off` when done.
+
+### Showcase video
+
+`marketing/showcase.mp4` (1920×1080, 60 fps, 40 s, not committed) is rendered
+from captures of the real app:
+
+1. Post `demo-on` and `pin` (keeps the notch open), then capture the notch window
+   for `closed-music`, `home` (`player`), `lyrics`, `markets`, `mirror` and
+   `picker` (`photobox`, wait for the previews), then `unpin` and capture
+   `meeting`, `prayer` (`peek-meeting`, `peek-prayer`) and the `peek-*` live
+   activities. Capture `theme-<name>.png` for albumArt, adaptive, aurora,
+   midnight and classic with the `theme-<name>` command. Set the weather place
+   to a plain city name first; it shows on the prayer banner.
+2. `swiftc -O -o render brand/marketing/video.swift` (copy it to `main.swift`
+   first), then `./render <shots> apps/website/public/photobox brand/marketing/showcase.mp4`.
+3. Post `demo-off` and restore any settings you changed.
+

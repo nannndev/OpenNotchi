@@ -96,15 +96,18 @@ final class NotchViewModel: ObservableObject {
 
     /// The Mirror tab stays open when the pointer leaves; a click elsewhere closes it.
     private var staysOpenOnHoverExit: Bool {
-        isOpen && tab == .mirror && settings.mirrorStaysOpen
+        isOpen && (pinned || (tab == .mirror && settings.mirrorStaysOpen))
     }
+
+    /// Keeps the notch open regardless of the pointer (the `pin` command, for demos and screenshots).
+    var pinned = false
 
     /// Set while something must not be interrupted, like a photobox countdown.
     @Published var holdOpen = false
 
     /// A click in another app closes the notch, unless it's being held open.
     func clickedOutside() {
-        guard !holdOpen else { return }
+        guard !holdOpen, !pinned else { return }
         close()
     }
 

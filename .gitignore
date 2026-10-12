@@ -10,3 +10,6 @@ website/.vercel/
 .claude/
 .vite/
 apps/macos/Vendor/
+
+# Rendered marketing video (large; render with brand/marketing/video.swift)
+brand/marketing/*.mp4
