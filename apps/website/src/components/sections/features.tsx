@@ -1,5 +1,5 @@
 import { motion } from "motion/react"
-import { AirplayIcon, CandlestickChart, Clipboard, CloudSun, Inbox, MessageSquareQuote, Music, Palette, Smartphone, Sparkles, Timer, Wifi, type LucideIcon } from "lucide-react"
+import { AirplayIcon, CalendarClock, Camera, CandlestickChart, Clipboard, CloudSun, Inbox, MessageSquareQuote, MoonStar, Music, Palette, ScanFace, ShieldCheck, Smartphone, Sparkles, Timer, type LucideIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
@@ -7,14 +7,18 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   { icon: AirplayIcon, title: "Live video preview", body: "The YouTube video you're watching plays along in the notch, muted and in sync." },
   { icon: MessageSquareQuote, title: "Synced lyrics", body: "Flip the player into lyrics mode. Lines light up as they're sung; tap one to jump there." },
   { icon: Smartphone, title: "Spotify on any device", body: "Playing on your iPhone or speaker? Connect Spotify to see it, read along and skip from your Mac." },
+  { icon: Camera, title: "Photobox", body: "Snap 1 to 6 photos into 18 trending frames, as a strip or sized for a story, post or square." },
+  { icon: ScanFace, title: "Mirror", body: "An HD mirror with looks, a ring light, portrait blur, album-art backgrounds and hand gestures." },
+  { icon: CalendarClock, title: "Meeting reminders", body: "A heads-up drops out of the notch before each event, with one-click Join for Zoom, Meet and Teams." },
+  { icon: MoonStar, title: "Prayer times", body: "The next prayer in the header and a reminder at each one. Kemenag, MWL, ISNA and more." },
   { icon: CandlestickChart, title: "Markets", body: "Your own watchlist of Indonesian and global stocks, indices, crypto and currencies." },
-  { icon: Inbox, title: "File tray", body: "Drop files on the notch to park them, then drag them out wherever you need." },
-  { icon: Wifi, title: "AirDrop", body: "Drop a file on the AirDrop zone and it's on its way to a nearby device." },
+  { icon: Inbox, title: "Tray & AirDrop", body: "Park files on the notch with real thumbnails, or AirDrop them and watch the progress." },
   { icon: Clipboard, title: "Clipboard history", body: "Search and re-copy recent text and images. Password-manager copies are skipped." },
   { icon: Sparkles, title: "Live activities", body: "Charging, AirPods battery and a volume & brightness HUD, right beside the notch." },
   { icon: CloudSun, title: "Weather & calendar", body: "Today's weather, your next events and battery level, at a glance." },
-  { icon: Timer, title: "Timer & mirror", body: "Pomodoro countdowns that stay visible, and a quick camera mirror." },
+  { icon: Timer, title: "Timer", body: "Pomodoro countdowns that stay visible beside the notch, with a sound when they're done." },
   { icon: Palette, title: "Make it yours", body: "Liquid Glass and music-adaptive themes, custom shortcut, and updates that install themselves." },
+  { icon: ShieldCheck, title: "Private by design", body: "Gestures, portrait blur and prayer times run on your Mac. No account, no tracking." },
 ]
 
 const THEMES = [

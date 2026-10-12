@@ -6,6 +6,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-12
+
 ### Added
 - Meeting reminders: a banner drops out of the notch before calendar events
   (1 to 15 minutes, or off), with a Join button for Zoom, Google Meet, Teams,

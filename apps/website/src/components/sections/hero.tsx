@@ -33,8 +33,8 @@ export function Hero() {
       </motion.h1>
 
       <motion.p {...rise(0.16)} className="mx-auto mt-6 max-w-xl text-[clamp(16px,2vw,19px)] leading-relaxed text-neutral-300">
-        OpenNotchi turns the MacBook notch into a little hub for your music, synced lyrics, files, AirDrop, clipboard and
-        timers. Hover the notch at the top of this page to try it.
+        OpenNotchi turns the MacBook notch into a little hub for your music, synced lyrics, files, AirDrop, meetings and a
+        photobooth. Hover the notch at the top of this page to try it.
       </motion.p>
 
       <motion.div {...rise(0.24)} className="mt-9 flex flex-wrap justify-center gap-3">

@@ -18,6 +18,7 @@ export function SiteNav() {
         <nav className="flex items-center gap-1 sm:gap-2">
           {[
             ["Features", "#features"],
+            ["Photobox", "#photobox"],
             ["Install", "#install"],
             ["Download", "#download"],
             ["Support", "#support"],
