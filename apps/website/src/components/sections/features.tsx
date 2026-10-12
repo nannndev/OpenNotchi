@@ -1,15 +1,19 @@
 import { motion } from "motion/react"
-import { CloudSun, Clipboard, Inbox, MessageSquareQuote, Music, Palette, Sparkles, Wifi, type LucideIcon } from "lucide-react"
+import { AirplayIcon, CandlestickChart, Clipboard, CloudSun, Inbox, MessageSquareQuote, Music, Palette, Smartphone, Sparkles, Timer, Wifi, type LucideIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
-  { icon: Music, title: "Now Playing", body: "Spotify, Apple Music and YouTube, with a live video preview, seekable progress and controls." },
-  { icon: MessageSquareQuote, title: "Synced lyrics", body: "Lines light up as they're sung. Tap one to jump there in the song." },
+  { icon: Music, title: "Now Playing", body: "Spotify, Apple Music and YouTube in your browser, with artwork, seekable progress and controls." },
+  { icon: AirplayIcon, title: "Live video preview", body: "The YouTube video you're watching plays along in the notch, muted and in sync." },
+  { icon: MessageSquareQuote, title: "Synced lyrics", body: "Flip the player into lyrics mode. Lines light up as they're sung; tap one to jump there." },
+  { icon: Smartphone, title: "Spotify on any device", body: "Playing on your iPhone or speaker? Connect Spotify to see it, read along and skip from your Mac." },
+  { icon: CandlestickChart, title: "Markets", body: "Your own watchlist of Indonesian and global stocks, indices, crypto and currencies." },
   { icon: Inbox, title: "File tray", body: "Drop files on the notch to park them, then drag them out wherever you need." },
   { icon: Wifi, title: "AirDrop", body: "Drop a file on the AirDrop zone and it's on its way to a nearby device." },
   { icon: Clipboard, title: "Clipboard history", body: "Search and re-copy recent text and images. Password-manager copies are skipped." },
-  { icon: Sparkles, title: "Live activities", body: "Timers, charging, AirPods battery and a volume & brightness HUD, right beside the notch." },
+  { icon: Sparkles, title: "Live activities", body: "Charging, AirPods battery and a volume & brightness HUD, right beside the notch." },
   { icon: CloudSun, title: "Weather & calendar", body: "Today's weather, your next events and battery level, at a glance." },
+  { icon: Timer, title: "Timer & mirror", body: "Pomodoro countdowns that stay visible, and a quick camera mirror." },
   { icon: Palette, title: "Make it yours", body: "Liquid Glass and music-adaptive themes, custom shortcut, and updates that install themselves." },
 ]
 

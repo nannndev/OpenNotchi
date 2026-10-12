@@ -62,6 +62,8 @@ const PERMISSIONS = [
   ["Location", "Weather for where you are", "Only if you choose “Use my location”"],
   ["Camera", "Mirror tab", "Only when you open Mirror"],
   ["Accessibility", "Volume & brightness HUD in the notch", "Only if you turn the HUD on"],
+  ["Browser JavaScript", "YouTube in Chrome, Brave, Edge, Arc or Safari", "Turn on “Allow JavaScript from Apple Events” in the browser"],
+  ["Spotify account", "Spotify playing on your iPhone or speaker", "Optional: Settings → Media → Connect Spotify"],
 ]
 
 export function InstallGuide() {
@@ -123,6 +125,12 @@ export function InstallGuide() {
             <p className="mb-5 text-sm text-neutral-400">
               OpenNotchi only asks for what a feature needs, when you use it. You can change any of these later in{" "}
               <b className="text-neutral-200">System Settings → Privacy &amp; Security</b>.
+            </p>
+            <p className="mb-5 text-sm text-neutral-400">
+              For YouTube, the browser has to allow it once: in Chrome, Brave, Edge or Arc open{" "}
+              <b className="text-neutral-200">View → Developer → Allow JavaScript from Apple Events</b>; in Safari turn on{" "}
+              <b className="text-neutral-200">Settings → Advanced → Show features for web developers</b>, then{" "}
+              <b className="text-neutral-200">Develop → Allow JavaScript from Apple Events</b>.
             </p>
             <div className="overflow-hidden rounded-2xl border border-white/10">
               {PERMISSIONS.map(([name, why, when], i) => (
