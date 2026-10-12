@@ -1,19 +1,12 @@
-import { Download as DownloadIcon, FileArchive } from "lucide-react"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { ArrowRight, Download as DownloadIcon, FileArchive } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { formatSize, useLatestRelease } from "@/hooks/use-github"
+import { formatCount, formatSize, useDownloadCount, useLatestRelease } from "@/hooks/use-github"
 import { CHANGELOG_URL, LATEST_DMG_URL, LATEST_ZIP_URL, RELEASES_URL, REPO_URL } from "@/lib/site"
-
-const STEPS = [
-  <><b>Open</b> the .dmg and drag OpenNotchi into Applications.</>,
-  <><b>Launch</b> it. It isn't notarized yet, so macOS blocks the first launch.</>,
-  <>Go to <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b>.</>,
-  <>Hover your notch. Allow Spotify/Music access when asked.</>,
-]
 
 export function Download() {
   const { data: release, error } = useLatestRelease()
+  const downloads = useDownloadCount()
   const versioned = (ext: string) => release?.assets.find((a) => a.name.startsWith("OpenNotchi-") && a.name.endsWith(ext))
   const dmg = versioned(".dmg")
   const zip = versioned(".zip")
@@ -58,36 +51,24 @@ export function Download() {
           <a className="underline-offset-4 hover:text-foreground hover:underline" href={REPO_URL} target="_blank" rel="noopener">Source code</a>
         </p>
 
+        {downloads !== null && downloads > 0 && (
+          <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm">
+            <DownloadIcon className="size-4 text-neutral-400" />
+            <span className="font-display font-bold tabular-nums">{formatCount(downloads)}</span>
+            <span className="text-muted-foreground">downloads so far</span>
+          </div>
+        )}
+
         <Separator className="my-10 bg-white/10" />
 
-        <ol className="mx-auto grid max-w-md gap-3.5 text-left">
-          {STEPS.map((step, i) => (
-            <li key={i} className="flex gap-3.5 text-sm leading-relaxed text-neutral-300 [&_b]:font-semibold [&_b]:text-white">
-              <span className="font-display grid size-[26px] shrink-0 place-items-center rounded-full bg-white/10 text-[13px] font-bold text-white">
-                {i + 1}
-              </span>
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
-
-        <Accordion type="single" collapsible className="mx-auto mt-8 max-w-md text-left">
-          <AccordionItem value="build" className="border-white/10">
-            <AccordionTrigger className="text-muted-foreground">Prefer to build it yourself?</AccordionTrigger>
-            <AccordionContent>
-              <pre className="overflow-x-auto rounded-xl border border-white/10 bg-black p-4 font-mono text-[13px] leading-relaxed text-neutral-300">
-                {`git clone ${REPO_URL}.git\ncd OpenNotchi\nmake install`}
-              </pre>
-            </AccordionContent>
-          </AccordionItem>
-          <AccordionItem value="requirements" className="border-white/10">
-            <AccordionTrigger className="text-muted-foreground">Requirements</AccordionTrigger>
-            <AccordionContent className="text-muted-foreground">
-              macOS 14 Sonoma or later. Works best on a MacBook with a notch; other displays get a floating pill.
-              Liquid Glass themes need macOS 26.
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+        <p className="text-sm text-neutral-400">
+          Open the .dmg, drag OpenNotchi into Applications, then allow it once in Privacy &amp; Security.
+        </p>
+        <Button variant="link" asChild className="mt-1 text-white">
+          <a href="#install">
+            Step-by-step install guide <ArrowRight className="size-4" />
+          </a>
+        </Button>
       </div>
     </section>
   )

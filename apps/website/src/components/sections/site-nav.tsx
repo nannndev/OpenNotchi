@@ -18,8 +18,9 @@ export function SiteNav() {
         <nav className="flex items-center gap-1 sm:gap-2">
           {[
             ["Features", "#features"],
+            ["Install", "#install"],
             ["Download", "#download"],
-            ["Contributors", "#contributors"],
+            ["Support", "#support"],
           ].map(([label, href]) => (
             <Button key={href} variant="ghost" size="sm" asChild className="hidden text-muted-foreground lg:inline-flex">
               <a href={href}>{label}</a>

@@ -2,7 +2,7 @@ import { motion } from "motion/react"
 import { AppleIcon, GitHubIcon } from "@/components/icons"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { useLatestRelease } from "@/hooks/use-github"
+import { formatCount, useDownloadCount, useLatestRelease } from "@/hooks/use-github"
 import { LATEST_DMG_URL, REPO_URL } from "@/lib/site"
 
 const rise = (delay: number) => ({
@@ -13,6 +13,7 @@ const rise = (delay: number) => ({
 
 export function Hero() {
   const { data: release } = useLatestRelease()
+  const downloads = useDownloadCount()
 
   return (
     <section className="relative mx-auto max-w-5xl px-4 pt-36 pb-20 text-center sm:pt-40">
@@ -52,7 +53,9 @@ export function Hero() {
       </motion.div>
 
       <motion.p {...rise(0.3)} className="mt-5 text-[13px] text-muted-foreground">
-        {release ? `${release.tag_name} · ` : ""}macOS 14 Sonoma or later · Apple Silicon &amp; Intel · MIT license
+        {release ? `${release.tag_name} · ` : ""}
+        {downloads ? `${formatCount(downloads)} downloads · ` : ""}
+        macOS 14 or later · Apple Silicon &amp; Intel · MIT license
       </motion.p>
     </section>
   )
