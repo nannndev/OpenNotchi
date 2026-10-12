@@ -17,3 +17,6 @@ edit them by hand.
 
 Deployed on Vercel with **Root Directory** set to `apps/website`. Vercel detects
 Vite automatically; `vercel.json` adds `/download` and `/github` redirects.
+Pushing to `main` deploys automatically. For a manual deploy, run `npx vercel --prod`
+from the **repo root** (running it here fails because Vercel appends the Root
+Directory again).
