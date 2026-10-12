@@ -72,17 +72,44 @@ enum MirrorEffect: String, CaseIterable, Identifiable {
     }
 }
 
+/// What's behind you in the mirror. Blur and album art cut you out with Vision's person segmentation.
+enum MirrorBackground: String, CaseIterable, Identifiable {
+    case none, blur, album
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none: return "Original background"
+        case .blur: return "Portrait blur"
+        case .album: return "Album art of the song playing"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .none: return "person.crop.rectangle"
+        case .blur: return "person.crop.rectangle.fill"
+        case .album: return "music.note.house.fill"
+        }
+    }
+}
+
 /// Mirrored camera preview at the camera's best resolution. The session runs only while the view is on screen.
 struct CameraPreview: NSViewRepresentable {
     var effect: MirrorEffect = .natural
     var ringLight = false
-    var portrait = false
+    var background: MirrorBackground = .none
+    /// Artwork used by the album background; it gently pulses while music plays.
+    var artwork: CGImage?
+    var musicPlaying = false
     var gesturesEnabled = false
     var cameraID: String = ""
     /// Bumped by the view to request a photo.
     var captureRequest = 0
     var onGesture: (MirrorGesture) -> Void = { _ in }
-    var onPhoto: (URL) -> Void = { _ in }
+    /// A full-resolution frame with the current look, after `captureRequest` changes.
+    var onCapture: (CGImage) -> Void = { _ in }
 
     func makeNSView(context: Context) -> CameraPreviewView {
         let view = CameraPreviewView()
@@ -92,9 +119,9 @@ struct CameraPreview: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: CameraPreviewView, context: Context) {
-        nsView.update(effect: effect, ringLight: ringLight, portrait: portrait, gestures: gesturesEnabled)
+        nsView.update(effect: effect, ringLight: ringLight, background: background, artwork: artwork, musicPlaying: musicPlaying, gestures: gesturesEnabled)
         nsView.onGesture = onGesture
-        nsView.onPhoto = onPhoto
+        nsView.onCapture = onCapture
         nsView.requestCapture(captureRequest)
         nsView.switchCamera(to: cameraID)
     }
@@ -124,14 +151,17 @@ final class CameraPreviewView: NSView, AVCaptureVideoDataOutputSampleBufferDeleg
     private var targetPixels = CGSize(width: 640, height: 360)
     private var effect: MirrorEffect = .natural
     private var ringLight = false
-    private var portrait = false
+    private var background: MirrorBackground = .none
+    private var artwork: CGImage?
+    private var artworkImage: CIImage?
+    private var musicPlaying = false
     private var gestures = false
     private var pendingCapture = false
     private var currentCameraID: String?
     private var lastCaptureRequest: Int?
 
     var onGesture: (MirrorGesture) -> Void = { _ in }
-    var onPhoto: (URL) -> Void = { _ in }
+    var onCapture: (CGImage) -> Void = { _ in }
 
     // Vision work, done on the camera queue.
     private let segmentation: VNGeneratePersonSegmentationRequest = {
@@ -171,11 +201,16 @@ final class CameraPreviewView: NSView, AVCaptureVideoDataOutputSampleBufferDeleg
         lock.withLock { targetPixels = size }
     }
 
-    func update(effect: MirrorEffect, ringLight: Bool, portrait: Bool, gestures: Bool) {
+    func update(effect: MirrorEffect, ringLight: Bool, background: MirrorBackground, artwork: CGImage?, musicPlaying: Bool, gestures: Bool) {
         lock.withLock {
             self.effect = effect
             self.ringLight = ringLight
-            self.portrait = portrait
+            self.background = background
+            if artwork !== self.artwork {
+                self.artwork = artwork
+                artworkImage = artwork.map { CIImage(cgImage: $0) }
+            }
+            self.musicPlaying = musicPlaying
             self.gestures = gestures
         }
     }
@@ -246,9 +281,9 @@ final class CameraPreviewView: NSView, AVCaptureVideoDataOutputSampleBufferDeleg
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        let (target, effect, ringLight, portrait, gestures, capture) = lock.withLock {
+        let (target, effect, ringLight, background, artwork, playing, gestures, capture) = lock.withLock {
             defer { pendingCapture = false }
-            return (targetPixels, self.effect, self.ringLight, self.portrait, self.gestures, pendingCapture)
+            return (targetPixels, self.effect, self.ringLight, self.background, artworkImage, musicPlaying, self.gestures, pendingCapture)
         }
         frameCount &+= 1
 
@@ -257,8 +292,13 @@ final class CameraPreviewView: NSView, AVCaptureVideoDataOutputSampleBufferDeleg
             DispatchQueue.main.async { [weak self] in self?.onGesture(gesture) }
         }
 
-        let frame = look(for: CIImage(cvPixelBuffer: pixelBuffer), pixelBuffer: pixelBuffer, effect: effect, ringLight: ringLight, portrait: portrait)
-        if capture { savePhoto(frame) }
+        let frame = look(
+            for: CIImage(cvPixelBuffer: pixelBuffer), pixelBuffer: pixelBuffer, effect: effect, ringLight: ringLight,
+            background: background, artwork: artwork, musicPlaying: playing
+        )
+        if capture, let photo = context.createCGImage(frame, from: frame.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)) {
+            DispatchQueue.main.async { [weak self] in self?.onCapture(photo) }
+        }
 
         // Scale to fill the view and crop the center.
         let extent = frame.extent
@@ -278,11 +318,14 @@ final class CameraPreviewView: NSView, AVCaptureVideoDataOutputSampleBufferDeleg
     }
 
     /// The full-resolution, mirrored frame with portrait blur, ring light and the selected look.
-    private func look(for source: CIImage, pixelBuffer: CVPixelBuffer, effect: MirrorEffect, ringLight: Bool, portrait: Bool) -> CIImage {
+    private func look(
+        for source: CIImage, pixelBuffer: CVPixelBuffer, effect: MirrorEffect, ringLight: Bool,
+        background: MirrorBackground, artwork: CIImage?, musicPlaying: Bool
+    ) -> CIImage {
         let extent = source.extent
         var image = source
 
-        if portrait {
+        if background != .none {
             // Segment every other frame and reuse the mask in between.
             if frameCount % 2 == 0 || lastMask == nil {
                 let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
@@ -295,13 +338,18 @@ final class CameraPreviewView: NSView, AVCaptureVideoDataOutputSampleBufferDeleg
                 }
             }
             if let mask = lastMask {
-                let background = image
-                    .clampedToExtent()
-                    .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 22])
-                    .cropped(to: extent)
-                    .applyingFilter("CIColorControls", parameters: [kCIInputBrightnessKey: -0.04])
+                let backdrop: CIImage
+                if background == .album, let artwork {
+                    backdrop = albumBackdrop(artwork, extent: extent, musicPlaying: musicPlaying)
+                } else {
+                    backdrop = image
+                        .clampedToExtent()
+                        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 22])
+                        .cropped(to: extent)
+                        .applyingFilter("CIColorControls", parameters: [kCIInputBrightnessKey: -0.04])
+                }
                 image = image.applyingFilter("CIBlendWithMask", parameters: [
-                    kCIInputBackgroundImageKey: background,
+                    kCIInputBackgroundImageKey: backdrop,
                     kCIInputMaskImageKey: mask,
                 ])
             }
@@ -318,17 +366,21 @@ final class CameraPreviewView: NSView, AVCaptureVideoDataOutputSampleBufferDeleg
         return effect.apply(to: image).cropped(to: image.extent)
     }
 
-    /// Saves the frame as a JPEG in ~/Pictures/OpenNotchi.
-    private func savePhoto(_ image: CIImage) {
-        let folder = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0].appendingPathComponent("OpenNotchi")
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-        let url = folder.appendingPathComponent("Mirror \(formatter.string(from: .now)).jpg")
-
-        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
-              (try? context.writeJPEGRepresentation(of: image, to: url, colorSpace: colorSpace, options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.92])) != nil
-        else { return }
-        DispatchQueue.main.async { [weak self] in self?.onPhoto(url) }
+    /// The artwork filling the frame, softly blurred, breathing slowly while music plays.
+    private func albumBackdrop(_ artwork: CIImage, extent: CGRect, musicPlaying: Bool) -> CIImage {
+        let scale = max(extent.width / artwork.extent.width, extent.height / artwork.extent.height)
+        let scaled = artwork.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        let centered = scaled.transformed(by: CGAffineTransform(
+            translationX: extent.midX - scaled.extent.midX,
+            y: extent.midY - scaled.extent.midY
+        ))
+        // Mirrored later with the rest of the frame, so flip it here to keep text on the cover readable.
+        let flipped = centered.transformed(by: CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -extent.width - 2 * extent.minX, y: 0))
+        let pulse = musicPlaying ? 0.06 * sin(Date.now.timeIntervalSinceReferenceDate * 2 * .pi / 1.8) : 0
+        return flipped
+            .clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 6])
+            .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.15, kCIInputBrightnessKey: -0.05 + pulse])
+            .cropped(to: extent)
     }
 }

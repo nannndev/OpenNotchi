@@ -23,7 +23,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   are saved to Pictures › OpenNotchi and dropped into the Tray
 - Mirror hand gestures, recognized on your Mac: ✌️ takes a photo, 👍 throws
   confetti, ✋ toggles the ring light
-- Mirror portrait mode: blurs the background behind you
+- Mirror backgrounds: portrait blur, or the album art of the song that's
+  playing behind you, gently pulsing while music plays
+- Photobox: four shots with a countdown, laid out as a strip in one of twelve
+  styles (Classic, Midnight, Film, Polaroid, Y2K, Sakura, Retro, Newspaper,
+  Neon, Pastel Grid, Love and Now Playing), saved and dropped into the Tray
 
 ### Changed
 - The location in Settings is shared by weather and prayer times

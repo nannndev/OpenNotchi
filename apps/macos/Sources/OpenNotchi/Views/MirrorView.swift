@@ -4,7 +4,11 @@ import SwiftUI
 struct MirrorView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var tray: TrayStore
+    @EnvironmentObject private var media: MediaManager
     @State private var isHovering = false
+    /// Photos taken so far in a photobox session; nil when taking single photos.
+    @State private var boothShots: [CGImage]?
+    @State private var boothBusy = false
     @State private var captureRequest = 0
     @State private var countdown: Int?
     @State private var flash = false
@@ -16,12 +20,14 @@ struct MirrorView: View {
             CameraPreview(
                 effect: settings.mirrorEffect,
                 ringLight: settings.mirrorRingLight,
-                portrait: settings.mirrorPortrait,
+                background: settings.mirrorBackground,
+                artwork: settings.mirrorBackground == .album ? media.artwork?.cgImage(forProposedRect: nil, context: nil, hints: nil) : nil,
+                musicPlaying: media.info?.isPlaying ?? false,
                 gesturesEnabled: settings.mirrorGestures,
                 cameraID: settings.mirrorCameraID,
                 captureRequest: captureRequest,
                 onGesture: handle,
-                onPhoto: photoSaved
+                onCapture: captured
             )
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay { ringLightGlow }
@@ -58,8 +64,23 @@ struct MirrorView: View {
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
+            .overlay(alignment: .top) {
+                if let shots = boothShots {
+                    HStack(spacing: 6) {
+                        ForEach(0..<4, id: \.self) { i in
+                            Circle()
+                                .fill(i < shots.count ? Color.white : Color.white.opacity(0.3))
+                                .frame(width: 8, height: 8)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(.black.opacity(0.5)))
+                    .padding(8)
+                }
+            }
             .overlay(alignment: .topLeading) {
-                if isHovering && settings.mirrorGestures && savedPhoto == nil {
+                if isHovering && settings.mirrorGestures && savedPhoto == nil && boothShots == nil {
                     Text("✌️ photo   👍 confetti   ✋ light")
                         .font(.system(size: 10, weight: .medium))
                         .padding(.horizontal, 8)
@@ -70,9 +91,12 @@ struct MirrorView: View {
                 }
             }
             .overlay(alignment: .trailing) {
-                ShutterButton(action: startCountdown)
-                    .padding(.trailing, 12)
-                    .opacity(isHovering && countdown == nil ? 1 : 0)
+                VStack(spacing: 10) {
+                    ShutterButton(action: { startCountdown() })
+                    PhotoboxButton(action: startPhotobox)
+                }
+                .padding(.trailing, 12)
+                .opacity(isHovering && countdown == nil && boothShots == nil ? 1 : 0)
             }
             .overlay(alignment: .bottom) {
                 MirrorControls()
@@ -111,18 +135,59 @@ struct MirrorView: View {
     }
 
     /// 3, 2, 1, flash, photo.
-    private func startCountdown() {
-        guard countdown == nil else { return }
+    private func startCountdown(from start: Int = 3) {
+        guard countdown == nil, !boothBusy else { return }
+        Task { @MainActor in await countdownAndShoot(from: start) }
+    }
+
+    @MainActor
+    private func countdownAndShoot(from start: Int) async {
+        for n in stride(from: start, through: 1, by: -1) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { countdown = n }
+            try? await Task.sleep(for: .milliseconds(800))
+        }
+        withAnimation(.easeOut(duration: 0.15)) { countdown = nil }
+        captureRequest += 1
+        flash = true
+        withAnimation(.easeOut(duration: 0.5)) { flash = false }
+        NSSound(named: "Tink")?.play()
+    }
+
+    /// Four shots with a countdown before each, then a strip in the chosen style.
+    private func startPhotobox() {
+        guard countdown == nil, !boothBusy else { return }
+        boothBusy = true
+        boothShots = []
         Task { @MainActor in
-            for n in [3, 2, 1] {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { countdown = n }
-                try? await Task.sleep(for: .milliseconds(800))
+            for i in 0..<4 {
+                await countdownAndShoot(from: i == 0 ? 3 : 2)
+                // Wait for the frame to come back from the camera.
+                for _ in 0..<20 where (boothShots?.count ?? 0) <= i {
+                    try? await Task.sleep(for: .milliseconds(50))
+                }
+                try? await Task.sleep(for: .milliseconds(450))
             }
-            withAnimation(.easeOut(duration: 0.15)) { countdown = nil }
-            captureRequest += 1
-            flash = true
-            withAnimation(.easeOut(duration: 0.5)) { flash = false }
-            NSSound(named: "Tink")?.play()
+            let shots = boothShots ?? []
+            withAnimation { boothShots = nil }
+            let style = settings.stripStyle
+            let info = StripInfo(date: .now, songTitle: media.info?.title, artist: media.info?.artist, artwork: media.artwork)
+            let url = await Task.detached(priority: .userInitiated) {
+                PhotoStripComposer.compose(shots, style: style, info: info).flatMap { MirrorPhotos.save($0, name: "Photobox") }
+            }.value
+            boothBusy = false
+            if let url { photoSaved(url) }
+        }
+    }
+
+    private func captured(_ image: CGImage) {
+        if boothShots != nil {
+            boothShots?.append(image)
+            return
+        }
+        Task.detached(priority: .userInitiated) {
+            if let url = MirrorPhotos.save(image, name: "Mirror") {
+                await MainActor.run { photoSaved(url) }
+            }
         }
     }
 
@@ -130,11 +195,44 @@ struct MirrorView: View {
         tray.add([url])
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { savedPhoto = url }
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2.5))
+            try? await Task.sleep(for: .seconds(3))
             withAnimation(.easeInOut(duration: 0.3)) {
                 if savedPhoto == url { savedPhoto = nil }
             }
         }
+    }
+}
+
+/// Photos and strips go to ~/Pictures/OpenNotchi.
+enum MirrorPhotos {
+    static func save(_ image: CGImage, name: String) -> URL? {
+        let folder = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0].appendingPathComponent("OpenNotchi")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        let url = folder.appendingPathComponent("\(name) \(formatter.string(from: .now)).jpg")
+        let rep = NSBitmapImageRep(cgImage: image)
+        guard let data = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.92]),
+              (try? data.write(to: url)) != nil else { return nil }
+        return url
+    }
+}
+
+private struct PhotoboxButton: View {
+    @EnvironmentObject private var settings: AppSettings
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "photo.stack.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(.black.opacity(0.5)))
+                .overlay(Circle().stroke(.white.opacity(0.8), lineWidth: 1.5))
+                .shadow(color: .black.opacity(0.4), radius: 6)
+        }
+        .buttonStyle(.plain)
+        .help("Photobox: 4 shots in a \(settings.stripStyle.displayName) strip")
     }
 }
 
@@ -260,7 +358,36 @@ private struct MirrorControls: View {
 
             Divider().frame(height: 16)
 
-            toggle(isOn: $settings.mirrorPortrait, on: "person.crop.rectangle.fill", off: "person.crop.rectangle", tint: .cyan, help: "Portrait: blur the background")
+            Menu {
+                Picker("Background", selection: $settings.mirrorBackground) {
+                    ForEach(MirrorBackground.allCases) { Label($0.displayName, systemImage: $0.icon).tag($0) }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                Image(systemName: settings.mirrorBackground.icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(settings.mirrorBackground == .none ? .white : .cyan)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Background: \(settings.mirrorBackground.displayName)")
+
+            Menu {
+                Picker("Photobox strip", selection: $settings.stripStyle) {
+                    ForEach(StripStyle.allCases) { Text($0.displayName).tag($0) }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(LinearGradient(colors: settings.stripStyle.swatch, startPoint: .top, endPoint: .bottom))
+                    .frame(width: 11, height: 18)
+                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(.white.opacity(0.7), lineWidth: 1))
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Photobox strip: \(settings.stripStyle.displayName)")
             toggle(isOn: $settings.mirrorRingLight, on: "light.max", off: "light.min", tint: .yellow, help: "Ring light")
             toggle(isOn: $settings.mirrorGestures, on: "hand.raised.fill", off: "hand.raised.slash", tint: .green, help: "Hand gestures: ✌️ photo, 👍 confetti, ✋ ring light")
 

@@ -79,7 +79,8 @@ final class AppSettings: ObservableObject {
     @Published var mirrorHeight: Double { didSet { defaults.set(mirrorHeight, forKey: "mirrorHeight") } }
     @Published var mirrorEffect: MirrorEffect { didSet { defaults.set(mirrorEffect.rawValue, forKey: "mirrorEffect") } }
     @Published var mirrorRingLight: Bool { didSet { defaults.set(mirrorRingLight, forKey: "mirrorRingLight") } }
-    @Published var mirrorPortrait: Bool { didSet { defaults.set(mirrorPortrait, forKey: "mirrorPortrait") } }
+    @Published var mirrorBackground: MirrorBackground { didSet { defaults.set(mirrorBackground.rawValue, forKey: "mirrorBackground") } }
+    @Published var stripStyle: StripStyle { didSet { defaults.set(stripStyle.rawValue, forKey: "stripStyle") } }
     @Published var mirrorGestures: Bool { didSet { defaults.set(mirrorGestures, forKey: "mirrorGestures") } }
     @Published var mirrorCameraID: String { didSet { defaults.set(mirrorCameraID, forKey: "mirrorCameraID") } }
     @Published var calendarEnabled: Bool { didSet { defaults.set(calendarEnabled, forKey: "calendarEnabled") } }
@@ -151,7 +152,8 @@ final class AppSettings: ObservableObject {
             "mirrorEffect": MirrorEffect.natural.rawValue,
             "mirrorRingLight": false,
             "mirrorCameraID": "",
-            "mirrorPortrait": false,
+            "mirrorBackground": MirrorBackground.none.rawValue,
+            "stripStyle": StripStyle.classic.rawValue,
             "mirrorGestures": true,
             "meetingReminderMinutes": 5,
             "meetingRemindersOnlyWithLink": false,
@@ -204,7 +206,8 @@ final class AppSettings: ObservableObject {
         mirrorEffect = MirrorEffect(rawValue: defaults.string(forKey: "mirrorEffect") ?? "") ?? .natural
         mirrorRingLight = defaults.bool(forKey: "mirrorRingLight")
         mirrorCameraID = defaults.string(forKey: "mirrorCameraID") ?? ""
-        mirrorPortrait = defaults.bool(forKey: "mirrorPortrait")
+        mirrorBackground = MirrorBackground(rawValue: defaults.string(forKey: "mirrorBackground") ?? "") ?? .none
+        stripStyle = StripStyle(rawValue: defaults.string(forKey: "stripStyle") ?? "") ?? .classic
         mirrorGestures = defaults.bool(forKey: "mirrorGestures")
         meetingReminderMinutes = defaults.integer(forKey: "meetingReminderMinutes")
         meetingRemindersOnlyWithLink = defaults.bool(forKey: "meetingRemindersOnlyWithLink")
