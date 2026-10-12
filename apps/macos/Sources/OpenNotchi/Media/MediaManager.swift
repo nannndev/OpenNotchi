@@ -55,7 +55,41 @@ final class MediaManager: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.refresh() }
     }
 
+    /// Demo content for screenshots and recordings (no real cover art or tracks).
+    private(set) var isDemo = false
+
+    func startDemo() {
+        isDemo = true
+        artworkKey = "demo"
+        info = NowPlayingInfo(
+            title: "Midnight Drive", artist: "The Placeholders", album: "Demo",
+            duration: 204, position: 72, isPlaying: true, sourceID: "demo"
+        )
+        artwork = Self.demoArtwork()
+    }
+
+    func stopDemo() {
+        isDemo = false
+        artworkKey = nil
+        info = nil
+        refresh()
+    }
+
+    /// A soft monochrome "album cover" drawn in code.
+    private static func demoArtwork() -> NSImage {
+        NSImage(size: NSSize(width: 600, height: 600), flipped: false) { rect in
+            NSGradient(colors: [NSColor(white: 0.32, alpha: 1), NSColor(white: 0.05, alpha: 1)])?
+                .draw(in: rect, angle: -60)
+            NSGradient(colors: [NSColor(white: 1, alpha: 0.85), NSColor(white: 1, alpha: 0)])?
+                .draw(fromCenter: NSPoint(x: 420, y: 450), radius: 0, toCenter: NSPoint(x: 420, y: 450), radius: 170, options: [])
+            NSGradient(colors: [NSColor(white: 0.6, alpha: 0.5), NSColor(white: 0.6, alpha: 0)])?
+                .draw(fromCenter: NSPoint(x: 160, y: 140), radius: 0, toCenter: NSPoint(x: 160, y: 140), radius: 260, options: [])
+            return true
+        }
+    }
+
     func refresh() {
+        guard !isDemo else { return }
         guard !isRefreshing else { return }
         let candidates = providers.filter { settings.isProviderEnabled($0.id) && $0.isRunning }
         guard !candidates.isEmpty else {
@@ -127,6 +161,7 @@ final class MediaManager: ObservableObject {
     // MARK: - Commands
 
     func playPause() {
+        guard !isDemo else { return }
         if var current = info {
             // Optimistic update so the button flips immediately.
             current.position = current.position(at: Date())

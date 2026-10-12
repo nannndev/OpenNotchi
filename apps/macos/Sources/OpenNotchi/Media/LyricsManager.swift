@@ -47,6 +47,13 @@ final class LyricsManager: ObservableObject {
     }
 
     private func trackChanged(_ info: NowPlayingInfo?) {
+        if info?.sourceID == "demo" {
+            let text = ["Headlights painting the empty road", "Radio humming a song we know", "Every stop light turning green",
+                        "Midnight drive, just you and me", "City sleeping, we're wide awake", "Turn it up for the long way home"]
+            trackKey = info?.trackKey
+            apply(.synced, text.enumerated().map { LyricLine(id: $0.offset, time: Double(60 + $0.offset * 5), text: $0.element) }, nil, key: nil)
+            return
+        }
         guard settings.lyricsEnabled, let info else {
             if info == nil { apply(.idle, [], nil, key: nil) }
             return

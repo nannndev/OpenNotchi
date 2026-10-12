@@ -66,3 +66,17 @@ make brand
 
 This rewrites the PNG/SVG files here, `apps/macos/Resources/AppIcon.icns` and the
 icons and social card in `apps/website/public/`.
+
+## Marketing
+
+`marketing/showcase.png` (2400×1350) shows the app with demo content only: no
+real album art, videos or personal data. To refresh it:
+
+1. Run the app and post `demo-on` to `io.github.opennotchi.command` (see the
+   README's Scripting section), then open each view with `player`, `lyrics`,
+   `markets`, `timer` and the `peek-*` commands.
+2. Capture the notch panel window with `screencapture -o -l <window id>` into a
+   folder as `home.png`, `lyrics.png`, `markets.png`, `timer.png`,
+   `closed-music.png`, `peek-charging.png`, `peek-airpods.png`, `peek-volume.png`.
+3. `swift brand/marketing/showcase.swift <folder> brand/marketing/showcase.png`
+4. Post `demo-off` when done.

@@ -73,12 +73,18 @@ final class NotchWindowController: NSObject {
         case "close": viewModel.close()
         case "toggle": viewModel.toggle()
         case "settings": AppDelegate.shared?.showSettings()
+        case "demo-on": AppDelegate.shared?.media.startDemo()
+        case "demo-off": AppDelegate.shared?.media.stopDemo()
         // Previews for the live activities, handy when designing them.
         case "peek-charging": viewModel.showPeek(.charging(level: 76))
         case "peek-airpods": viewModel.showPeek(.device(name: "AirPods Pro", symbol: "airpodspro", battery: 82))
         case "peek-volume": viewModel.showPeek(.volume(level: 0.62, muted: false))
         case "peek-brightness": viewModel.showPeek(.brightness(level: 0.4))
         case "home": viewModel.tab = .home; viewModel.open()
+        case "player":
+            viewModel.tab = .home
+            viewModel.open()
+            DispatchQueue.main.async { AppSettings.shared.homeLyricsMode = false }
         case "lyrics":
             viewModel.tab = .home
             viewModel.open()
