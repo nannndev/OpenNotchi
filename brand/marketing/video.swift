@@ -1,6 +1,6 @@
 // Renders the OpenNotchi showcase video from captures of the real app (demo mode).
 //
-// Usage: swift brand/marketing/video.swift <shots folder> <strips folder> <output.mp4>
+// Usage: render <shots folder> <strips folder> <output.mp4> <landing page screenshot.png>
 // See brand/BRAND.md (Marketing) for how the shots are captured.
 import AppKit
 import AVFoundation
@@ -8,9 +8,15 @@ import AVFoundation
 let shots = CommandLine.arguments[1]
 let strips = CommandLine.arguments[2]
 let output = URL(fileURLWithPath: CommandLine.arguments[3])
+/// Full-page screenshot of the landing page at 1440 px wide, 2x.
+let landingPage = NSImage(contentsOfFile: CommandLine.arguments[4])!
 
 let W = 1920, H = 1080, FPS = 60
-let duration = 40.0
+/// The website preview runs first; the app scenes start after it.
+let webLength = 7.0
+/// The app scenes begin while the website fades out, so there's no empty beat between them.
+let mainStart = webLength - 0.7
+let duration = mainStart + 40.0
 
 // MARK: - Assets
 
@@ -118,7 +124,61 @@ func drop(_ img: NSImage, t: Double, start: Double, alpha: Double) {
     NSGraphicsContext.restoreGraphicsState()
 }
 
+/// Opening: the landing page in a browser window, scrolling from the hero to the photobox.
+func website(_ t: Double, alpha: Double) {
+    guard alpha > 0.001 else { return }
+    let frame = CGRect(x: 200, y: 90 + CGFloat(1 - easeOut(t / 0.8)) * 40, width: 1520, height: 900)
+    let bar: CGFloat = 52
+    // Window with shadow.
+    NSGraphicsContext.saveGraphicsState()
+    let shadow = NSShadow()
+    shadow.shadowColor = NSColor.black.withAlphaComponent(0.6 * alpha)
+    shadow.shadowBlurRadius = 50
+    shadow.shadowOffset = CGSize(width: 0, height: -20)
+    shadow.set()
+    NSColor(white: 0.14, alpha: alpha).setFill()
+    NSBezierPath(roundedRect: frame, xRadius: 16, yRadius: 16).fill()
+    NSGraphicsContext.restoreGraphicsState()
+    // Toolbar: traffic lights and the address.
+    for (i, color) in [NSColor.systemRed, .systemYellow, .systemGreen].enumerated() {
+        color.withAlphaComponent(alpha).setFill()
+        NSBezierPath(ovalIn: CGRect(x: frame.minX + 22 + CGFloat(i) * 24, y: frame.minY + 19, width: 14, height: 14)).fill()
+    }
+    let field = CGRect(x: frame.midX - 260, y: frame.minY + 11, width: 520, height: 30)
+    NSColor(white: 0.24, alpha: alpha).setFill()
+    NSBezierPath(roundedRect: field, xRadius: 9, yRadius: 9).fill()
+    text("🔒 opennotchi.vercel.app", font: .systemFont(ofSize: 17, weight: .medium), color: NSColor(white: 0.85, alpha: 1), centerX: field.midX, y: field.minY + 5, alpha: alpha)
+    // The page, scrolled.
+    let content = CGRect(x: frame.minX, y: frame.minY + bar, width: frame.width, height: frame.height - bar)
+    let scale = content.width / landingPage.size.width
+    let stops: [(Double, CGFloat)] = [(0, 0), (1.6, 0), (3.2, 880), (3.9, 880), (5.6, 2250), (7.5, 2250)]
+    var offset: CGFloat = 0
+    for i in 1..<stops.count where t >= stops[i - 1].0 {
+        let (t0, y0) = stops[i - 1], (t1, y1) = stops[i]
+        offset = y0 + (y1 - y0) * CGFloat(easeInOut((t - t0) / (t1 - t0)))
+    }
+    NSGraphicsContext.saveGraphicsState()
+    let clip = NSBezierPath(roundedRect: content, xRadius: 16, yRadius: 16)
+    clip.append(NSBezierPath(rect: CGRect(x: content.minX, y: content.minY, width: content.width, height: 20)))
+    clip.addClip()
+    let page = CGRect(x: content.minX, y: content.minY - offset, width: content.width, height: landingPage.size.height * scale)
+    draw(landingPage, in: page, alpha: alpha)
+    NSGraphicsContext.restoreGraphicsState()
+}
+
 func render(_ t: Double) {
+    let main = t - mainStart
+    if main >= 0 {
+        renderMain(main)
+    } else {
+        background(0)
+    }
+    if t < webLength + 0.2 {
+        website(t, alpha: min(easeOut(t / 0.5), 1 - easeInOut((t - (webLength - 0.6)) / 0.6)))
+    }
+}
+
+func renderMain(_ t: Double) {
     background(t)
     let cx = CGFloat(W) / 2
 
@@ -219,11 +279,12 @@ func render(_ t: Double) {
     caption("Live activities", "Charging, AirPods, volume & brightness, right beside the notch", t: t, start: 34.1, end: 37.4, y: 470)
 
     // 11. Outro.
-    let outro = window(t, 37.4, duration + 1, fade: 0.6)
+    let end = duration - mainStart + 1
+    let outro = window(t, 37.4, end, fade: 0.6)
     draw(closed, in: shotRect(closed), alpha: outro)
     wordmark(centerY: 440, size: 140, alpha: outro)
-    text("Free & open source for macOS", font: rounded(44, .semibold), color: NSColor(white: 0.85, alpha: 1), centerX: cx, y: 540, alpha: window(t, 37.7, duration + 1, fade: 0.6))
-    text("opennotchi.vercel.app", font: .monospacedSystemFont(ofSize: 34, weight: .medium), color: NSColor(white: 0.55, alpha: 1), centerX: cx, y: 630, alpha: window(t, 38.0, duration + 1, fade: 0.6))
+    text("Free & open source for macOS", font: rounded(44, .semibold), color: NSColor(white: 0.85, alpha: 1), centerX: cx, y: 540, alpha: window(t, 37.7, end, fade: 0.6))
+    text("opennotchi.vercel.app", font: .monospacedSystemFont(ofSize: 34, weight: .medium), color: NSColor(white: 0.55, alpha: 1), centerX: cx, y: 630, alpha: window(t, 38.0, end, fade: 0.6))
 }
 
 // MARK: - Encoding

@@ -88,8 +88,8 @@ real album art, videos or personal data. To refresh it:
 
 ### Showcase video
 
-`marketing/showcase.mp4` (1920×1080, 60 fps, 40 s, not committed) is rendered
-from captures of the real app:
+`marketing/showcase.mp4` (1920×1080, 60 fps, about 46 s, not committed) opens on
+the landing page in a browser window, then shows captures of the real app:
 
 1. Post `demo-on` and `pin` (keeps the notch open), then capture the notch window
    for `closed-music`, `home` (`player`), `lyrics`, `markets`, `mirror` and
@@ -98,7 +98,10 @@ from captures of the real app:
    activities. Capture `theme-<name>.png` for albumArt, adaptive, aurora,
    midnight and classic with the `theme-<name>` command. Set the weather place
    to a plain city name first; it shows on the prayer banner.
-2. `swiftc -O -o render brand/marketing/video.swift` (copy it to `main.swift`
-   first), then `./render <shots> apps/website/public/photobox brand/marketing/showcase.mp4`.
-3. Post `demo-off` and restore any settings you changed.
+2. Take a full-page screenshot of the landing page at 1440 px wide, 2x (headless
+   Chrome with `--window-size=1440,7000 --force-device-scale-factor=2 --timeout=7000`
+   and a throwaway `--user-data-dir`; the delay lets the scroll animations run).
+3. `swiftc -O -o render brand/marketing/video.swift` (copy it to `main.swift`
+   first), then `./render <shots> apps/website/public/photobox brand/marketing/showcase.mp4 <page.png>`.
+4. Post `demo-off` and restore any settings you changed.
 
