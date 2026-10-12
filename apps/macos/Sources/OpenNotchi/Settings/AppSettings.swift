@@ -41,6 +41,8 @@ final class AppSettings: ObservableObject {
     /// Home shows lyrics instead of the player (toggled from the artwork button).
     @Published var homeLyricsMode: Bool { didSet { defaults.set(homeLyricsMode, forKey: "homeLyricsMode") } }
     @Published var lyricsOnHome: Bool { didSet { defaults.set(lyricsOnHome, forKey: "lyricsOnHome") } }
+    @Published var vinylModeEnabled: Bool { didSet { defaults.set(vinylModeEnabled, forKey: "vinylModeEnabled") } }
+    @Published var ambientAuraEnabled: Bool { didSet { defaults.set(ambientAuraEnabled, forKey: "ambientAuraEnabled") } }
     @Published var chargingPeekEnabled: Bool { didSet { defaults.set(chargingPeekEnabled, forKey: "chargingPeekEnabled") } }
     @Published var devicePeekEnabled: Bool {
         didSet {
@@ -56,6 +58,8 @@ final class AppSettings: ObservableObject {
     }
     @Published var marketsEnabled: Bool { didSet { defaults.set(marketsEnabled, forKey: "marketsEnabled") } }
     @Published var showTickerInHeader: Bool { didSet { defaults.set(showTickerInHeader, forKey: "showTickerInHeader") } }
+    @Published var networkLiveActivity: Bool { didSet { defaults.set(networkLiveActivity, forKey: "networkLiveActivity") } }
+    @Published var showStatsInHeader: Bool { didSet { defaults.set(showStatsInHeader, forKey: "showStatsInHeader") } }
     @Published var marketTickers: [String] { didSet { defaults.set(marketTickers, forKey: "marketTickers") } }
     @Published var weatherEnabled: Bool { didSet { defaults.set(weatherEnabled, forKey: "weatherEnabled") } }
     @Published var useFahrenheit: Bool { didSet { defaults.set(useFahrenheit, forKey: "useFahrenheit") } }
@@ -75,6 +79,7 @@ final class AppSettings: ObservableObject {
     @Published var clipboardEnabled: Bool { didSet { defaults.set(clipboardEnabled, forKey: "clipboardEnabled") } }
     @Published var timerTabEnabled: Bool { didSet { defaults.set(timerTabEnabled, forKey: "timerTabEnabled") } }
     @Published var mirrorTabEnabled: Bool { didSet { defaults.set(mirrorTabEnabled, forKey: "mirrorTabEnabled") } }
+    @Published var devToolsEnabled: Bool { didSet { defaults.set(devToolsEnabled, forKey: "devToolsEnabled") } }
     /// Height of the open notch on the Mirror tab, set by dragging its bottom edge.
     @Published var mirrorHeight: Double { didSet { defaults.set(mirrorHeight, forKey: "mirrorHeight") } }
     @Published var mirrorEffect: MirrorEffect { didSet { defaults.set(mirrorEffect.rawValue, forKey: "mirrorEffect") } }
@@ -133,8 +138,10 @@ final class AppSettings: ObservableObject {
             "devicePeekEnabled": true,
             "hudEnabled": false,
             "weatherEnabled": true,
-            "marketsEnabled": true,
+            "marketsEnabled": false,
             "showTickerInHeader": true,
+            "networkLiveActivity": true,
+            "showStatsInHeader": true,
             "marketTickers": ["^JKSE", "BBCA.JK", "^GSPC", "AAPL", "BTC-USD", "IDR=X"],
             "useFahrenheit": Locale.current.measurementSystem == .us,
             "weatherPlace": "",
@@ -147,11 +154,14 @@ final class AppSettings: ObservableObject {
             "lyricsEnabled": true,
             "lyricsOnHome": true,
             "homeLyricsMode": false,
+            "vinylModeEnabled": true,
+            "ambientAuraEnabled": true,
             "theme": NotchTheme.defaultTheme.rawValue,
             "accent": AccentChoice.white.rawValue,
             "clipboardEnabled": true,
-            "timerTabEnabled": true,
-            "mirrorTabEnabled": true,
+            "timerTabEnabled": false,
+            "mirrorTabEnabled": false,
+            "devToolsEnabled": true,
             "calendarEnabled": true,
             "mirrorHeight": 200.0,
             "mirrorEffect": MirrorEffect.natural.rawValue,
@@ -191,6 +201,8 @@ final class AppSettings: ObservableObject {
         weatherEnabled = defaults.bool(forKey: "weatherEnabled")
         marketsEnabled = defaults.bool(forKey: "marketsEnabled")
         showTickerInHeader = defaults.bool(forKey: "showTickerInHeader")
+        networkLiveActivity = defaults.bool(forKey: "networkLiveActivity")
+        showStatsInHeader = defaults.bool(forKey: "showStatsInHeader")
         marketTickers = defaults.stringArray(forKey: "marketTickers") ?? []
         useFahrenheit = defaults.bool(forKey: "useFahrenheit")
         weatherPlace = defaults.string(forKey: "weatherPlace") ?? ""
@@ -205,11 +217,14 @@ final class AppSettings: ObservableObject {
         lyricsEnabled = defaults.bool(forKey: "lyricsEnabled")
         lyricsOnHome = defaults.bool(forKey: "lyricsOnHome")
         homeLyricsMode = defaults.bool(forKey: "homeLyricsMode")
+        vinylModeEnabled = defaults.bool(forKey: "vinylModeEnabled")
+        ambientAuraEnabled = defaults.bool(forKey: "ambientAuraEnabled")
         theme = NotchTheme(rawValue: defaults.string(forKey: "theme") ?? "") ?? NotchTheme.defaultTheme
         accent = AccentChoice(rawValue: defaults.string(forKey: "accent") ?? "") ?? .white
         clipboardEnabled = defaults.bool(forKey: "clipboardEnabled")
         timerTabEnabled = defaults.bool(forKey: "timerTabEnabled")
         mirrorTabEnabled = defaults.bool(forKey: "mirrorTabEnabled")
+        devToolsEnabled = defaults.bool(forKey: "devToolsEnabled")
         calendarEnabled = defaults.bool(forKey: "calendarEnabled")
         mirrorHeight = defaults.double(forKey: "mirrorHeight")
         mirrorEffect = MirrorEffect(rawValue: defaults.string(forKey: "mirrorEffect") ?? "") ?? .natural
@@ -261,6 +276,7 @@ final class AppSettings: ObservableObject {
             case .timer: return timerTabEnabled
             case .mirror: return mirrorTabEnabled
             case .markets: return marketsEnabled
+            case .dev: return devToolsEnabled
             }
         }
     }

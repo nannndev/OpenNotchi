@@ -1,21 +1,31 @@
+import AppKit
 import QuickLookThumbnailing
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct TrayView: View {
     @EnvironmentObject private var tray: TrayStore
+    @EnvironmentObject private var vision: VisionService
 
     var body: some View {
         HStack(spacing: 14) {
-            AirDropDropZone()
-                .frame(width: 130)
+            // Left Action Zones: AirDrop & Instant OCR
+            VStack(spacing: 8) {
+                AirDropDropZone()
+                VisionOCRDropZone()
+            }
+            .frame(width: 130)
 
+            // Right Files Parking Area
             if tray.items.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "tray.and.arrow.down")
                         .font(.system(size: 26))
                     Text("Drop files here to keep them handy")
                         .font(.system(size: 13, weight: .medium))
+                    Text("Or drop an image on Instant OCR to copy text")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
                 }
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -29,9 +39,22 @@ struct TrayView: View {
                             }
                         }
                         .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
                     }
+
                     HStack {
                         Button("AirDrop all") { AirDropService.send(tray.items) }
+                        Spacer()
+                        if let notification = vision.statusNotification {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 9))
+                                Text(notification)
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                            .foregroundStyle(.indigo)
+                            .transition(.opacity)
+                        }
                         Spacer()
                         Button("Clear") { tray.clear() }
                     }
@@ -51,54 +74,60 @@ struct TrayView: View {
     }
 }
 
+// MARK: - AirDrop Drop Zone
+
 private struct AirDropDropZone: View {
     @EnvironmentObject private var airDrop: AirDropService
     @State private var isTargeted = false
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 3) {
             ZStack {
                 switch airDrop.state {
                 case .sending(_, let progress?):
-                    AirDropProgressRing(progress: progress, lineWidth: 4)
-                        .frame(width: 40, height: 40)
+                    AirDropProgressRing(progress: progress, lineWidth: 3)
+                        .frame(width: 24, height: 24)
                     Text("\(Int(progress * 100))%")
-                        .font(.system(size: 10, weight: .bold).monospacedDigit())
+                        .font(.system(size: 8, weight: .bold).monospacedDigit())
                 case .choosing, .sending(_, nil):
-                    ProgressView().controlSize(.small)
-                        .frame(width: 40, height: 40)
+                    ProgressView().controlSize(.mini)
+                        .frame(width: 24, height: 24)
                 case .sent:
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 34))
+                        .font(.system(size: 20))
                         .foregroundStyle(.green)
-                        .transition(.scale.combined(with: .opacity))
                 case .failed:
                     Image(systemName: "exclamationmark.circle.fill")
-                        .font(.system(size: 34))
+                        .font(.system(size: 20))
                         .foregroundStyle(.orange)
                 case .idle:
                     Image(systemName: "airplayaudio")
                         .symbolVariant(.circle.fill)
-                        .font(.system(size: 30))
+                        .font(.system(size: 20))
                         .foregroundStyle(.blue)
                 }
             }
-            .frame(height: 40)
+            .frame(height: 24)
+
             Text("AirDrop")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
+
             Text(statusText)
-                .font(.system(size: 10))
+                .font(.system(size: 9))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: airDrop.state)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(.blue.opacity(isTargeted ? 0.3 : 0.12))
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.blue.opacity(isTargeted ? 0.35 : 0.12))
         )
-        .scaleEffect(isTargeted ? 1.04 : 1)
-        .animation(.spring(response: 0.3), value: isTargeted)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isTargeted ? Color.blue : .clear, lineWidth: 1.5)
+        )
+        .scaleEffect(isTargeted ? 1.03 : 1)
+        .animation(.spring(response: 0.25), value: isTargeted)
         .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
             TrayStore.loadFileURLs(from: providers) { AirDropService.send($0) }
         }
@@ -107,15 +136,71 @@ private struct AirDropDropZone: View {
     private var statusText: String {
         switch airDrop.state {
         case .idle: return "Drop to send"
-        case .choosing: return "Pick a device…"
-        case .sending(let count, _): return count == 1 ? "Sending…" : "Sending \(count) files…"
-        case .sent(let count): return count == 1 ? "Sent" : "Sent \(count) files"
-        case .failed: return "Couldn't send"
+        case .choosing: return "Pick device…"
+        case .sending(let count, _): return count == 1 ? "Sending…" : "Sending \(count)…"
+        case .sent: return "Sent"
+        case .failed: return "Failed"
         }
     }
 }
 
-/// Circular progress used by the AirDrop zone and the live activity.
+// MARK: - Vision OCR Drop Zone
+
+private struct VisionOCRDropZone: View {
+    @EnvironmentObject private var vision: VisionService
+    @EnvironmentObject private var tray: TrayStore
+    @State private var isTargeted = false
+
+    var body: some View {
+        VStack(spacing: 3) {
+            ZStack {
+                if vision.isProcessing {
+                    ProgressView().controlSize(.mini)
+                        .frame(width: 24, height: 24)
+                } else {
+                    Image(systemName: "text.viewfinder")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(isTargeted ? .indigo : .purple)
+                }
+            }
+            .frame(height: 24)
+
+            Text("Instant OCR")
+                .font(.system(size: 11, weight: .semibold))
+
+            Text(vision.isProcessing ? "Reading text…" : "Drop image to copy")
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(LinearGradient(
+                    colors: [Color.purple.opacity(isTargeted ? 0.35 : 0.12), Color.indigo.opacity(isTargeted ? 0.4 : 0.1)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isTargeted ? Color.purple : .clear, lineWidth: 1.5)
+        )
+        .scaleEffect(isTargeted ? 1.03 : 1)
+        .animation(.spring(response: 0.25), value: isTargeted)
+        .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
+            TrayStore.loadFileURLs(from: providers) { urls in
+                if let first = urls.first {
+                    vision.recognizeText(from: first)
+                    tray.add(urls)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Progress Ring
+
 struct AirDropProgressRing: View {
     let progress: Double
     var lineWidth: CGFloat = 3
@@ -132,28 +217,54 @@ struct AirDropProgressRing: View {
     }
 }
 
+// MARK: - Tray Item View
+
 private struct TrayItemView: View {
     @EnvironmentObject private var tray: TrayStore
+    @EnvironmentObject private var vision: VisionService
     let url: URL
     @State private var hovering = false
     @State private var thumbnail: NSImage?
 
+    private var isImageOrDoc: Bool {
+        vision.isImageOrPDF(url)
+    }
+
     var body: some View {
         VStack(spacing: 4) {
-            Group {
-                if let thumbnail {
-                    Image(nsImage: thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
-                        .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
-                } else {
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                        .resizable()
+            ZStack(alignment: .bottomTrailing) {
+                Group {
+                    if let thumbnail {
+                        Image(nsImage: thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+                    } else {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                            .resizable()
+                    }
+                }
+                .frame(width: 48, height: 48)
+
+                // Quick OCR button on hover
+                if hovering && isImageOrDoc {
+                    Button {
+                        vision.recognizeText(from: url)
+                    } label: {
+                        Image(systemName: "text.viewfinder")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(3)
+                            .background(Circle().fill(Color.indigo.opacity(0.9)))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Copy text from this image (OCR)")
+                    .transition(.scale)
                 }
             }
-            .frame(width: 48, height: 48)
             .task(id: url) { thumbnail = await Self.thumbnail(for: url) }
+
             Text(url.lastPathComponent)
                 .font(.system(size: 10))
                 .lineLimit(2)
@@ -166,7 +277,7 @@ private struct TrayItemView: View {
             if hovering {
                 Button { tray.remove(url) } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
+                        .font(.system(size: 13))
                         .foregroundStyle(.white, .gray)
                 }
                 .buttonStyle(.plain)
@@ -174,19 +285,42 @@ private struct TrayItemView: View {
         }
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { NSWorkspace.shared.open(url) }
-        // A file URL, so it can be dropped on the AirDrop zone as well as in Finder and other apps.
         .onDrag { NSItemProvider(object: url as NSURL) }
         .contextMenu {
             Button("Open") { NSWorkspace.shared.open(url) }
             Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             Button("AirDrop") { AirDropService.send([url]) }
+
+            if isImageOrDoc {
+                Divider()
+                Button("🪄 Copy Text (Vision OCR)") {
+                    vision.recognizeText(from: url)
+                }
+                Menu("⚡ Convert Image") {
+                    Button("To WebP") {
+                        if let newURL = vision.convertImage(from: url, to: .webp) {
+                            tray.add([newURL])
+                        }
+                    }
+                    Button("To PNG") {
+                        if let newURL = vision.convertImage(from: url, to: .png) {
+                            tray.add([newURL])
+                        }
+                    }
+                    Button("To JPEG") {
+                        if let newURL = vision.convertImage(from: url, to: .jpeg) {
+                            tray.add([newURL])
+                        }
+                    }
+                }
+            }
+
             Divider()
             Button("Remove from Tray") { tray.remove(url) }
         }
         .help(url.path)
     }
 
-    /// Quick Look preview of the file (photos, PDFs, videos…), or nil to fall back to the icon.
     static func thumbnail(for url: URL) async -> NSImage? {
         let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: 96, height: 96), scale: 2, representationTypes: .thumbnail)
         return try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage

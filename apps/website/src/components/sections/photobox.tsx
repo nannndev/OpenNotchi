@@ -17,6 +17,7 @@ const FRAMES = [
 
 const POINTS = [
   ["✌️", "Hold up a peace sign and the countdown starts. 👍 throws confetti."],
+  ["✨", "Korean photobooth deco studio: cute stars, ribbons, stamps, doodle frames and pins."],
   ["🎵", "The Player frame shows the song you're listening to."],
   ["📐", "1 to 6 photos, as a classic strip or sized for a story, post or square."],
   ["📤", "Saved to Pictures and dropped in the Tray, ready to AirDrop."],
@@ -27,13 +28,13 @@ export function Photobox() {
     <section id="photobox" className="relative scroll-mt-16 overflow-hidden border-y border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
         <div className="text-center">
-          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">New in 0.4</Badge>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">New in 0.5 · Deco Studio</Badge>
           <h2 className="font-display mt-5 text-[clamp(34px,5vw,54px)] leading-tight font-extrabold tracking-[-0.03em]">
-            A photobooth in your notch.
+            A photobooth &amp; deco studio in your notch.
           </h2>
           <p className="mx-auto mt-3.5 max-w-2xl text-[17px] text-muted-foreground">
-            Open the Mirror, pick a frame and strike a pose. OpenNotchi counts down, snaps your photos and lays them
-            out in one of 18 frames, with your own text if you like.
+            Open the Mirror, pick a frame, and decorate with Korean photobooth stickers, custom doodle frames, pins, and stamps.
+            Strike a pose with hand gestures, snap your strip, and drop it straight into the Tray.
           </p>
         </div>
 

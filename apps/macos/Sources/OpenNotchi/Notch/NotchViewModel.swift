@@ -8,6 +8,7 @@ enum NotchTab: String, CaseIterable {
     case timer = "Timer"
     case mirror = "Mirror"
     case markets = "Markets"
+    case dev = "Dev"
 
     var icon: String {
         switch self {
@@ -17,6 +18,7 @@ enum NotchTab: String, CaseIterable {
         case .timer: return "timer"
         case .mirror: return "camera.fill"
         case .markets: return "chart.line.uptrend.xyaxis"
+        case .dev: return "terminal.fill"
         }
     }
 }
@@ -39,15 +41,24 @@ final class NotchViewModel: ObservableObject {
         }
     }
 
+    @Published var isStudioOpen = false
+
     static let openWidth: CGFloat = 680
     static let defaultOpenHeight: CGFloat = 200
     /// The Mirror tab can be dragged taller, up to this height.
     static let maxOpenHeight: CGFloat = 470
 
     var openSize: CGSize {
-        let height = tab == .mirror && settings.mirrorTabEnabled
-            ? min(max(settings.mirrorHeight, Self.defaultOpenHeight), Self.maxOpenHeight)
-            : Self.defaultOpenHeight
+        let height: CGFloat
+        if isStudioOpen {
+            height = Self.maxOpenHeight
+        } else if tab == .mirror && settings.mirrorTabEnabled {
+            height = min(max(settings.mirrorHeight, Self.defaultOpenHeight), Self.maxOpenHeight)
+        } else if tab == .dev {
+            height = 230
+        } else {
+            height = Self.defaultOpenHeight
+        }
         return CGSize(width: Self.openWidth, height: height)
     }
 

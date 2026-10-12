@@ -17,6 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) lazy var markets = MarketManager(settings: settings)
     private(set) lazy var prayers = PrayerTimesManager(settings: settings)
     private lazy var reminders = ReminderCenter(settings: settings, calendar: calendar, prayers: prayers)
+    let audioDevice = AudioDeviceManager.shared
+    let colorPicker = ColorPickerManager.shared
+    let portInspector = PortInspector.shared
+    let vision = VisionService.shared
+    let stats = SystemStatsManager.shared
     let updater = Updater()
 
     private let bluetooth = BluetoothMonitor()
@@ -90,8 +95,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        bluetooth.onConnect = { [weak self] name, symbol, battery in
-            self?.notchController?.showPeek(.device(name: name, symbol: symbol, battery: battery))
+        bluetooth.onConnect = { [weak self] name, symbol, battery, info in
+            self?.notchController?.showPeek(.device(name: name, symbol: symbol, battery: battery, info: info))
         }
 
         reminders.onBanner = { [weak self] banner in

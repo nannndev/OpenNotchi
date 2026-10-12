@@ -258,6 +258,7 @@ private struct FeaturesPane: View {
                 Toggle("Clipboard history", isOn: $settings.clipboardEnabled)
                 Toggle("Timer", isOn: $settings.timerTabEnabled)
                 Toggle("Mirror (camera)", isOn: $settings.mirrorTabEnabled)
+                Toggle("Developer tools (ports, eyedropper, mic)", isOn: $settings.devToolsEnabled)
             }
             Section("Home") {
                 Toggle("Lyrics (button on the artwork)", isOn: $settings.lyricsEnabled)
@@ -268,6 +269,8 @@ private struct FeaturesPane: View {
             Section("Live activities") {
                 Toggle("Charger connected", isOn: $settings.chargingPeekEnabled)
                 Toggle("AirPods and Bluetooth devices", isOn: $settings.devicePeekEnabled)
+                Toggle("Network speed beside notch when active", isOn: $settings.networkLiveActivity)
+                Toggle("Show network traffic in header ticker", isOn: $settings.showStatsInHeader)
                 Toggle("Volume & brightness HUD in the notch", isOn: $settings.hudEnabled)
                 if settings.hudEnabled && !accessibilityGranted {
                     HStack {
@@ -351,6 +354,11 @@ private struct MediaPane: View {
 
     var body: some View {
         Form {
+            Section("Playback & Style") {
+                Toggle("Spinning vinyl record style", isOn: $settings.vinylModeEnabled)
+                Toggle("Ambient artwork aura glow", isOn: $settings.ambientAuraEnabled)
+                Toggle("Show lyrics on home player", isOn: $settings.lyricsOnHome)
+            }
             Section("Apps") {
                 Toggle("Apple Music", isOn: $settings.appleMusicEnabled)
                 Toggle("Spotify", isOn: $settings.spotifyEnabled)

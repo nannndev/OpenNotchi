@@ -9,18 +9,14 @@ struct HeaderView: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(settings.visibleTabs, id: \.self) { tab in
-                TabButton(tab: tab, isSelected: vm.tab == tab, badge: tab == .tray ? tray.items.count : 0) {
-                    vm.tab = tab
-                }
-            }
+            tabsScrollView
 
-            Spacer()
+            Spacer(minLength: 16)
 
             // Leave the camera housing area empty.
             Color.clear.frame(width: vm.hasPhysicalNotch ? vm.notchSize.width : 0)
 
-            Spacer()
+            Spacer(minLength: 16)
 
             // Weather and the watchlist share one slot and take turns, so the header never overflows.
             StatusRotator()
@@ -33,6 +29,14 @@ struct HeaderView: View {
             }
 
             Menu {
+                Menu("Visible Tabs") {
+                    Toggle("Clipboard", isOn: $settings.clipboardEnabled)
+                    Toggle("Timer", isOn: $settings.timerTabEnabled)
+                    Toggle("Mirror", isOn: $settings.mirrorTabEnabled)
+                    Toggle("Markets", isOn: $settings.marketsEnabled)
+                    Toggle("Dev Tools", isOn: $settings.devToolsEnabled)
+                }
+                Divider()
                 Button("Settings…") { AppDelegate.shared?.showSettings() }
                 Divider()
                 Button("Quit OpenNotchi") { AppDelegate.shared?.quit() }
@@ -47,6 +51,50 @@ struct HeaderView: View {
             .fixedSize()
         }
     }
+
+    private var maxTabsWidth: CGFloat {
+        let notchWidth = vm.hasPhysicalNotch ? vm.notchSize.width : 160
+        // Window width is 680, header padding is 32 on each side = 616pt header width.
+        // Center is at 308pt. Notch spans (308 - notchWidth/2) to (308 + notchWidth/2).
+        let wing = (616 - notchWidth) / 2
+        return max(160, wing - 14)
+    }
+
+    private var tabsScrollView: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 3) {
+                    ForEach(settings.visibleTabs, id: \.self) { tab in
+                        TabButton(tab: tab, isSelected: vm.tab == tab, badge: tab == .tray ? tray.items.count : 0) {
+                            vm.tab = tab
+                        }
+                        .id(tab)
+                    }
+                }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 1)
+            }
+            .background(HorizontalWheelScrollHelper())
+            .frame(maxWidth: maxTabsWidth, alignment: .leading)
+            .clipped()
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: 0.90),
+                        .init(color: .clear, location: 1.0)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .onChange(of: vm.tab) { _, newTab in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    proxy.scrollTo(newTab, anchor: .center)
+                }
+            }
+        }
+    }
 }
 
 private struct TabButton: View {
@@ -54,35 +102,66 @@ private struct TabButton: View {
     let isSelected: Bool
     let badge: Int
     let action: () -> Void
+    @State private var isHovering = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Image(systemName: tab.icon)
+                    .font(.system(size: 11, weight: .medium))
                 if isSelected {
                     Text(tab.rawValue)
+                        .font(.system(size: 11, weight: .semibold))
                         .fixedSize()
                 }
                 if badge > 0 {
                     Text("\(badge)")
-                        .font(.system(size: 10, weight: .bold))
-                        .padding(.horizontal, 5)
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
                         .background(Capsule().fill(.white.opacity(0.2)))
                 }
             }
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(isSelected ? .white : .secondary)
-            .padding(.horizontal, isSelected ? 9 : 6)
-            .padding(.vertical, 4)
+            .foregroundStyle(isSelected ? .white : isHovering ? .white.opacity(0.9) : .secondary)
+            .padding(.horizontal, isSelected ? 8 : 6)
+            .padding(.vertical, 3.5)
             .background(
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(.white.opacity(isSelected ? 0.15 : 0))
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? .white.opacity(0.18) : isHovering ? .white.opacity(0.08) : .clear)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(tab.rawValue)
-        .animation(.spring(response: 0.3), value: isSelected)
+        .onHover { isHovering = $0 }
+        .animation(.spring(response: 0.25), value: isSelected)
+    }
+}
+
+/// Helper that translates vertical mouse-wheel events into horizontal scrolling for the enclosing NSScrollView.
+private struct HorizontalWheelScrollHelper: NSViewRepresentable {
+    func makeNSView(context: Context) -> WheelCatcher {
+        WheelCatcher()
+    }
+    func updateNSView(_ nsView: WheelCatcher, context: Context) {}
+
+    class WheelCatcher: NSView {
+        override func scrollWheel(with event: NSEvent) {
+            if event.scrollingDeltaX == 0 && event.scrollingDeltaY != 0 {
+                if let scrollView = enclosingScrollView {
+                    let clipView = scrollView.contentView
+                    var newOrigin = clipView.bounds.origin
+                    let delta = event.isDirectionInvertedFromDevice ? event.scrollingDeltaY : -event.scrollingDeltaY
+                    newOrigin.x -= delta * 1.6
+                    let maxScroll = max(0, (scrollView.documentView?.frame.width ?? 0) - clipView.bounds.width)
+                    newOrigin.x = min(max(0, newOrigin.x), maxScroll)
+                    clipView.scroll(to: newOrigin)
+                    scrollView.reflectScrolledClipView(clipView)
+                    return
+                }
+            }
+            super.scrollWheel(with: event)
+        }
     }
 }
 
@@ -92,6 +171,7 @@ private struct StatusRotator: View {
     @EnvironmentObject private var weather: WeatherManager
     @EnvironmentObject private var markets: MarketManager
     @EnvironmentObject private var prayers: PrayerTimesManager
+    @EnvironmentObject private var stats: SystemStatsManager
     @EnvironmentObject private var vm: NotchViewModel
     @State private var index = 0
 
@@ -99,12 +179,14 @@ private struct StatusRotator: View {
         case prayer(PrayerTime)
         case weather(WeatherSnapshot)
         case quote(Quote)
+        case network(down: String, up: String)
 
         var id: String {
             switch self {
             case .prayer: return "prayer"
             case .weather: return "weather"
             case .quote(let quote): return quote.symbol
+            case .network: return "network"
             }
         }
     }
@@ -113,6 +195,10 @@ private struct StatusRotator: View {
         var items: [Item] = []
         if let next = prayers.next { items.append(.prayer(next)) }
         if settings.weatherEnabled, let snapshot = weather.snapshot { items.append(.weather(snapshot)) }
+        // Live network traffic if active
+        if settings.showStatsInHeader && stats.isNetworkActive {
+            items.append(.network(down: stats.formattedDown, up: stats.formattedUp))
+        }
         // The Markets tab already shows every ticker.
         if settings.showTickerInHeader && vm.tab != .markets {
             items += markets.watchlist.map(Item.quote)
@@ -148,6 +234,20 @@ private struct StatusRotator: View {
                                 .foregroundStyle(quote.change >= 0 ? .green : .red)
                         }
                         .help("\(quote.name): \(quote.formattedPrice) \(quote.currency)")
+                    case .network(let down, let up):
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.down")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.green)
+                            Text(down)
+                                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.cyan)
+                            Text(up)
+                                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        }
+                        .help("Live network: Download \(down) · Upload \(up)")
                     }
                 }
                 .id(item.id)

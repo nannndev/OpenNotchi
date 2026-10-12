@@ -1,33 +1,57 @@
 import SwiftUI
 
-/// A short-lived event shown beside the closed notch, e.g. "charger connected".
+/// Battery levels for connected Bluetooth devices (especially AirPods).
+struct DeviceBatteryInfo: Equatable {
+    var left: Int?
+    var right: Int?
+    var caseBattery: Int?
+    var single: Int?
+
+    var primaryBattery: Int? {
+        single ?? left ?? right
+    }
+
+    var isAirPods: Bool {
+        left != nil || right != nil || caseBattery != nil
+    }
+}
+
+/// A short-lived event shown beside or below the closed notch.
 enum Peek: Equatable {
     case charging(level: Int)
-    case device(name: String, symbol: String, battery: Int?)
+    case device(name: String, symbol: String, battery: Int?, info: DeviceBatteryInfo? = nil)
     case volume(level: Float, muted: Bool)
     case brightness(level: Float)
+    case micMute(muted: Bool)
     /// A reminder that grows below the notch, with an optional action button.
     case banner(Banner)
 
     /// How long the peek stays visible.
     var duration: TimeInterval {
         switch self {
-        case .charging, .device: return 3
-        case .volume, .brightness: return 1.6
+        case .charging: return 3.2
+        case .device: return 3.8
+        case .volume, .brightness, .micMute: return 1.8
         case .banner: return 12
         }
     }
 
-    /// HUD peeks show a level bar and need a little more room.
+    /// HUD peeks show a fluid level bar and need a wider pill.
     var isHUD: Bool {
         switch self {
-        case .volume, .brightness: return true
+        case .volume, .brightness, .micMute, .charging: return true
         default: return false
         }
     }
 
     var isBanner: Bool {
         if case .banner = self { return true }
+        return false
+    }
+
+    /// True when showing an AirPods or Bluetooth drop-down Dynamic Island card.
+    var isDeviceCard: Bool {
+        if case .device = self { return true }
         return false
     }
 }
@@ -42,3 +66,4 @@ struct Banner: Equatable {
     var actionTitle: String?
     var actionURL: URL?
 }
+

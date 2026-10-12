@@ -39,4 +39,6 @@ final class SpotifyProvider: MediaProvider {
     func nextTrack() { tell("next track") }
     func previousTrack() { tell("previous track") }
     func seek(to seconds: Double) { tell("set player position to \(Int(seconds))") }
+    func toggleShuffle() { tell("set shuffling to not shuffling") }
+    func toggleRepeat() { tell("set repeating to not repeating") }
 }

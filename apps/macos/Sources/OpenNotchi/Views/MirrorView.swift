@@ -16,6 +16,7 @@ struct MirrorView: View {
     @State private var flash = false
     @State private var bursts: [UUID] = []
     @State private var savedPhoto: URL?
+    @State private var studioSession: PhotoboxSession?
 
     var body: some View {
         VStack(spacing: 4) {
@@ -114,11 +115,15 @@ struct MirrorView: View {
                 .opacity(isHovering && countdown == nil && boothShots == nil && !choosingStrip ? 1 : 0)
             }
             .overlay {
-                if choosingStrip {
+                if choosingStrip && studioSession == nil {
                     StripPicker(
                         onStart: {
                             withAnimation { choosingStrip = false }
                             startPhotobox()
+                        },
+                        onOpenStudio: {
+                            withAnimation { choosingStrip = false }
+                            openStudioWithDemo()
                         },
                         onClose: { withAnimation { choosingStrip = false } }
                     )
@@ -126,10 +131,31 @@ struct MirrorView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
                 }
             }
+            .overlay {
+                if let session = studioSession {
+                    PhotoboxStudioView(
+                        session: Binding(get: { session }, set: { studioSession = $0 }),
+                        onFinish: { url in
+                            photoSaved(url)
+                            bursts.append(UUID())
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                studioSession = nil
+                            }
+                        },
+                        onCancel: {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                studioSession = nil
+                            }
+                        }
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                }
+            }
             .overlay(alignment: .bottom) {
                 MirrorControls()
                     .padding(8)
-                    .opacity(isHovering && !choosingStrip ? 1 : 0)
+                    .opacity(isHovering && !choosingStrip && studioSession == nil ? 1 : 0)
             }
             .shadow(color: settings.mirrorRingLight ? .white.opacity(0.35) : .clear, radius: 12)
             .onHover { inside in
@@ -139,12 +165,18 @@ struct MirrorView: View {
 
             ResizeHandle()
         }
-        // Only a running countdown or photobox holds the notch open; the picker can be clicked away.
-        .onChange(of: boothBusy || countdown != nil) { _, busy in vm.holdOpen = busy }
+        // Keep notch open during countdown, photobox shooting, or while in Studio
+        .onChange(of: boothBusy || countdown != nil || studioSession != nil) { _, busy in
+            vm.holdOpen = busy
+            vm.isStudioOpen = studioSession != nil
+        }
         .onReceive(NotificationCenter.default.publisher(for: .openStripPicker)) { _ in
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { choosingStrip = true }
         }
-        .onDisappear { vm.holdOpen = false }
+        .onDisappear {
+            vm.holdOpen = false
+            vm.isStudioOpen = false
+        }
     }
 
     @ViewBuilder
@@ -208,11 +240,21 @@ struct MirrorView: View {
             let style = settings.stripStyle
             let format = settings.stripFormat
             let info = StripInfo(caption: settings.stripCaption, media: media)
-            let url = await Task.detached(priority: .userInitiated) {
-                PhotoStripComposer.compose(shots, style: style, format: format, info: info).flatMap { MirrorPhotos.save($0, name: "Photobox") }
-            }.value
             boothBusy = false
-            if let url { photoSaved(url) }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                studioSession = PhotoboxSession(photos: shots, style: style, format: format, info: info)
+            }
+        }
+    }
+
+    private func openStudioWithDemo() {
+        let samples = PhotoStripComposer.samplePhotos
+        let shots = (0..<settings.stripShots).map { samples[$0 % samples.count] }
+        let style = settings.stripStyle
+        let format = settings.stripFormat
+        let info = StripInfo(caption: settings.stripCaption, media: media, sample: true)
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            studioSession = PhotoboxSession(photos: shots, style: style, format: format, info: info)
         }
     }
 
@@ -246,6 +288,7 @@ private struct StripPicker: View {
     @EnvironmentObject private var media: MediaManager
     @ObservedObject private var previews = StripPreviews.shared
     let onStart: () -> Void
+    let onOpenStudio: () -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -320,18 +363,33 @@ private struct StripPicker: View {
                     }
                 }
 
-                VStack(spacing: 8) {
+                VStack(spacing: 7) {
                     Button(action: onStart) {
                         Label("Start", systemImage: "camera.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
+                            .font(.system(size: 11, weight: .bold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
                             .background(Capsule().fill(.white))
                             .foregroundStyle(.black)
                     }
                     .buttonStyle(.plain)
+
+                    Button(action: onOpenStudio) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "sparkles")
+                            Text("Studio 🎀")
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(.white.opacity(0.14)))
+                        .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Decorate strip with stickers & stamps")
+
                     Button(action: onClose) {
-                        Text("Cancel").font(.system(size: 11)).foregroundStyle(.secondary)
+                        Text("Cancel").font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                 }

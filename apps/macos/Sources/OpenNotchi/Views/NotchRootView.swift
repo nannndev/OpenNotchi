@@ -7,11 +7,16 @@ struct NotchRootView: View {
     @EnvironmentObject private var timer: TimerManager
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var airDrop: AirDropService
+    @EnvironmentObject private var stats: SystemStatsManager
+
+    private var isNetworkSpeedVisible: Bool {
+        settings.showLiveActivity && settings.networkLiveActivity && stats.isNetworkActive
+    }
 
     private var showActivity: Bool {
         guard !vm.isOpen else { return false }
         if vm.peek != nil || airDrop.isTransferring { return true }
-        return settings.showLiveActivity && (timer.isActive || (media.info?.isPlaying ?? false))
+        return settings.showLiveActivity && (timer.isActive || (media.info?.isPlaying ?? false) || isNetworkSpeedVisible)
     }
 
     private var bodySize: CGSize {
@@ -21,9 +26,14 @@ struct NotchRootView: View {
             // Banners grow below the notch with room for a title and a button.
             return CGSize(width: max(size.width + 2 * (size.height + 40), 400), height: size.height + BannerView.contentHeight)
         }
+        if showActivity, vm.peek?.isDeviceCard == true {
+            // AirPods & Bluetooth cards drop down into an elegant Dynamic Island card
+            return CGSize(width: max(size.width + 2 * (size.height + 48), 380), height: size.height + DeviceBannerView.contentHeight)
+        }
         if showActivity {
-            // HUD peeks need room for a level bar on the right.
-            let side = vm.peek?.isHUD == true ? size.height + 48 : size.height + 8
+            // HUD peeks need room for a level bar on the right. Network speed needs room for text.
+            let isNetOnly = isNetworkSpeedVisible && !timer.isActive && !(media.info?.isPlaying ?? false) && vm.peek == nil && !airDrop.isTransferring
+            let side = vm.peek?.isHUD == true ? size.height + 76 : isNetOnly ? size.height + 44 : size.height + 8
             size.width += 2 * side
         }
         return size
@@ -32,7 +42,8 @@ struct NotchRootView: View {
     private var topRadius: CGFloat { vm.isOpen ? 14 : 6 }
     private var bottomRadius: CGFloat {
         if vm.isOpen { return settings.cornerRadius }
-        return showActivity && vm.peek?.isBanner == true ? 20 : 10
+        if showActivity && (vm.peek?.isBanner == true || vm.peek?.isDeviceCard == true) { return 20 }
+        return 10
     }
 
     var body: some View {
@@ -87,6 +98,7 @@ struct NotchRootView: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showActivity)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: vm.peek?.isHUD)
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: vm.peek?.isBanner)
+        .animation(.spring(response: 0.4, dampingFraction: 0.82), value: vm.peek?.isDeviceCard)
     }
 }
 
@@ -97,12 +109,16 @@ struct ClosedActivityView: View {
     @EnvironmentObject private var airDrop: AirDropService
     @EnvironmentObject private var media: MediaManager
     @EnvironmentObject private var timer: TimerManager
+    @EnvironmentObject private var stats: SystemStatsManager
+    @EnvironmentObject private var settings: AppSettings
     @Environment(\.notchAccent) private var accent
     let height: CGFloat
 
     var body: some View {
         if case .banner(let banner) = vm.peek {
             BannerView(banner: banner, height: height)
+        } else if case .device(let name, let symbol, let battery, let info) = vm.peek, vm.peek?.isDeviceCard == true {
+            DeviceBannerView(name: name, symbol: symbol, battery: battery, info: info, height: height)
         } else {
             row
         }
@@ -143,12 +159,41 @@ struct ClosedActivityView: View {
                         .font(.system(size: 12, weight: .semibold).monospacedDigit())
                         .foregroundStyle(accent.highlight)
                 }
+            } else if settings.networkLiveActivity && stats.isNetworkActive && !(media.info?.isPlaying ?? false) {
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.green)
+                    Text(stats.formattedDown)
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white)
+                }
+                .frame(width: height + 36, alignment: .leading)
+
+                Spacer()
+
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.cyan)
+                    Text(stats.formattedUp)
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white)
+                }
+                .frame(width: height + 36, alignment: .trailing)
             } else {
+                let isPlaying = media.info?.isPlaying ?? false
                 ArtworkView(image: media.artwork, cornerRadius: 5)
                     .frame(width: height - 10, height: height - 10)
+                    .contentShape(Rectangle())
+                    .onTapGesture { media.playPause() }
+                    .help(isPlaying ? "Pause music" : "Play music")
                 Spacer()
-                WaveformView(isPlaying: true, barCount: 4, maxHeight: height - 16, color: accent.color)
+                WaveformView(isPlaying: isPlaying, barCount: 4, maxHeight: height - 16, color: accent.color)
                     .frame(width: height - 10)
+                    .contentShape(Rectangle())
+                    .onTapGesture { media.playPause() }
+                    .help(isPlaying ? "Pause music" : "Play music")
             }
         }
         .frame(height: height)
@@ -228,6 +273,118 @@ struct BannerView: View {
     }
 }
 
+/// An AirPods / Bluetooth connection drop-down card in the Dynamic Island.
+struct DeviceBannerView: View {
+    static let contentHeight: CGFloat = 46
+
+    let name: String
+    let symbol: String
+    let battery: Int?
+    let info: DeviceBatteryInfo?
+    let height: CGFloat
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Upper row beside the physical notch
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: symbol)
+                        .font(.system(size: height * 0.46, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .white.opacity(0.35), radius: 4)
+                        .frame(width: height - 6)
+                }
+
+                Spacer()
+
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(Color(red: 0.2, green: 0.95, blue: 0.4))
+                        .frame(width: 6, height: 6)
+                        .shadow(color: Color.green.opacity(0.8), radius: 4)
+                    Text("Connected")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color(red: 0.2, green: 0.95, blue: 0.4))
+                }
+            }
+            .frame(height: height)
+
+            // Lower card underneath the physical notch
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.system(size: 13, weight: .bold))
+                        .lineLimit(1)
+                    Text(subtitleText)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                // Battery indicators
+                if let info, info.isAirPods {
+                    HStack(spacing: 7) {
+                        if let l = info.left {
+                            batteryPill(label: "L", level: l, icon: "airpod.left")
+                        }
+                        if let r = info.right {
+                            batteryPill(label: "R", level: r, icon: "airpod.right")
+                        }
+                        if let c = info.caseBattery {
+                            batteryPill(label: "Case", level: c, icon: "airpodspro.chargingcase.wireless.fill")
+                        }
+                    }
+                } else if let b = battery ?? info?.primaryBattery {
+                    HStack(spacing: 5) {
+                        Image(systemName: batteryIcon(for: b))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(b <= 20 ? .red : .green)
+                        Text("\(b)%")
+                            .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(b <= 20 ? .red : .white)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(.white.opacity(0.12)))
+                }
+            }
+            .padding(.horizontal, 4)
+            .frame(height: Self.contentHeight)
+        }
+    }
+
+    private var subtitleText: String {
+        if symbol.contains("airpod") { return "Spatial Audio Active" }
+        if symbol.contains("keyboard") { return "Bluetooth Keyboard" }
+        if symbol.contains("mouse") { return "Bluetooth Mouse" }
+        if symbol.contains("trackpad") { return "Bluetooth Trackpad" }
+        return "Bluetooth Connected"
+    }
+
+    private func batteryPill(label: String, level: Int, icon: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+            Text("\(level)%")
+                .font(.system(size: 10, weight: .bold, design: .rounded).monospacedDigit())
+                .foregroundStyle(level <= 20 ? .red : .white)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3.5)
+        .background(Capsule().fill(.white.opacity(0.12)))
+    }
+
+    private func batteryIcon(for level: Int) -> String {
+        if level > 75 { return "battery.100" }
+        if level > 50 { return "battery.75" }
+        if level > 25 { return "battery.50" }
+        return "battery.25"
+    }
+}
+
 /// Left icon + right detail for a peek. Content transitions between peeks.
 private struct PeekView: View {
     let peek: Peek
@@ -239,15 +396,20 @@ private struct PeekView: View {
             switch peek {
             case .charging(let level):
                 Image(systemName: "bolt.fill")
-                    .font(.system(size: height * 0.45, weight: .semibold))
-                    .foregroundStyle(.green)
-                    .frame(width: height - 10)
+                    .font(.system(size: height * 0.46, weight: .bold))
+                    .foregroundStyle(Color(red: 0.2, green: 0.95, blue: 0.4))
+                    .shadow(color: Color.green.opacity(0.6), radius: 6)
+                    .frame(width: height - 8, alignment: .leading)
                 Spacer()
-                Text("\(level)%")
-                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.green)
+                HStack(spacing: 6) {
+                    FluidHUDLevelBar(level: Float(level) / 100.0, color: Color(red: 0.2, green: 0.95, blue: 0.4))
+                    Text("\(level)%")
+                        .font(.system(size: 10.5, weight: .heavy, design: .rounded).monospacedDigit())
+                        .foregroundStyle(Color(red: 0.2, green: 0.95, blue: 0.4))
+                        .frame(width: 32, alignment: .trailing)
+                }
 
-            case .device(let name, let symbol, let battery):
+            case .device(let name, let symbol, let battery, _):
                 Image(systemName: symbol)
                     .font(.system(size: height * 0.45, weight: .medium))
                     .frame(width: height - 10)
@@ -264,41 +426,111 @@ private struct PeekView: View {
                 }
 
             case .volume(let level, let muted):
-                Image(systemName: muted || level == 0 ? "speaker.slash.fill" : level < 0.34 ? "speaker.wave.1.fill" : level < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill")
-                    .font(.system(size: height * 0.4, weight: .medium))
-                    .frame(width: height - 4, alignment: .leading)
+                HStack(spacing: 5) {
+                    if muted || level == 0 {
+                        Image(systemName: "speaker.slash.fill")
+                            .font(.system(size: height * 0.44, weight: .bold))
+                            .foregroundStyle(.red)
+                            .shadow(color: .red.opacity(0.5), radius: 4)
+                    } else {
+                        Image(systemName: level < 0.34 ? "speaker.wave.1.fill" : level < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill")
+                            .font(.system(size: height * 0.44, weight: .bold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .white.opacity(0.3), radius: 4)
+                    }
+                }
+                .frame(width: height - 4, alignment: .leading)
+
                 Spacer()
-                LevelBar(level: muted ? 0 : level, color: accent.color)
+
+                HStack(spacing: 6) {
+                    FluidHUDLevelBar(
+                        level: muted ? 0 : level,
+                        color: muted ? .red : accent.color
+                    )
+
+                    if muted {
+                        Text("MUTE")
+                            .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                            .foregroundStyle(.red)
+                            .frame(width: 32, alignment: .trailing)
+                    } else {
+                        Text("\(Int((level * 100).rounded()))%")
+                            .font(.system(size: 10.5, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(.white)
+                            .frame(width: 32, alignment: .trailing)
+                    }
+                }
 
             case .brightness(let level):
-                Image(systemName: level < 0.5 ? "sun.min.fill" : "sun.max.fill")
-                    .font(.system(size: height * 0.42, weight: .medium))
+                Image(systemName: level < 0.35 ? "sun.min.fill" : level < 0.7 ? "sun.haze.fill" : "sun.max.fill")
+                    .font(.system(size: height * 0.46, weight: .bold))
+                    .foregroundStyle(Color(red: 1.0, green: 0.85, blue: 0.25))
+                    .shadow(color: Color.yellow.opacity(0.5), radius: 5)
                     .frame(width: height - 4, alignment: .leading)
+
                 Spacer()
-                LevelBar(level: level, color: accent.color)
+
+                HStack(spacing: 6) {
+                    FluidHUDLevelBar(
+                        level: level,
+                        color: Color(red: 1.0, green: 0.85, blue: 0.25)
+                    )
+
+                    Text("\(Int((level * 100).rounded()))%")
+                        .font(.system(size: 10.5, weight: .bold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .frame(width: 32, alignment: .trailing)
+                }
+
+            case .micMute(let muted):
+                Image(systemName: muted ? "mic.slash.fill" : "mic.fill")
+                    .font(.system(size: height * 0.44, weight: .bold))
+                    .foregroundStyle(muted ? .red : Color(red: 1.0, green: 0.6, blue: 0.2))
+                    .shadow(color: muted ? .red.opacity(0.5) : Color.orange.opacity(0.5), radius: 4)
+                    .frame(width: height - 4, alignment: .leading)
+
+                Spacer()
+
+                Text(muted ? "MUTED" : "ACTIVE")
+                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(muted ? .red : Color(red: 1.0, green: 0.6, blue: 0.2))
 
             case .banner:
-                EmptyView() // drawn by BannerView
+                EmptyView()
             }
         }
         .transition(.opacity)
     }
 }
 
-private struct LevelBar: View {
+private struct FluidHUDLevelBar: View {
     let level: Float
     let color: Color
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            Capsule().fill(.white.opacity(0.2))
-            Capsule().fill(color)
-                .frame(width: 56 * CGFloat(min(max(level, 0), 1)))
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.18))
+
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [color.opacity(0.85), color],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: max(0, geo.size.width * CGFloat(min(max(level, 0), 1))))
+                    .shadow(color: color.opacity(0.45), radius: 3, y: 0)
+            }
         }
-        .frame(width: 56, height: 5)
-        .animation(.spring(response: 0.25, dampingFraction: 0.9), value: level)
+        .frame(width: 68, height: 7.5)
+        .animation(.spring(response: 0.28, dampingFraction: 0.8), value: level)
     }
 }
+
 
 /// Shared measurements so every tab lines up the same way:
 /// equal side columns with the main content centered between them.
@@ -338,6 +570,7 @@ struct ExpandedView: View {
                 case .timer: TimerView()
                 case .mirror: MirrorView()
                 case .markets: MarketsView()
+                case .dev: DevToolsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

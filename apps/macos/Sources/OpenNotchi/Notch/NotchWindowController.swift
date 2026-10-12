@@ -40,6 +40,11 @@ final class NotchWindowController: NSObject {
             .environmentObject(prayers)
             .environmentObject(settings)
             .environmentObject(AirDropService.shared)
+            .environmentObject(AudioDeviceManager.shared)
+            .environmentObject(ColorPickerManager.shared)
+            .environmentObject(PortInspector.shared)
+            .environmentObject(VisionService.shared)
+            .environmentObject(SystemStatsManager.shared)
         let hosting = FirstMouseHostingView(rootView: root)
         hosting.frame = NSRect(origin: .zero, size: Self.windowSize)
         panel.contentView = hosting
@@ -92,10 +97,25 @@ final class NotchWindowController: NSObject {
         case "demo-on": AppDelegate.shared?.media.startDemo()
         case "demo-off": AppDelegate.shared?.media.stopDemo()
         // Previews for the live activities, handy when designing them.
-        case "peek-charging": viewModel.showPeek(.charging(level: 76))
-        case "peek-airpods": viewModel.showPeek(.device(name: "AirPods Pro", symbol: "airpodspro", battery: 82))
-        case "peek-volume": viewModel.showPeek(.volume(level: 0.62, muted: false))
-        case "peek-brightness": viewModel.showPeek(.brightness(level: 0.4))
+        case "peek-charging": viewModel.showPeek(.charging(level: 85))
+        case "peek-airpods":
+            viewModel.showPeek(.device(
+                name: "AirPods Pro",
+                symbol: "airpodspro",
+                battery: 92,
+                info: DeviceBatteryInfo(left: 92, right: 92, caseBattery: 85, single: 92)
+            ))
+        case "peek-headphones":
+            viewModel.showPeek(.device(
+                name: "Sony WH-1000XM5",
+                symbol: "headphones",
+                battery: 80,
+                info: DeviceBatteryInfo(left: nil, right: nil, caseBattery: nil, single: 80)
+            ))
+        case "peek-volume": viewModel.showPeek(.volume(level: 0.68, muted: false))
+        case "peek-mute": viewModel.showPeek(.volume(level: 0, muted: true))
+        case "peek-brightness": viewModel.showPeek(.brightness(level: 0.75))
+        case "peek-mic": viewModel.showPeek(.micMute(muted: true))
         case "peek-meeting":
             viewModel.showPeek(.banner(ReminderCenter.eventBanner(
                 title: "Daily standup",
@@ -133,6 +153,7 @@ final class NotchWindowController: NSObject {
                 NotificationCenter.default.post(name: .openStripPicker, object: nil)
             }
         case "markets": viewModel.tab = .markets; viewModel.open()
+        case "dev", "tools": viewModel.tab = .dev; viewModel.open()
         default: break
         }
     }

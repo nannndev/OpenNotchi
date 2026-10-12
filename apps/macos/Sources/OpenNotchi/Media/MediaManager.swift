@@ -192,6 +192,30 @@ final class MediaManager: ObservableObject {
         perform { $0.seek(to: seconds) }
     }
 
+    func toggleShuffle() {
+        if var current = info {
+            current.isShuffled = !(current.isShuffled ?? false)
+            info = current
+        }
+        perform { $0.toggleShuffle() }
+    }
+
+    func toggleRepeat() {
+        if var current = info {
+            current.isRepeating = !(current.isRepeating ?? false)
+            info = current
+        }
+        perform { $0.toggleRepeat() }
+    }
+
+    func toggleLove() {
+        if var current = info {
+            current.isLoved = !(current.isLoved ?? false)
+            info = current
+        }
+        perform { $0.toggleLove() }
+    }
+
     private func perform(_ action: @escaping (MediaProvider) -> Void) {
         guard let id = info?.sourceID ?? activeProviderID, let provider = provider(for: id) else { return }
         AppleScriptRunner.queue.async { [weak self] in

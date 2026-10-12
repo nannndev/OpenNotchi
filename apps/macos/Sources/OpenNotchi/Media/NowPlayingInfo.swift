@@ -15,6 +15,9 @@ struct NowPlayingInfo: Equatable {
     var videoID: String? = nil
     /// Name of the device playing it when that's not this Mac (Spotify Connect).
     var remoteDevice: String? = nil
+    var isShuffled: Bool? = nil
+    var isRepeating: Bool? = nil
+    var isLoved: Bool? = nil
     var timestamp = Date()
 
     var trackKey: String { "\(sourceID)|\(title)|\(artist)|\(album)" }

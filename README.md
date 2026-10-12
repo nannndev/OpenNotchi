@@ -13,36 +13,25 @@ alternative to paid apps like NotchNook and Alcove.
 
 - **Notch that expands on hover**, matching the physical camera housing (falls
   back to a pill on displays without a notch)
-- **Now Playing** for **Spotify**, **Apple Music** and **YouTube / YouTube Music**
-  in Chrome, Brave, Edge, Arc and Safari: artwork, title/artist, seekable
-  progress bar, play/pause/next/previous
-- **Live video preview** of the YouTube video right in the notch
-- **Spotify on other devices** (Spotify Connect): see and control what's
-  playing on your iPhone or speaker after connecting your Spotify account
-- **Markets**: your own watchlist of IDX (`.JK`) and global stocks, indices,
-  crypto and currencies with sparklines (delayed, for information only)
-- **Synced lyrics** from [LRCLIB](https://lrclib.net) (free, no API key): a
-  Lyrics tab that follows the song, plus the current line under the title on Home
-- **Live activity** while closed: artwork and waveform beside the notch
-- **Tray**: drag files onto the notch to park them, drag them back out later,
-  double-click to open, right-click for Finder/AirDrop
-- **AirDrop**: drop files on the AirDrop zone to send them right away
-- **Clipboard history**: text and images, searchable, click to copy again.
-  Skips items password managers mark as concealed
-- **Calendar**: today's upcoming events next to the player, with a Join button
-  for Zoom, Google Meet, Teams, Webex and FaceTime links
-- **Meeting reminders**: a banner drops out of the notch a few minutes before
-  each event, with a one-click Join
-- **Prayer times**: the next prayer in the header and a banner at each prayer,
-  calculated offline (Kemenag, MWL, ISNA, Umm al-Qura, JAKIM, Diyanet and more;
-  Hanafi Asr; Imsak and iftar during Ramadan)
-- **Timer**: Pomodoro-style presets, countdown shown beside the notch while closed,
-  sound + notification when done
-- **Mirror**: camera preview up to 1080p, drag to resize, with looks, a ring light,
-  portrait blur or album-art backgrounds, hand gestures (✌️ 👍 ✋), photos
-  straight to the Tray and a **photobox** that makes strips in 12 styles
-- **Live activities**: charger connected, AirPods / Bluetooth devices with
-  battery, and an optional volume & brightness HUD in the notch
+- **Now Playing with Spinning Vinyl Deck**: Interactive album jacket where a grooved vinyl record slides out and rotates continuously during playback, with an ambient color aura backdrop matching the album art palette
+- **Complete Transport & Audio Controls**: Integrated system volume slider with 1-click mute/unmute, shuffle, repeat, and favorite heart buttons
+- **Interactive Karaoke Lyrics**: Synced lyrics with depth blur, hover play cues, and 1-click seeking by tapping any lyric line
+- **Closed Notch Dynamic Island**: Interactive tap on mini artwork or animated waveform to play/pause directly from the closed notch
+- **Developer Tools**: Built-in **Port Inspector** for active localhost servers with 1-click process termination, screen **Color Eyedropper** (HEX, RGB, Swift), **Audio Device Switcher** with L/R channels, and **System Performance Monitor** (CPU, RAM, Network I/O)
+- **Photobox & Deco Studio**: Photobooth camera with 18 trending styles and Korean Deco Studio (custom doodle frames, stars, ribbons, stamps, pins, tape) with instant export to Tray
+- **Live Video Preview** of YouTube videos right in the notch
+- **Spotify on other devices** (Spotify Connect): see and control playback on other devices
+- **AirPods & Device Battery Drop-Down**: Detailed Left, Right, and Charging Case battery percentages with native Apple SF symbols, plus fluid spring HUD for volume and brightness
+- **Tray**: drag files onto the notch to park them, drag them back out later, double-click to open, right-click for Finder/AirDrop/OCR/Format conversion
+- **AirDrop & Instant OCR**: drop files on the AirDrop zone to send immediately, or drop any image / PDF onto the **Instant OCR** zone to copy recognized text to clipboard (Apple Vision offline, 0 latency)
+- **Image Converter**: 1-click convert parked images to WebP, PNG, or JPEG with compression
+- **Clipboard history**: text and images, searchable, click to copy again. Skips items password managers mark as concealed
+- **Calendar & Meeting Reminders**: today's upcoming events next to the player, with a Join button for Zoom, Meet, Teams, Webex, and drop-down reminder banners
+- **Prayer times**: the next prayer in the header and a banner at each prayer, calculated offline
+- **Timer**: Pomodoro-style presets, countdown shown beside the notch while closed
+- **Mirror**: camera preview up to 1080p with looks, ring light, portrait blur, and hand gestures (✌️ 👍 ✋)
+- **Markets**: your own watchlist of IDX (`.JK`) and global stocks, crypto and currencies
+- **Weather** in the notch header (Open-Meteo, no API key)
 - **Weather** in the notch header (Open-Meteo, no API key): search a city or
   use your location
 - **Auto-update** via Sparkle, from GitHub Releases

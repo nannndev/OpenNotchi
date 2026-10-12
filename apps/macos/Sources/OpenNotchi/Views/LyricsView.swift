@@ -44,16 +44,16 @@ struct MiniPlayerColumn: View {
     @Environment(\.notchAccent) private var accent
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 4) {
-                ControlButton(systemName: "backward.fill", size: 13) { media.previousTrack() }
-                ControlButton(systemName: (media.info?.isPlaying ?? false) ? "pause.fill" : "play.fill", size: 20) { media.playPause() }
-                ControlButton(systemName: "forward.fill", size: 13) { media.nextTrack() }
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                ControlButton(systemName: "backward.fill", size: 12) { media.previousTrack() }
+                PlayPauseButton(isPlaying: media.info?.isPlaying ?? false) { media.playPause() }
+                ControlButton(systemName: "forward.fill", size: 12) { media.nextTrack() }
             }
             if let info = media.info {
                 TimelineView(.periodic(from: .now, by: 0.5)) { context in
                     let position = info.position(at: context.date)
-                    VStack(spacing: 4) {
+                    VStack(spacing: 3) {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(.white.opacity(0.15))
@@ -67,11 +67,12 @@ struct MiniPlayerColumn: View {
                             Spacer()
                             Text(info.duration > 0 ? formatTime(info.duration) : "--:--")
                         }
-                        .font(.system(size: 9, weight: .medium).monospacedDigit())
+                        .font(.system(size: 8.5, weight: .medium).monospacedDigit())
                         .foregroundStyle(.secondary)
                     }
                 }
             }
+            PlayerVolumeBar()
         }
         .disabled(media.info == nil)
         .opacity(media.info == nil ? 0.4 : 1)
@@ -129,31 +130,48 @@ private struct LyricLineView: View {
     /// How many lines away from the one being sung.
     let distance: Int
     let accent: ResolvedAccent
+    @State private var hovering = false
 
     private var isCurrent: Bool { distance == 0 }
 
     private var opacity: Double {
+        if isCurrent { return 1.0 }
+        if hovering { return 0.85 }
         switch distance {
-        case 0: return 1
-        case 1: return 0.5
-        case 2: return 0.3
+        case 1: return 0.52
+        case 2: return 0.32
         default: return 0.18
         }
     }
 
     var body: some View {
-        Text(line.text.isEmpty ? "♪" : line.text)
-            .font(.system(size: 16, weight: .bold, design: .rounded))
-            .multilineTextAlignment(.center)
-            .foregroundStyle(isCurrent && !accent.isNeutral ? accent.color : .white)
-            .opacity(opacity)
-            .blur(radius: distance >= 2 ? min(Double(distance - 1) * 0.6, 1.8) : 0)
-            // Inset before scaling so the enlarged current line never clips at the edges.
-            .padding(.horizontal, 18)
-            .scaleEffect(isCurrent ? 1.06 : 0.94)
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-            .animation(.spring(response: 0.45, dampingFraction: 0.8), value: distance)
+        HStack(spacing: 6) {
+            if hovering && !isCurrent {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(accent.color)
+                    .transition(.opacity)
+            }
+            Text(line.text.isEmpty ? "♪" : line.text)
+                .font(.system(size: isCurrent ? 16 : 14.5, weight: isCurrent ? .bold : .medium, design: .rounded))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(isCurrent && !accent.isNeutral ? accent.color : (hovering ? .white : .white))
+                .shadow(color: isCurrent ? (accent.isNeutral ? Color.white.opacity(0.3) : accent.color.opacity(0.45)) : .clear, radius: 8)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(hovering ? Color.white.opacity(0.08) : Color.clear)
+        )
+        .opacity(opacity)
+        .blur(radius: (distance >= 2 && !hovering) ? min(Double(distance - 1) * 0.6, 1.8) : 0)
+        .scaleEffect(isCurrent ? 1.06 : (hovering ? 1.02 : 0.95))
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: distance)
+        .animation(.spring(response: 0.25), value: hovering)
     }
 }
 

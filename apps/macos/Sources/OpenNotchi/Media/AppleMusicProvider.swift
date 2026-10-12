@@ -44,4 +44,6 @@ final class AppleMusicProvider: MediaProvider {
     func nextTrack() { tell("next track") }
     func previousTrack() { tell("previous track") }
     func seek(to seconds: Double) { tell("set player position to \(Int(seconds))") }
+    func toggleShuffle() { tell("set shuffle enabled to not (shuffle enabled)") }
+    func toggleRepeat() { tell("if song repeat is off then set song repeat to all else if song repeat is all then set song repeat to one else set song repeat to off") }
 }

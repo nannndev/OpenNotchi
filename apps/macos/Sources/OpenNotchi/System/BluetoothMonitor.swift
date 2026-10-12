@@ -4,8 +4,8 @@ import IOBluetooth
 
 /// Reports Bluetooth devices (AirPods, headphones, keyboards…) as they connect.
 final class BluetoothMonitor: NSObject, CBCentralManagerDelegate {
-    /// Called on the main thread with the device's name, an SF Symbol and battery (if known).
-    var onConnect: ((String, String, Int?) -> Void)?
+    /// Called on the main thread with the device's name, an SF Symbol, primary battery, and detailed battery info.
+    var onConnect: ((String, String, Int?, DeviceBatteryInfo?) -> Void)?
 
     private var notification: IOBluetoothUserNotification?
     private var permissionRequest: CBCentralManager?
@@ -51,8 +51,9 @@ final class BluetoothMonitor: NSObject, CBCentralManagerDelegate {
         let symbol = Self.symbol(for: device, name: name)
 
         // Battery levels arrive a moment after the connection.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            self?.onConnect?(name, symbol, Self.battery(of: device))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            let info = Self.batteryInfo(of: device)
+            self?.onConnect?(name, symbol, info.primaryBattery, info)
         }
     }
 
@@ -73,15 +74,25 @@ final class BluetoothMonitor: NSObject, CBCentralManagerDelegate {
         }
     }
 
-    /// Battery percentage via IOBluetoothDevice's undocumented battery properties.
-    /// Returns nil when the device doesn't report one.
-    private static func battery(of device: IOBluetoothDevice) -> Int? {
-        let keys = ["batteryPercentCombined", "batteryPercentSingle", "batteryPercentLeft", "batteryPercentRight"]
-        let values = keys.compactMap { key -> Int? in
+    /// Battery info via IOBluetoothDevice's undocumented battery properties.
+    static func batteryInfo(of device: IOBluetoothDevice) -> DeviceBatteryInfo {
+        func read(_ key: String) -> Int? {
             guard device.responds(to: NSSelectorFromString(key)),
                   let value = device.value(forKey: key) as? Int, value > 0 else { return nil }
             return value
         }
-        return values.first
+
+        let left = read("batteryPercentLeft")
+        let right = read("batteryPercentRight")
+        let caseBattery = read("batteryPercentCase")
+        let single = read("batteryPercentSingle") ?? read("batteryPercentCombined")
+
+        return DeviceBatteryInfo(left: left, right: right, caseBattery: caseBattery, single: single)
+    }
+
+    /// Battery percentage via IOBluetoothDevice's undocumented battery properties.
+    private static func battery(of device: IOBluetoothDevice) -> Int? {
+        batteryInfo(of: device).primaryBattery
     }
 }
+

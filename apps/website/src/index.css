@@ -168,6 +168,19 @@ body {
   to { stroke-dashoffset: 276.5; }
 }
 
+@keyframes spin-vinyl {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-vinyl {
+  animation: spin-vinyl 8s linear infinite;
+}
+
+.spin-vinyl-paused {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;

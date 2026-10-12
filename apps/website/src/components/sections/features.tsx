@@ -1,20 +1,21 @@
 import { motion } from "motion/react"
-import { AirplayIcon, CalendarClock, Camera, CandlestickChart, Clipboard, CloudSun, Inbox, MessageSquareQuote, MoonStar, Music, Palette, ScanFace, ShieldCheck, Smartphone, Sparkles, Timer, type LucideIcon } from "lucide-react"
+import { AirplayIcon, CalendarClock, Camera, CandlestickChart, Clipboard, CloudSun, Disc, Inbox, MessageSquareQuote, MoonStar, Palette, ScanFace, ShieldCheck, Smartphone, Sparkles, Terminal, Timer, type LucideIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
-  { icon: Music, title: "Now Playing", body: "Spotify, Apple Music and YouTube in your browser, with artwork, seekable progress and controls." },
-  { icon: AirplayIcon, title: "Live video preview", body: "The YouTube video you're watching plays along in the notch, muted and in sync." },
-  { icon: MessageSquareQuote, title: "Synced lyrics", body: "Flip the player into lyrics mode. Lines light up as they're sung; tap one to jump there." },
+  { icon: Disc, title: "Vinyl & Ambient Aura", body: "Interactive grooved vinyl record slides out and spins continuously, bathed in a living color aura matched to your cover art." },
+  { icon: Terminal, title: "Developer Tools", body: "Built-in localhost port inspector with process killer, screen eyedropper color picker, and audio device manager." },
+  { icon: MessageSquareQuote, title: "Interactive Lyrics", body: "Flip to synced lyrics with depth blur. Hover for instant play cues or click any line to seek there." },
+  { icon: Camera, title: "Photobox & Deco Studio", body: "Snap into 18 frames, customize with Korean stickers, doodle frames, pins, tape, and drop straight to the Tray." },
+  { icon: Sparkles, title: "AirPods & Fluid HUD", body: "Left/Right/Case battery drop-down card and springy fluid HUD capsule for system volume, brightness and mic." },
   { icon: Smartphone, title: "Spotify on any device", body: "Playing on your iPhone or speaker? Connect Spotify to see it, read along and skip from your Mac." },
-  { icon: Camera, title: "Photobox", body: "Snap 1 to 6 photos into 18 trending frames, as a strip or sized for a story, post or square." },
+  { icon: AirplayIcon, title: "Live video preview", body: "The YouTube video you're watching plays along in the notch, muted and in sync." },
   { icon: ScanFace, title: "Mirror", body: "An HD mirror with looks, a ring light, portrait blur, album-art backgrounds and hand gestures." },
   { icon: CalendarClock, title: "Meeting reminders", body: "A heads-up drops out of the notch before each event, with one-click Join for Zoom, Meet and Teams." },
   { icon: MoonStar, title: "Prayer times", body: "The next prayer in the header and a reminder at each one. Kemenag, MWL, ISNA and more." },
   { icon: CandlestickChart, title: "Markets", body: "Your own watchlist of Indonesian and global stocks, indices, crypto and currencies." },
   { icon: Inbox, title: "Tray & AirDrop", body: "Park files on the notch with real thumbnails, or AirDrop them and watch the progress." },
   { icon: Clipboard, title: "Clipboard history", body: "Search and re-copy recent text and images. Password-manager copies are skipped." },
-  { icon: Sparkles, title: "Live activities", body: "Charging, AirPods battery and a volume & brightness HUD, right beside the notch." },
   { icon: CloudSun, title: "Weather & calendar", body: "Today's weather, your next events and battery level, at a glance." },
   { icon: Timer, title: "Timer", body: "Pomodoro countdowns that stay visible beside the notch, with a sound when they're done." },
   { icon: Palette, title: "Make it yours", body: "Liquid Glass and music-adaptive themes, custom shortcut, and updates that install themselves." },

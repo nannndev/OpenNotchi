@@ -6,6 +6,18 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-13
+
+### Added
+- **Spinning Vinyl Record Deck & Sleeve**: Interactive album jacket where a grooved vinyl disc slides out and spins continuously while playing, featuring concentric microgrooves, specular sheen, and circular center artwork label
+- **Ambient Backdrop Aura**: Dynamic blurred ambient lighting behind the player matching the dominant colors extracted from the album artwork palette, with gentle breathing animation
+- **Full Transport & Volume Controls**: Integrated volume slider with instant click-to-mute, shuffle toggle, repeat toggle, loved/favorite track button, and glowing play/pause button
+- **Interactive Karaoke Lyrics**: Hover preview with play cue, click-to-seek timestamp jumping, depth-of-field distance blur, and rounded glowing karaoke typography for the active lyric line
+- **Closed Notch Dynamic Island Live Activity**: Interactive tap-to-toggle play/pause directly on the mini artwork and dancing waveform when the notch is closed
+- **Developer Tools Tab**: Active local port inspector with process killer, screen eyedropper color picker with 1-click HEX/RGB copy, audio output device manager with L/R channel balance, and real-time CPU/RAM/Network gauges
+- **Photobox Sticker & Deco Studio**: Korean photobooth-style sticker editor with custom doodle frames, cute stars, ribbons, stamps, pins, tape, drag/rotate/scale placement, and instant export to the Tray
+- **AirPods & Device Battery Drop-Down Banner**: Detailed Left earbud, Right earbud, and Charging Case battery levels with native Apple SF symbols, plus fluid spring HUD capsule for system volume, brightness, and mic mute status
+
 ## [0.4.0] - 2026-10-12
 
 ### Added

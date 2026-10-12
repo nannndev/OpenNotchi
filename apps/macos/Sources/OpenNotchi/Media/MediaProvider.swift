@@ -18,10 +18,16 @@ protocol MediaProvider: AnyObject {
     func nextTrack()
     func previousTrack()
     func seek(to seconds: Double)
+    func toggleShuffle()
+    func toggleRepeat()
+    func toggleLove()
 }
 
 extension MediaProvider {
     var showsInLauncher: Bool { true }
+    func toggleShuffle() {}
+    func toggleRepeat() {}
+    func toggleLove() {}
 
     var appURL: URL? { NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) }
     var isInstalled: Bool { appURL != nil }
