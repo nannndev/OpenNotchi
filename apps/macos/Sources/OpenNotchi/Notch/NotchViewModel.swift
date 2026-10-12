@@ -44,6 +44,7 @@ final class NotchViewModel: ObservableObject {
     /// Current peek beside the closed notch, cleared after its duration.
     @Published private(set) var peek: Peek?
     private var peekWork: DispatchWorkItem?
+    private var deferredBanner: (peek: Peek, at: Date)?
 
     private let settings: AppSettings
     private var isHovering = false
@@ -66,6 +67,11 @@ final class NotchViewModel: ObservableObject {
     func hoverChanged(_ inside: Bool) {
         isHovering = inside
         pending?.cancel()
+        // A banner stays put while the pointer is on it (so its button can be clicked) instead of opening the notch.
+        if peek?.isBanner == true {
+            inside ? peekWork?.cancel() : schedulePeekDismissal(after: 4)
+            return
+        }
         if inside {
             let work = DispatchWorkItem { [weak self] in self?.open() }
             pending = work
@@ -86,12 +92,25 @@ final class NotchViewModel: ObservableObject {
     }
 
     func showPeek(_ peek: Peek) {
-        guard !isOpen else { return }
+        guard !isOpen else {
+            // Reminders shouldn't be lost while the notch is open: show them once it closes.
+            if peek.isBanner { deferredBanner = (peek, .now) }
+            return
+        }
         self.peek = peek
+        schedulePeekDismissal(after: peek.duration)
+    }
+
+    func dismissPeek() {
+        peekWork?.cancel()
+        peek = nil
+    }
+
+    private func schedulePeekDismissal(after delay: TimeInterval) {
         peekWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.peek = nil }
         peekWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + peek.duration, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     func toggle() {
@@ -100,7 +119,14 @@ final class NotchViewModel: ObservableObject {
 
     func close() {
         pending?.cancel()
+        guard isOpen else { return }
         isOpen = false
+        if let deferred = deferredBanner {
+            deferredBanner = nil
+            if Date.now.timeIntervalSince(deferred.at) < 5 * 60 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.showPeek(deferred.peek) }
+            }
+        }
     }
 
     private func scheduleClose(after delay: TimeInterval) {

@@ -16,6 +16,10 @@ struct NotchRootView: View {
     private var bodySize: CGSize {
         if vm.isOpen { return vm.openSize }
         var size = vm.notchSize
+        if showActivity, vm.peek?.isBanner == true {
+            // Banners grow below the notch with room for a title and a button.
+            return CGSize(width: max(size.width + 2 * (size.height + 40), 400), height: size.height + BannerView.contentHeight)
+        }
         if showActivity {
             // HUD peeks need room for a level bar on the right.
             let side = vm.peek?.isHUD == true ? size.height + 48 : size.height + 8
@@ -25,7 +29,10 @@ struct NotchRootView: View {
     }
 
     private var topRadius: CGFloat { vm.isOpen ? 14 : 6 }
-    private var bottomRadius: CGFloat { vm.isOpen ? settings.cornerRadius : 10 }
+    private var bottomRadius: CGFloat {
+        if vm.isOpen { return settings.cornerRadius }
+        return showActivity && vm.peek?.isBanner == true ? 20 : 10
+    }
 
     var body: some View {
         let shape = NotchShape(topRadius: topRadius, bottomRadius: bottomRadius)
@@ -76,6 +83,7 @@ struct NotchRootView: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: vm.isOpen)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showActivity)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: vm.peek?.isHUD)
+        .animation(.spring(response: 0.4, dampingFraction: 0.82), value: vm.peek?.isBanner)
     }
 }
 
@@ -89,6 +97,14 @@ struct ClosedActivityView: View {
     let height: CGFloat
 
     var body: some View {
+        if case .banner(let banner) = vm.peek {
+            BannerView(banner: banner, height: height)
+        } else {
+            row
+        }
+    }
+
+    private var row: some View {
         HStack {
             if let peek = vm.peek {
                 PeekView(peek: peek, height: height)
@@ -112,6 +128,79 @@ struct ClosedActivityView: View {
             }
         }
         .frame(height: height)
+    }
+}
+
+/// A reminder below the notch: icon and badge beside the camera, title and an action underneath.
+struct BannerView: View {
+    static let contentHeight: CGFloat = 50
+
+    @EnvironmentObject private var vm: NotchViewModel
+    let banner: Banner
+    let height: CGFloat
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Image(systemName: banner.icon)
+                    .symbolRenderingMode(.multicolor)
+                    .font(.system(size: height * 0.42, weight: .semibold))
+                    .foregroundStyle(banner.tint)
+                    .frame(width: height - 6)
+                Spacer()
+                Text(banner.badge)
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(banner.tint)
+            }
+            .frame(height: height)
+
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(banner.title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .lineLimit(1)
+                    if let subtitle = banner.subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 4)
+                if let title = banner.actionTitle, let url = banner.actionURL {
+                    Button {
+                        NSWorkspace.shared.open(url)
+                        vm.dismissPeek()
+                    } label: {
+                        Label(title, systemImage: "video.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(.green))
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
+                }
+                Button {
+                    vm.dismissPeek()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(.white.opacity(0.1)))
+                }
+                .buttonStyle(.plain)
+                .help("Dismiss")
+            }
+            .padding(.leading, 6)
+            .frame(height: Self.contentHeight - 6)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            vm.dismissPeek()
+            vm.open()
+        }
     }
 }
 
@@ -163,6 +252,9 @@ private struct PeekView: View {
                     .frame(width: height - 4, alignment: .leading)
                 Spacer()
                 LevelBar(level: level, color: accent.color)
+
+            case .banner:
+                EmptyView() // drawn by BannerView
             }
         }
         .transition(.opacity)

@@ -15,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) lazy var lyrics = LyricsManager(media: media, settings: settings)
     private(set) lazy var weather = WeatherManager(settings: settings)
     private(set) lazy var markets = MarketManager(settings: settings)
+    private(set) lazy var prayers = PrayerTimesManager(settings: settings)
+    private lazy var reminders = ReminderCenter(settings: settings, calendar: calendar, prayers: prayers)
     let updater = Updater()
 
     private let bluetooth = BluetoothMonitor()
@@ -39,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             lyrics: lyrics,
             weather: weather,
             markets: markets,
+            prayers: prayers,
             settings: settings
         )
         setupStatusItem()
@@ -89,6 +92,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         bluetooth.onConnect = { [weak self] name, symbol, battery in
             self?.notchController?.showPeek(.device(name: name, symbol: symbol, battery: battery))
+        }
+
+        reminders.onBanner = { [weak self] banner in
+            self?.notchController?.showPeek(.banner(banner))
         }
 
         mediaKeys.handler = { [weak self] key in
@@ -171,6 +178,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .environmentObject(media)
                     .environmentObject(weather)
                     .environmentObject(markets)
+                    .environmentObject(prayers)
+                    .environmentObject(calendar)
                     .environmentObject(updater)
             )
             let window = NSWindow(contentViewController: hosting)

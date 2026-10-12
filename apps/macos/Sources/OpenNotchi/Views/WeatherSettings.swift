@@ -1,7 +1,23 @@
 import SwiftUI
 
-/// Place picker for the weather badge: city search or current location.
+/// Weather badge toggle and units. The place comes from `LocationSettings`.
 struct WeatherSettings: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        Toggle("Show weather in the notch", isOn: $settings.weatherEnabled)
+        if settings.weatherEnabled {
+            Picker("Units", selection: $settings.useFahrenheit) {
+                Text("Celsius").tag(false)
+                Text("Fahrenheit").tag(true)
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+}
+
+/// Place used by weather and prayer times: city search or current location.
+struct LocationSettings: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var weather: WeatherManager
     @State private var query = ""
@@ -9,8 +25,7 @@ struct WeatherSettings: View {
     @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
-        Toggle("Show weather in the notch", isOn: $settings.weatherEnabled)
-        if settings.weatherEnabled {
+        Group {
             LabeledContent("Location") {
                 HStack {
                     Text(settings.weatherPlace.isEmpty ? "Not set" : settings.weatherPlace)
@@ -44,11 +59,6 @@ struct WeatherSettings: View {
                 }
                 .buttonStyle(.plain)
             }
-            Picker("Units", selection: $settings.useFahrenheit) {
-                Text("Celsius").tag(false)
-                Text("Fahrenheit").tag(true)
-            }
-            .pickerStyle(.segmented)
         }
     }
 

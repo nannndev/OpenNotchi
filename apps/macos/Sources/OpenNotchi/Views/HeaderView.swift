@@ -91,15 +91,18 @@ private struct StatusRotator: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var weather: WeatherManager
     @EnvironmentObject private var markets: MarketManager
+    @EnvironmentObject private var prayers: PrayerTimesManager
     @EnvironmentObject private var vm: NotchViewModel
     @State private var index = 0
 
     private enum Item: Equatable {
+        case prayer(PrayerTime)
         case weather(WeatherSnapshot)
         case quote(Quote)
 
         var id: String {
             switch self {
+            case .prayer: return "prayer"
             case .weather: return "weather"
             case .quote(let quote): return quote.symbol
             }
@@ -108,6 +111,7 @@ private struct StatusRotator: View {
 
     private var items: [Item] {
         var items: [Item] = []
+        if let next = prayers.next { items.append(.prayer(next)) }
         if settings.weatherEnabled, let snapshot = weather.snapshot { items.append(.weather(snapshot)) }
         // The Markets tab already shows every ticker.
         if settings.showTickerInHeader && vm.tab != .markets {
@@ -123,6 +127,17 @@ private struct StatusRotator: View {
                 let item = items[index % items.count]
                 Group {
                     switch item {
+                    case .prayer(let prayer):
+                        HStack(spacing: 5) {
+                            Image(systemName: prayer.kind.symbol)
+                                .symbolRenderingMode(.multicolor)
+                                .font(.system(size: 12))
+                            Text(prayers.name(prayer.kind)).font(.system(size: 12, weight: .bold, design: .rounded))
+                            Text(prayer.date, format: .dateTime.hour().minute())
+                                .font(.system(size: 12, weight: .medium).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        .help(prayers.today.map { "\(prayers.name($0.kind))  \($0.date.formatted(date: .omitted, time: .shortened))" }.joined(separator: "\n"))
                     case .weather(let snapshot):
                         WeatherBadge(snapshot: snapshot, place: settings.weatherPlace)
                     case .quote(let quote):

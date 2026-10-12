@@ -278,6 +278,19 @@ private struct FeaturesPane: View {
                     }
                 }
             }
+            Section("Reminders") {
+                MeetingReminderSettings()
+            }
+            Section {
+                LocationSettings()
+            } header: {
+                Text("Location")
+            } footer: {
+                Text("Used for weather and prayer times.")
+            }
+            Section("Prayer times") {
+                PrayerSettings()
+            }
             Section("Weather") {
                 WeatherSettings()
             }

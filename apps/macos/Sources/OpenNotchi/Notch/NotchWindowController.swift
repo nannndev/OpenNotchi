@@ -20,6 +20,7 @@ final class NotchWindowController: NSObject {
         lyrics: LyricsManager,
         weather: WeatherManager,
         markets: MarketManager,
+        prayers: PrayerTimesManager,
         settings: AppSettings
     ) {
         viewModel = NotchViewModel(settings: settings)
@@ -36,6 +37,7 @@ final class NotchWindowController: NSObject {
             .environmentObject(lyrics)
             .environmentObject(weather)
             .environmentObject(markets)
+            .environmentObject(prayers)
             .environmentObject(settings)
         let hosting = FirstMouseHostingView(rootView: root)
         hosting.frame = NSRect(origin: .zero, size: Self.windowSize)
@@ -80,6 +82,23 @@ final class NotchWindowController: NSObject {
         case "peek-airpods": viewModel.showPeek(.device(name: "AirPods Pro", symbol: "airpodspro", battery: 82))
         case "peek-volume": viewModel.showPeek(.volume(level: 0.62, muted: false))
         case "peek-brightness": viewModel.showPeek(.brightness(level: 0.4))
+        case "peek-meeting":
+            viewModel.showPeek(.banner(ReminderCenter.eventBanner(
+                title: "Daily standup",
+                start: .now.addingTimeInterval(5 * 60),
+                link: (URL(string: "https://meet.google.com/")!, "Google Meet"),
+                color: .blue
+            )))
+        case "peek-prayer":
+            let settings = AppSettings.shared
+            let prayer = PrayerTime(kind: .maghrib, date: .now)
+            viewModel.showPeek(.banner(ReminderCenter.prayerBanner(
+                prayer,
+                name: prayer.kind.name(indonesian: settings.prayerIndonesianNames),
+                place: settings.weatherPlace,
+                minutesLeft: 0,
+                indonesian: settings.prayerIndonesianNames
+            )))
         case "home": viewModel.tab = .home; viewModel.open()
         case "player":
             viewModel.tab = .home

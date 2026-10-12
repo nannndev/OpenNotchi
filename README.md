@@ -29,7 +29,13 @@ alternative to paid apps like NotchNook and Alcove.
 - **AirDrop**: drop files on the AirDrop zone to send them right away
 - **Clipboard history**: text and images, searchable, click to copy again.
   Skips items password managers mark as concealed
-- **Calendar**: today's upcoming events next to the player
+- **Calendar**: today's upcoming events next to the player, with a Join button
+  for Zoom, Google Meet, Teams, Webex and FaceTime links
+- **Meeting reminders**: a banner drops out of the notch a few minutes before
+  each event, with a one-click Join
+- **Prayer times**: the next prayer in the header and a banner at each prayer,
+  calculated offline (Kemenag, MWL, ISNA, Umm al-Qura, JAKIM, Diyanet and more;
+  Hanafi Asr; Imsak and iftar during Ramadan)
 - **Timer**: Pomodoro-style presets, countdown shown beside the notch while closed,
   sound + notification when done
 - **Mirror**: quick camera preview
@@ -89,8 +95,8 @@ Ad-hoc signed debug builds may ask again after a rebuild.
 Other tools can drive the notch with a distributed notification named
 `io.github.opennotchi.command` whose object is `open`, `close`, `toggle`, or a
 tab name (`home`, `lyrics`, `tray`, `clipboard`, `timer`, `mirror`), or
-`settings`. `peek-charging`, `peek-airpods`, `peek-volume` and
-`peek-brightness` preview the live activities.
+`settings`. `peek-charging`, `peek-airpods`, `peek-volume`,
+`peek-brightness`, `peek-meeting` and `peek-prayer` preview the live activities.
 
 ## Project layout
 

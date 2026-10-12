@@ -76,6 +76,17 @@ final class AppSettings: ObservableObject {
     @Published var timerTabEnabled: Bool { didSet { defaults.set(timerTabEnabled, forKey: "timerTabEnabled") } }
     @Published var mirrorTabEnabled: Bool { didSet { defaults.set(mirrorTabEnabled, forKey: "mirrorTabEnabled") } }
     @Published var calendarEnabled: Bool { didSet { defaults.set(calendarEnabled, forKey: "calendarEnabled") } }
+    /// Minutes before a calendar event to show the reminder; 0 turns it off.
+    @Published var meetingReminderMinutes: Int { didSet { defaults.set(meetingReminderMinutes, forKey: "meetingReminderMinutes") } }
+    @Published var meetingRemindersOnlyWithLink: Bool { didSet { defaults.set(meetingRemindersOnlyWithLink, forKey: "meetingRemindersOnlyWithLink") } }
+    @Published var reminderSound: Bool { didSet { defaults.set(reminderSound, forKey: "reminderSound") } }
+    @Published var prayerEnabled: Bool { didSet { defaults.set(prayerEnabled, forKey: "prayerEnabled") } }
+    @Published var prayerMethod: PrayerMethod { didSet { defaults.set(prayerMethod.rawValue, forKey: "prayerMethod") } }
+    @Published var hanafiAsr: Bool { didSet { defaults.set(hanafiAsr, forKey: "hanafiAsr") } }
+    @Published var prayerIndonesianNames: Bool { didSet { defaults.set(prayerIndonesianNames, forKey: "prayerIndonesianNames") } }
+    @Published var prayerNotify: Bool { didSet { defaults.set(prayerNotify, forKey: "prayerNotify") } }
+    /// Extra heads-up this many minutes before each prayer; 0 turns it off.
+    @Published var prayerReminderMinutes: Int { didSet { defaults.set(prayerReminderMinutes, forKey: "prayerReminderMinutes") } }
 
     @Published var launchAtLogin: Bool {
         didSet {
@@ -129,6 +140,15 @@ final class AppSettings: ObservableObject {
             "timerTabEnabled": true,
             "mirrorTabEnabled": true,
             "calendarEnabled": true,
+            "meetingReminderMinutes": 5,
+            "meetingRemindersOnlyWithLink": false,
+            "reminderSound": false,
+            "prayerEnabled": Locale.current.region?.identifier == "ID",
+            "prayerMethod": PrayerMethod.regionalDefault.rawValue,
+            "hanafiAsr": false,
+            "prayerIndonesianNames": Locale.current.region?.identifier == "ID" || Locale.current.language.languageCode?.identifier == "id",
+            "prayerNotify": true,
+            "prayerReminderMinutes": 0,
         ])
         hoverDelay = defaults.double(forKey: "hoverDelay")
         hapticsEnabled = defaults.bool(forKey: "hapticsEnabled")
@@ -167,6 +187,15 @@ final class AppSettings: ObservableObject {
         timerTabEnabled = defaults.bool(forKey: "timerTabEnabled")
         mirrorTabEnabled = defaults.bool(forKey: "mirrorTabEnabled")
         calendarEnabled = defaults.bool(forKey: "calendarEnabled")
+        meetingReminderMinutes = defaults.integer(forKey: "meetingReminderMinutes")
+        meetingRemindersOnlyWithLink = defaults.bool(forKey: "meetingRemindersOnlyWithLink")
+        reminderSound = defaults.bool(forKey: "reminderSound")
+        prayerEnabled = defaults.bool(forKey: "prayerEnabled")
+        prayerMethod = PrayerMethod(rawValue: defaults.string(forKey: "prayerMethod") ?? "") ?? .regionalDefault
+        hanafiAsr = defaults.bool(forKey: "hanafiAsr")
+        prayerIndonesianNames = defaults.bool(forKey: "prayerIndonesianNames")
+        prayerNotify = defaults.bool(forKey: "prayerNotify")
+        prayerReminderMinutes = defaults.integer(forKey: "prayerReminderMinutes")
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

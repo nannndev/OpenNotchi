@@ -65,6 +65,19 @@ private struct EventRow: View {
                     .font(.system(size: 10).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
+            Spacer(minLength: 0)
+            if let link = MeetingLinks.link(for: event) {
+                Button {
+                    NSWorkspace.shared.open(link.url)
+                } label: {
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 9, weight: .semibold))
+                        .frame(width: 20, height: 20)
+                        .background(Circle().fill(.green))
+                }
+                .buttonStyle(.plain)
+                .help("Join on \(link.service)")
+            }
         }
     }
 }

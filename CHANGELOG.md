@@ -6,6 +6,21 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Meeting reminders: a banner drops out of the notch before calendar events
+  (1 to 15 minutes, or off), with a Join button for Zoom, Google Meet, Teams,
+  Webex and FaceTime links. Optionally only for events with a call link
+- Join buttons on today's events next to the player
+- Prayer times: the next prayer rotates in the header, with a banner at each
+  prayer and an optional heads-up before it. Calculated on your Mac (no data
+  sent) with Kemenag, MWL, ISNA, Egypt, Umm al-Qura, JAKIM and Diyanet methods
+  and Hanafi Asr. Imsak and an iftar message during Ramadan
+- Optional sound with reminders
+
+### Changed
+- The location in Settings is shared by weather and prayer times
+- Reminders that arrive while the notch is open show once it closes
+
 ## [0.3.0] - 2026-10-12
 
 ### Added
