@@ -83,10 +83,6 @@ struct PhotoboxSettings: View {
     }
 
     private func render() {
-        cache.update(caption: settings.stripCaption, info: StripInfo(
-            songTitle: media.info?.title ?? "Midnight Drive",
-            artist: media.info?.artist ?? "The Placeholders",
-            artwork: media.artwork
-        ))
+        cache.update(caption: settings.stripCaption, info: StripInfo(media: media, sample: true))
     }
 }

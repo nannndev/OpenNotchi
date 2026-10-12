@@ -32,6 +32,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Mirror pane in Settings with live previews of every photobox style
 - The photobox button opens a style picker right in the mirror, with live
   previews, your strip text and a Start button
+- Six trending photobox styles: Receipt, Social Post, Player (with the song
+  that's playing), Scrapbook, Coquette and Retro PC
 - The Mirror tab stays open when the pointer leaves it (click elsewhere to
   close), and never closes in the middle of a countdown
 
@@ -41,6 +43,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Dragging a Tray item onto the AirDrop zone did nothing
+- The strip text prompt opened behind the tall Mirror and couldn't be closed;
+  the text is now typed right in the style picker
 - AirDrop window closing by itself or never finishing, because the sharing
   service was released right after it opened
 

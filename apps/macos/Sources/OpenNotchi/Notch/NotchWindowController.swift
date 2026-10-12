@@ -113,6 +113,12 @@ final class NotchWindowController: NSObject {
         case "clipboard": viewModel.tab = .clipboard; viewModel.open()
         case "timer": viewModel.tab = .timer; viewModel.open()
         case "mirror": viewModel.tab = .mirror; viewModel.open()
+        case "photobox":
+            viewModel.tab = .mirror
+            viewModel.open()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                NotificationCenter.default.post(name: .openStripPicker, object: nil)
+            }
         case "markets": viewModel.tab = .markets; viewModel.open()
         default: break
         }

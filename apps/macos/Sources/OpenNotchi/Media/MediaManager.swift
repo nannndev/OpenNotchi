@@ -56,7 +56,7 @@ final class MediaManager: ObservableObject {
     }
 
     /// Demo content for screenshots and recordings (no real cover art or tracks).
-    private(set) var isDemo = false
+    @Published private(set) var isDemo = false
 
     func startDemo() {
         isDemo = true

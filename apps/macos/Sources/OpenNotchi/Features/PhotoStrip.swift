@@ -4,13 +4,21 @@ import SwiftUI
 
 /// Look of a photobox strip.
 enum StripStyle: String, CaseIterable, Identifiable {
-    case classic, midnight, film, polaroid, y2k, sakura, retro, newspaper, neon, pastel, love, album
+    // Trending looks first.
+    case classic, receipt, social, player, scrapbook, coquette, desktop
+    case film, polaroid, y2k, midnight, sakura, retro, newspaper, neon, pastel, love, album
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
         case .classic: return "Classic"
+        case .receipt: return "Receipt"
+        case .social: return "Social Post"
+        case .player: return "Player"
+        case .scrapbook: return "Scrapbook"
+        case .coquette: return "Coquette"
+        case .desktop: return "Retro PC"
         case .midnight: return "Midnight"
         case .film: return "Film"
         case .polaroid: return "Polaroid"
@@ -29,6 +37,12 @@ enum StripStyle: String, CaseIterable, Identifiable {
     var swatch: [Color] {
         switch self {
         case .classic: return [.white, Color(white: 0.85)]
+        case .receipt: return [Color(red: 0.97, green: 0.96, blue: 0.94), Color(white: 0.3)]
+        case .social: return [.white, Color(red: 0.93, green: 0.29, blue: 0.4)]
+        case .player: return [Color(red: 0.2, green: 0.75, blue: 0.4), Color(white: 0.08)]
+        case .scrapbook: return [Color(red: 0.91, green: 0.86, blue: 0.77), Color(red: 0.55, green: 0.8, blue: 0.7)]
+        case .coquette: return [Color(red: 0.97, green: 0.84, blue: 0.88), Color(red: 0.76, green: 0.1, blue: 0.36)]
+        case .desktop: return [Color(red: 0, green: 0.5, blue: 0.5), Color(white: 0.75)]
         case .midnight: return [Color(white: 0.2), .black]
         case .film: return [Color(red: 0.91, green: 0.64, blue: 0.23), Color(white: 0.08)]
         case .polaroid: return [Color(red: 0.96, green: 0.94, blue: 0.9), Color(red: 0.17, green: 0.23, blue: 0.4)]
@@ -54,6 +68,35 @@ struct StripInfo {
     var songTitle: String?
     var artist: String?
     var artwork: NSImage?
+    /// Where the song is, for the Player style's progress bar.
+    var songPosition: Double?
+    var songDuration: Double?
+    var isPlaying = true
+
+    /// The song that's playing now. `sample` fills in a placeholder song for previews when nothing plays.
+    @MainActor
+    init(caption: String? = nil, media: MediaManager, sample: Bool = false) {
+        self.caption = caption
+        if let song = media.info {
+            songTitle = song.title
+            artist = song.artist
+            artwork = media.artwork
+            songPosition = song.position(at: .now)
+            songDuration = song.duration > 0 ? song.duration : nil
+            isPlaying = song.isPlaying
+        } else if sample {
+            songTitle = "Midnight Drive"
+            artist = "The Placeholders"
+        }
+    }
+
+    init(caption: String? = nil, date: Date = .now, songTitle: String? = nil, artist: String? = nil, artwork: NSImage? = nil) {
+        self.caption = caption
+        self.date = date
+        self.songTitle = songTitle
+        self.artist = artist
+        self.artwork = artwork
+    }
 }
 
 /// Lays four photos out as a photobox strip (or a 2×2 grid) in one of the `StripStyle`s.
@@ -82,25 +125,32 @@ enum PhotoStripComposer {
         let photos = photos.map { filtered($0, style: style) }
 
         let width: CGFloat = 1200
-        let side: CGFloat = style == .film ? 120 : 70
-        let footer: CGFloat = style.isGrid ? 340 : 430
-        let gap: CGFloat = style == .film ? 26 : 34
+        let side: CGFloat
+        switch style {
+        case .film: side = 120
+        case .social: side = 0
+        case .receipt: side = 100
+        default: side = 70
+        }
+        let header: CGFloat = style == .social ? 150 : 0
+        let footer = footerHeight(style)
+        let gap: CGFloat = style == .film ? 26 : style == .social ? 6 : 34
         var cells: [CGRect] = []
         let height: CGFloat
         if style.isGrid {
             let cellW = (width - 2 * side - gap) / 2
             let cellH = cellW * 3 / 4
             for i in 0..<4 {
-                cells.append(CGRect(x: side + CGFloat(i % 2) * (cellW + gap), y: side + CGFloat(i / 2) * (cellH + gap), width: cellW, height: cellH))
+                cells.append(CGRect(x: side + CGFloat(i % 2) * (cellW + gap), y: header + side + CGFloat(i / 2) * (cellH + gap), width: cellW, height: cellH))
             }
-            height = side + 2 * cellH + gap + footer
+            height = header + side + 2 * cellH + gap + footer
         } else {
             let cellW = width - 2 * side
             let cellH = cellW * 3 / 4
             for i in 0..<4 {
-                cells.append(CGRect(x: side, y: side + CGFloat(i) * (cellH + gap), width: cellW, height: cellH))
+                cells.append(CGRect(x: side, y: header + side + CGFloat(i) * (cellH + gap), width: cellW, height: cellH))
             }
-            height = side + 4 * cellH + 3 * gap + footer
+            height = header + side + 4 * cellH + 3 * gap + footer
         }
         let canvas = CGRect(x: 0, y: 0, width: width, height: height)
         let footerRect = CGRect(x: 0, y: height - footer, width: width, height: footer)
@@ -115,9 +165,12 @@ enum PhotoStripComposer {
         NSGraphicsContext.current = NSGraphicsContext(cgContext: cg, flipped: true)
         defer { NSGraphicsContext.restoreGraphicsState() }
 
-        drawBackground(style, canvas: canvas, cells: cells, info: info)
+        drawBackground(style, canvas: canvas, cells: cells, info: info, photos: photos)
         for (i, cell) in cells.enumerated() {
             drawPhoto(photos[i % photos.count], in: cell, style: style, index: i)
+        }
+        if style == .social {
+            drawSocialHeader(avatar: photos[0], width: width, caption: info.caption)
         }
         // Keep decorations off the photos and the footer text.
         let textArea = CGRect(x: 120, y: footerRect.minY + 20, width: width - 240, height: footerRect.height - 20)
@@ -135,7 +188,7 @@ enum PhotoStripComposer {
             width: footerRect.width / footerScale,
             height: footerRect.height / footerScale
         )
-        drawFooter(style, rect: scaledFooter, info: info)
+        drawFooter(style, rect: scaledFooter, info: info, photos: photos)
         cg.restoreGState()
 
         return cg.makeImage()
@@ -149,6 +202,10 @@ enum PhotoStripComposer {
         switch style {
         case .newspaper:
             output = image.applyingFilter("CIPhotoEffectNoir").applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.15])
+        case .receipt:
+            // Thermal-print look: grayscale, punchy, a little faded.
+            output = image.applyingFilter("CIPhotoEffectMono")
+                .applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.35, kCIInputBrightnessKey: 0.06])
         case .retro:
             output = image.applyingFilter("CIPhotoEffectTransfer")
         case .film:
@@ -160,6 +217,7 @@ enum PhotoStripComposer {
     }
 
     private static func drawPhoto(_ photo: CGImage, in cell: CGRect, style: StripStyle, index: Int) {
+        if drawTrendPhoto(photo, in: cell, style: style, index: index) { return }
         var frame = cell
         let radius: CGFloat
         switch style {
@@ -173,6 +231,7 @@ enum PhotoStripComposer {
         case .neon: radius = 18
         case .love: radius = 20
         case .album: radius = 16
+        case .receipt, .social, .player, .scrapbook, .coquette, .desktop: radius = 0 // drawn by drawTrendPhoto
         }
 
         // Frames and glows drawn behind the photo.
@@ -235,8 +294,10 @@ enum PhotoStripComposer {
 
     // MARK: - Background
 
-    private static func drawBackground(_ style: StripStyle, canvas: CGRect, cells: [CGRect], info: StripInfo) {
+    private static func drawBackground(_ style: StripStyle, canvas: CGRect, cells: [CGRect], info: StripInfo, photos: [CGImage]) {
         switch style {
+        case .receipt, .social, .player, .scrapbook, .coquette, .desktop:
+            drawTrendBackground(style, canvas: canvas, photos: photos, info: info)
         case .classic:
             fill(canvas, NSColor(red: 0.98, green: 0.98, blue: 0.97, alpha: 1))
         case .midnight:
@@ -304,6 +365,16 @@ enum PhotoStripComposer {
     private static func drawDecorations(_ style: StripStyle, canvas: CGRect, avoid cells: [CGRect]) {
         var rng = SeededRandom(seed: 7)
         switch style {
+        case .scrapbook:
+            let ink = NSColor(red: 0.23, green: 0.18, blue: 0.18, alpha: 0.75)
+            let doodles = ["star", "heart", "sparkle", "sun.max", "scribble", "music.note", "camera"]
+            for _ in 0..<18 {
+                symbol(doodles.randomElement(using: &rng)!, color: ink, at: scatter(canvas, cells, &rng), size: .random(in: 22...40, using: &rng))
+            }
+        case .coquette:
+            for _ in 0..<22 {
+                symbol("heart.fill", color: NSColor.white.withAlphaComponent(.random(in: 0.5...0.9, using: &rng)), at: scatter(canvas, cells, &rng), size: .random(in: 16...34, using: &rng))
+            }
         case .y2k:
             for _ in 0..<26 {
                 let size = CGFloat.random(in: 22...54, using: &rng)
@@ -367,7 +438,7 @@ enum PhotoStripComposer {
 
     // MARK: - Footer
 
-    private static func drawFooter(_ style: StripStyle, rect: CGRect, info: StripInfo) {
+    private static func drawFooter(_ style: StripStyle, rect: CGRect, info: StripInfo, photos: [CGImage]) {
         let date = info.date
         func dateString(_ format: String) -> String {
             let f = DateFormatter()
@@ -381,6 +452,8 @@ enum PhotoStripComposer {
         maxTextWidth = rect.width - 60
 
         switch style {
+        case .receipt, .social, .player, .scrapbook, .coquette, .desktop:
+            drawTrendFooter(style, rect: rect, info: info, caption: custom)
         case .classic:
             y += centered(title("photobooth"), font: rounded(64, .heavy), color: NSColor(white: 0.12, alpha: 1), x: center, y: y)
             centered(dateString("dd · MM · yyyy"), font: .systemFont(ofSize: 30, weight: .medium), color: NSColor(white: 0.45, alpha: 1), x: center, y: y + 14)
@@ -519,6 +592,360 @@ enum PhotoStripComposer {
     }
 }
 
+// MARK: - Trending styles
+
+extension PhotoStripComposer {
+    static func footerHeight(_ style: StripStyle) -> CGFloat {
+        switch style {
+        case .receipt: return 880
+        case .social: return 430
+        case .player: return 560
+        case .desktop: return 300
+        case .pastel: return 340
+        default: return 430
+        }
+    }
+
+    /// Photos for the trending styles. Returns false for the classic ones.
+    fileprivate static func drawTrendPhoto(_ photo: CGImage, in cell: CGRect, style: StripStyle, index: Int) -> Bool {
+        switch style {
+        case .receipt, .social:
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(rect: cell).addClip()
+            drawAspectFill(photo, in: cell)
+            NSGraphicsContext.restoreGraphicsState()
+
+        case .player:
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(roundedRect: cell, xRadius: 26, yRadius: 26).addClip()
+            drawAspectFill(photo, in: cell)
+            NSGraphicsContext.restoreGraphicsState()
+
+        case .coquette:
+            withShadow(color: NSColor(red: 0.6, green: 0.2, blue: 0.3, alpha: 0.25), blur: 14, offset: CGSize(width: 0, height: 4)) {
+                NSColor.white.setFill()
+                NSBezierPath(roundedRect: cell, xRadius: 30, yRadius: 30).fill()
+            }
+            let frame = cell.insetBy(dx: 14, dy: 14)
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(roundedRect: frame, xRadius: 20, yRadius: 20).addClip()
+            drawAspectFill(photo, in: frame)
+            NSGraphicsContext.restoreGraphicsState()
+            emoji("🎀", size: 84, center: CGPoint(x: cell.midX, y: cell.minY + 6))
+
+        case .scrapbook:
+            // Printed photos, slightly crooked, held down with washi tape.
+            let angles: [CGFloat] = [-2.2, 1.8, -1.3, 2.4]
+            guard let cg = NSGraphicsContext.current?.cgContext else { return true }
+            cg.saveGState()
+            cg.translateBy(x: cell.midX, y: cell.midY)
+            cg.rotate(by: angles[index % angles.count] * .pi / 180)
+            cg.translateBy(x: -cell.midX, y: -cell.midY)
+            let paper = cell.insetBy(dx: 18, dy: 12)
+            withShadow(color: NSColor.black.withAlphaComponent(0.25), blur: 12, offset: CGSize(width: 2, height: 5)) {
+                NSColor(white: 0.99, alpha: 1).setFill()
+                NSBezierPath(rect: paper).fill()
+            }
+            let frame = paper.insetBy(dx: 18, dy: 18)
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(rect: frame).addClip()
+            drawAspectFill(photo, in: frame)
+            NSGraphicsContext.restoreGraphicsState()
+            let tapes: [NSColor] = [
+                NSColor(red: 0.62, green: 0.86, blue: 0.78, alpha: 0.8),
+                NSColor(red: 0.98, green: 0.72, blue: 0.78, alpha: 0.8),
+                NSColor(red: 0.98, green: 0.88, blue: 0.55, alpha: 0.8),
+                NSColor(red: 0.7, green: 0.78, blue: 0.98, alpha: 0.8),
+            ]
+            cg.translateBy(x: paper.midX, y: paper.minY + 4)
+            cg.rotate(by: (index % 2 == 0 ? -6 : 5) * .pi / 180)
+            tapes[index % tapes.count].setFill()
+            NSBezierPath(rect: CGRect(x: -100, y: -24, width: 200, height: 48)).fill()
+            cg.restoreGState()
+
+        case .desktop:
+            drawWindow(photo, in: cell, title: "photo_\(index + 1).jpg")
+
+        default:
+            return false
+        }
+        return true
+    }
+
+    fileprivate static func drawTrendBackground(_ style: StripStyle, canvas: CGRect, photos: [CGImage], info: StripInfo) {
+        switch style {
+        case .receipt:
+            fill(canvas, NSColor(red: 0.86, green: 0.85, blue: 0.82, alpha: 1))
+            // Paper with torn, zigzag ends.
+            let paper = canvas.insetBy(dx: 50, dy: 0)
+            let tooth: CGFloat = 22
+            let path = NSBezierPath()
+            path.move(to: CGPoint(x: paper.minX, y: paper.minY + tooth))
+            var x = paper.minX
+            var up = true
+            while x < paper.maxX {
+                x = min(x + tooth, paper.maxX)
+                path.line(to: CGPoint(x: x, y: paper.minY + (up ? 0 : tooth)))
+                up.toggle()
+            }
+            path.line(to: CGPoint(x: paper.maxX, y: paper.maxY - tooth))
+            up = true
+            while x > paper.minX {
+                x = max(x - tooth, paper.minX)
+                path.line(to: CGPoint(x: x, y: paper.maxY - (up ? 0 : tooth)))
+                up.toggle()
+            }
+            path.close()
+            withShadow(color: NSColor.black.withAlphaComponent(0.2), blur: 16, offset: CGSize(width: 0, height: 4)) {
+                NSColor(red: 0.985, green: 0.98, blue: 0.965, alpha: 1).setFill()
+                path.fill()
+            }
+
+        case .social:
+            fill(canvas, .white)
+
+        case .player:
+            // Backdrop tinted like a music app's now playing screen: from the cover art, else the photos.
+            let cover = info.artwork?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+            let tint = averageColor(cover ?? photos.first) ?? NSColor(red: 0.2, green: 0.3, blue: 0.5, alpha: 1)
+            NSGradient(colors: [tint.blended(withFraction: 0.35, of: .black) ?? tint, NSColor(white: 0.06, alpha: 1)])!
+                .draw(in: canvas, angle: -90)
+
+        case .scrapbook:
+            fill(canvas, NSColor(red: 0.91, green: 0.86, blue: 0.77, alpha: 1))
+            NSColor(red: 0.8, green: 0.72, blue: 0.6, alpha: 0.5).setFill()
+            for y in stride(from: 24.0, to: canvas.height, by: 40) {
+                for x in stride(from: 24.0, to: canvas.width, by: 40) {
+                    NSBezierPath(ovalIn: CGRect(x: x, y: y, width: 5, height: 5)).fill()
+                }
+            }
+
+        case .coquette:
+            fill(canvas, NSColor(red: 0.97, green: 0.84, blue: 0.88, alpha: 1))
+            // Gingham: translucent white bands both ways.
+            NSColor.white.withAlphaComponent(0.32).setFill()
+            for x in stride(from: 0.0, to: canvas.width, by: 80) {
+                NSBezierPath(rect: CGRect(x: x, y: 0, width: 40, height: canvas.height)).fill()
+            }
+            for y in stride(from: 0.0, to: canvas.height, by: 80) {
+                NSBezierPath(rect: CGRect(x: 0, y: y, width: canvas.width, height: 40)).fill()
+            }
+
+        case .desktop:
+            fill(canvas, NSColor(red: 0, green: 0.5, blue: 0.5, alpha: 1))
+            // Taskbar along the bottom.
+            let bar = CGRect(x: 0, y: canvas.maxY - 76, width: canvas.width, height: 76)
+            fill(bar, NSColor(white: 0.75, alpha: 1))
+            fill(CGRect(x: 0, y: bar.minY, width: canvas.width, height: 3), .white)
+            let start = CGRect(x: 12, y: bar.minY + 12, width: 150, height: 52)
+            bevel(start, raised: true)
+            draw("▦ Start", font: .systemFont(ofSize: 28, weight: .heavy), color: .black, at: CGPoint(x: start.minX + 18, y: start.minY + 9))
+            let clock = CGRect(x: canvas.width - 162, y: bar.minY + 12, width: 150, height: 52)
+            bevel(clock, raised: false)
+            let f = DateFormatter()
+            f.dateFormat = "HH:mm"
+            draw(f.string(from: .now), font: .monospacedDigitSystemFont(ofSize: 26, weight: .medium), color: .black, at: CGPoint(x: clock.minX + 38, y: clock.minY + 11))
+
+        default:
+            break
+        }
+    }
+
+    fileprivate static func drawSocialHeader(avatar: CGImage, width: CGFloat, caption: String?) {
+        let avatarRect = CGRect(x: 30, y: 30, width: 90, height: 90)
+        // Story ring around the avatar.
+        NSGradient(colors: [.systemYellow, .systemOrange, .systemPink, .systemPurple])!
+            .draw(in: NSBezierPath(ovalIn: avatarRect.insetBy(dx: -6, dy: -6)), angle: 45)
+        NSColor.white.setFill()
+        NSBezierPath(ovalIn: avatarRect.insetBy(dx: -2, dy: -2)).fill()
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(ovalIn: avatarRect).addClip()
+        drawAspectFill(avatar, in: avatarRect)
+        NSGraphicsContext.restoreGraphicsState()
+        draw("bestie.diaries", font: .systemFont(ofSize: 34, weight: .bold), color: .black, at: CGPoint(x: 146, y: 32))
+        draw("Original audio", font: .systemFont(ofSize: 26), color: NSColor(white: 0.45, alpha: 1), at: CGPoint(x: 146, y: 76))
+        draw("•••", font: .systemFont(ofSize: 34, weight: .bold), color: .black, at: CGPoint(x: width - 90, y: 46))
+    }
+
+    fileprivate static func drawTrendFooter(_ style: StripStyle, rect: CGRect, info: StripInfo, caption: String?) {
+        let f = DateFormatter()
+        switch style {
+        case .receipt:
+            let mono = NSFont(name: "Menlo", size: 29) ?? .monospacedSystemFont(ofSize: 29, weight: .regular)
+            let bold = NSFont(name: "Menlo-Bold", size: 29) ?? .monospacedSystemFont(ofSize: 29, weight: .bold)
+            let ink = NSColor(white: 0.12, alpha: 1)
+            let columns = 32
+            func line(_ left: String, _ right: String = "") -> String {
+                left + String(repeating: " ", count: max(1, columns - left.count - right.count)) + right
+            }
+            f.dateFormat = "dd/MM/yyyy"
+            let date = f.string(from: info.date)
+            f.dateFormat = "HH:mm"
+            let time = f.string(from: info.date)
+            var y = rect.minY + 34
+            y += centered("★ " + (caption ?? "PHOTOBOX").uppercased() + " ★", font: .monospacedSystemFont(ofSize: 42, weight: .heavy), color: ink, x: rect.midX, y: y) + 6
+            for (text, font) in [
+                ("OPEN DAILY · NO REFUNDS ON VIBES", mono),
+                (line(date, time), mono),
+                (String(repeating: "-", count: columns), mono),
+                (line("4x CORE MEMORY", "PRICELESS"), mono),
+                (line("1x GOOD VIBES", "FREE"), mono),
+                (line("1x INSIDE JOKE", "FREE"), mono),
+                (String(repeating: "-", count: columns), mono),
+                (line("TOTAL", "PRICELESS"), bold),
+            ] {
+                y += centered(text, font: font, color: ink, x: rect.midX, y: y) + 2
+            }
+            // Barcode.
+            var rng = SeededRandom(seed: UInt64(info.date.timeIntervalSince1970) / 60)
+            var x = rect.midX - 200
+            ink.setFill()
+            while x < rect.midX + 200 {
+                let w = CGFloat.random(in: 2...7, using: &rng)
+                NSBezierPath(rect: CGRect(x: x, y: y + 18, width: w, height: 70)).fill()
+                x += w + .random(in: 2...6, using: &rng)
+            }
+            centered("THANK YOU, COME AGAIN ♡", font: mono, color: ink, x: rect.midX, y: y + 100)
+
+        case .social:
+            let x = rect.minX + 24
+            var y = rect.minY + 20
+            for (i, name) in ["heart.fill", "bubble.right", "paperplane"].enumerated() {
+                symbol(name, color: i == 0 ? NSColor(red: 0.93, green: 0.22, blue: 0.33, alpha: 1) : .black, at: CGPoint(x: x + 20 + CGFloat(i) * 76, y: y + 24), size: 40)
+            }
+            symbol("bookmark", color: .black, at: CGPoint(x: rect.maxX - 44, y: y + 24), size: 40)
+            y += 72
+            draw("Liked by you and 1,024 others", font: .systemFont(ofSize: 30, weight: .semibold), color: .black, at: CGPoint(x: x, y: y))
+            y += 44
+            let text = NSMutableAttributedString(string: "bestie.diaries ", attributes: [.font: NSFont.systemFont(ofSize: 30, weight: .semibold), .foregroundColor: NSColor.black])
+            text.append(NSAttributedString(string: caption ?? "core memories unlocked ✨", attributes: [.font: NSFont.systemFont(ofSize: 30), .foregroundColor: NSColor.black]))
+            text.draw(in: CGRect(x: x, y: y, width: rect.width - 48, height: 42))
+            y += 44
+            draw("View all 128 comments", font: .systemFont(ofSize: 27), color: NSColor(white: 0.5, alpha: 1), at: CGPoint(x: x, y: y))
+            y += 40
+            f.dateFormat = "d MMMM"
+            draw(f.string(from: info.date).uppercased(), font: .systemFont(ofSize: 21, weight: .medium), color: NSColor(white: 0.55, alpha: 1), at: CGPoint(x: x, y: y))
+
+        case .player:
+            // The song that was playing when the strip was taken; your text becomes the "playing from" line.
+            let x = rect.minX + 54
+            let width = rect.width - 108
+            var y = rect.minY + 30
+            let title = info.songTitle ?? caption ?? "our little moments"
+            let artist = info.artist ?? "you & me"
+            if info.songTitle != nil, let caption {
+                draw("PLAYING FROM  " + caption.uppercased(), font: .systemFont(ofSize: 20, weight: .bold), color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: x, y: y), maxWidth: width)
+                y += 34
+            }
+            var textX = x
+            if let artwork = info.artwork {
+                let thumb = CGRect(x: x, y: y + 4, width: 96, height: 96)
+                NSGraphicsContext.saveGraphicsState()
+                NSBezierPath(roundedRect: thumb, xRadius: 10, yRadius: 10).addClip()
+                artwork.draw(in: thumb, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                NSGraphicsContext.restoreGraphicsState()
+                textX += 116
+            }
+            draw(title, font: .systemFont(ofSize: 46, weight: .bold), color: .white, at: CGPoint(x: textX, y: y), maxWidth: x + width - 70 - textX)
+            symbol("heart.fill", color: NSColor(red: 0.2, green: 0.85, blue: 0.45, alpha: 1), at: CGPoint(x: x + width - 20, y: y + 32), size: 40)
+            y += 60
+            draw(artist, font: .systemFont(ofSize: 30, weight: .medium), color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: textX, y: y), maxWidth: x + width - 70 - textX)
+            y += 82
+            let duration = info.songDuration ?? 225
+            let position = min(info.songPosition ?? 84, duration)
+            let fraction = CGFloat(position / duration)
+            fill(CGRect(x: x, y: y, width: width, height: 6), NSColor(white: 1, alpha: 0.25))
+            fill(CGRect(x: x, y: y, width: width * fraction, height: 6), .white)
+            NSColor.white.setFill()
+            NSBezierPath(ovalIn: CGRect(x: x + width * fraction - 10, y: y - 7, width: 20, height: 20)).fill()
+            y += 20
+            func clock(_ seconds: Double) -> String { String(format: "%d:%02d", Int(seconds) / 60, Int(seconds) % 60) }
+            draw(clock(position), font: .monospacedDigitSystemFont(ofSize: 22, weight: .medium), color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: x, y: y))
+            draw("-" + clock(duration - position), font: .monospacedDigitSystemFont(ofSize: 22, weight: .medium), color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: x + width - 62, y: y))
+            y += 90
+            let controls: [(String, CGFloat)] = [("shuffle", 32), ("backward.fill", 44), ("", 0), ("forward.fill", 44), ("repeat", 32)]
+            for (i, control) in controls.enumerated() {
+                let center = CGPoint(x: x + 16 + (width - 32) * CGFloat(i) / 4, y: y)
+                if control.0.isEmpty {
+                    // Play button: white disc with a dark pause glyph.
+                    NSColor.white.setFill()
+                    NSBezierPath(ovalIn: CGRect(x: center.x - 46, y: center.y - 46, width: 92, height: 92)).fill()
+                    symbol(info.isPlaying ? "pause.fill" : "play.fill", color: NSColor(white: 0.1, alpha: 1), at: center, size: 38)
+                } else {
+                    symbol(control.0, color: .white, at: center, size: control.1)
+                }
+            }
+
+        case .scrapbook:
+            let ink = NSColor(red: 0.23, green: 0.18, blue: 0.18, alpha: 1)
+            var y = rect.minY + 40
+            y += centered(caption ?? "our little adventure", font: NSFont(name: "Marker Felt Wide", size: 64) ?? rounded(56, .bold), color: ink, x: rect.midX, y: y)
+            f.dateFormat = "dd.MM.yy"
+            centered("— " + f.string(from: info.date) + " —", font: NSFont(name: "Noteworthy-Bold", size: 30) ?? .systemFont(ofSize: 28), color: ink.withAlphaComponent(0.7), x: rect.midX, y: y + 10)
+
+        case .coquette:
+            let rose = NSColor(red: 0.76, green: 0.1, blue: 0.36, alpha: 1)
+            var y = rect.minY + 30
+            y += centered(caption ?? "lovely", font: NSFont(name: "Snell Roundhand Bold", size: 96) ?? rounded(70, .bold), color: rose, x: rect.midX, y: y)
+            f.dateFormat = "dd · MM · yyyy"
+            centered("🎀  " + f.string(from: info.date) + "  🎀", font: rounded(28, .semibold), color: rose.withAlphaComponent(0.8), x: rect.midX, y: y)
+
+        case .desktop:
+            let y = rect.minY + 34
+            centered(caption ?? "my_memories.exe", font: NSFont(name: "Courier New Bold", size: 54) ?? .monospacedSystemFont(ofSize: 50, weight: .bold), color: .white, x: rect.midX, y: y, shadow: NSColor.black.withAlphaComponent(0.6))
+
+        default:
+            break
+        }
+    }
+
+    /// A Windows-98-style window with the photo inside.
+    private static func drawWindow(_ photo: CGImage, in cell: CGRect, title: String) {
+        bevel(cell, raised: true)
+        let inner = cell.insetBy(dx: 6, dy: 6)
+        let titleBar = CGRect(x: inner.minX, y: inner.minY, width: inner.width, height: 46)
+        NSGradient(colors: [NSColor(red: 0, green: 0, blue: 0.5, alpha: 1), NSColor(red: 0.06, green: 0.52, blue: 0.82, alpha: 1)])!.draw(in: titleBar, angle: 0)
+        draw(title, font: .systemFont(ofSize: 24, weight: .bold), color: .white, at: CGPoint(x: titleBar.minX + 14, y: titleBar.minY + 9))
+        for (i, glyph) in ["_", "□", "×"].enumerated() {
+            let button = CGRect(x: titleBar.maxX - CGFloat(3 - i) * 42 - 4, y: titleBar.minY + 7, width: 36, height: 32)
+            bevel(button, raised: true)
+            draw(glyph, font: .systemFont(ofSize: 22, weight: .heavy), color: .black, at: CGPoint(x: button.minX + 10, y: button.minY + 1))
+        }
+        let photoRect = CGRect(x: inner.minX + 4, y: titleBar.maxY + 6, width: inner.width - 8, height: inner.maxY - titleBar.maxY - 10)
+        bevel(photoRect.insetBy(dx: -3, dy: -3), raised: false)
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(rect: photoRect).addClip()
+        drawAspectFill(photo, in: photoRect)
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    /// Classic 3D bevel: light top-left, dark bottom-right (reversed when sunken).
+    private static func bevel(_ rect: CGRect, raised: Bool) {
+        fill(rect, NSColor(white: 0.75, alpha: 1))
+        let light = NSColor.white, dark = NSColor(white: 0.35, alpha: 1)
+        let (topLeft, bottomRight) = raised ? (light, dark) : (dark, light)
+        fill(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: 3), topLeft)
+        fill(CGRect(x: rect.minX, y: rect.minY, width: 3, height: rect.height), topLeft)
+        fill(CGRect(x: rect.minX, y: rect.maxY - 3, width: rect.width, height: 3), bottomRight)
+        fill(CGRect(x: rect.maxX - 3, y: rect.minY, width: 3, height: rect.height), bottomRight)
+    }
+
+    private static func emoji(_ text: String, size: CGFloat, center: CGPoint) {
+        let string = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: size)])
+        let s = string.size()
+        string.draw(at: CGPoint(x: center.x - s.width / 2, y: center.y - s.height / 2))
+    }
+
+    private static func averageColor(_ image: CGImage?) -> NSColor? {
+        guard let image else { return nil }
+        let ci = CIImage(cgImage: image)
+        let average = ci.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: ci.extent)])
+        var pixel = [UInt8](repeating: 0, count: 4)
+        ciContext.render(average, toBitmap: &pixel, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        return NSColor(srgbRed: CGFloat(pixel[0]) / 255, green: CGFloat(pixel[1]) / 255, blue: CGFloat(pixel[2]) / 255, alpha: 1)
+    }
+}
+
 /// Deterministic random numbers, so a style's decorations are laid out the same way every time.
 private struct SeededRandom: RandomNumberGenerator {
     private var state: UInt64
@@ -580,23 +1007,3 @@ final class StripPreviews: ObservableObject {
     }
 }
 
-/// Asks for the text printed on photobox strips. The notch panel is a poor place to type, so it's a small alert.
-@MainActor
-enum StripCaptionPrompt {
-    static func ask(_ settings: AppSettings) {
-        let alert = NSAlert()
-        alert.messageText = "Text on your photobox strip"
-        alert.informativeText = "Leave it empty to use each style's own title."
-        let field = NSTextField(string: settings.stripCaption)
-        field.placeholderString = "e.g. bestie day out ✨"
-        field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = field
-        NSApp.activate(ignoringOtherApps: true)
-        if alert.runModal() == .alertFirstButtonReturn {
-            settings.stripCaption = String(field.stringValue.prefix(40))
-        }
-    }
-}

@@ -19,18 +19,31 @@ struct MirrorView: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            CameraPreview(
-                effect: settings.mirrorEffect,
-                ringLight: settings.mirrorRingLight,
-                background: settings.mirrorBackground,
-                artwork: settings.mirrorBackground == .album ? media.artwork?.cgImage(forProposedRect: nil, context: nil, hints: nil) : nil,
-                musicPlaying: media.info?.isPlaying ?? false,
-                gesturesEnabled: settings.mirrorGestures,
-                cameraID: settings.mirrorCameraID,
-                captureRequest: captureRequest,
-                onGesture: handle,
-                onCapture: captured
-            )
+            Group {
+                if media.isDemo {
+                    // Demo mode (screenshots, marketing): a sample portrait instead of the real camera.
+                    // Fills whatever space it's given without asking for more.
+                    Color.black.overlay {
+                        Image(decorative: PhotoStripComposer.samplePhotos[1], scale: 1)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    }
+                    .clipped()
+                } else {
+                    CameraPreview(
+                        effect: settings.mirrorEffect,
+                        ringLight: settings.mirrorRingLight,
+                        background: settings.mirrorBackground,
+                        artwork: settings.mirrorBackground == .album ? media.artwork?.cgImage(forProposedRect: nil, context: nil, hints: nil) : nil,
+                        musicPlaying: media.info?.isPlaying ?? false,
+                        gesturesEnabled: settings.mirrorGestures,
+                        cameraID: settings.mirrorCameraID,
+                        captureRequest: captureRequest,
+                        onGesture: handle,
+                        onCapture: captured
+                    )
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay { ringLightGlow }
             .overlay {
@@ -126,7 +139,11 @@ struct MirrorView: View {
 
             ResizeHandle()
         }
-        .onChange(of: choosingStrip || boothBusy || countdown != nil) { _, busy in vm.holdOpen = busy }
+        // Only a running countdown or photobox holds the notch open; the picker can be clicked away.
+        .onChange(of: boothBusy || countdown != nil) { _, busy in vm.holdOpen = busy }
+        .onReceive(NotificationCenter.default.publisher(for: .openStripPicker)) { _ in
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { choosingStrip = true }
+        }
         .onDisappear { vm.holdOpen = false }
     }
 
@@ -187,7 +204,7 @@ struct MirrorView: View {
             let shots = boothShots ?? []
             withAnimation { boothShots = nil }
             let style = settings.stripStyle
-            let info = StripInfo(caption: settings.stripCaption, date: .now, songTitle: media.info?.title, artist: media.info?.artist, artwork: media.artwork)
+            let info = StripInfo(caption: settings.stripCaption, media: media)
             let url = await Task.detached(priority: .userInitiated) {
                 PhotoStripComposer.compose(shots, style: style, info: info).flatMap { MirrorPhotos.save($0, name: "Photobox") }
             }.value
@@ -230,16 +247,20 @@ private struct StripPicker: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .bottom, spacing: 10) {
-                        ForEach(StripStyle.allCases) { style in
-                            chip(style).id(style)
+            // Thumbnails are sized to the mirror's height so whole strips and their names stay visible.
+            GeometryReader { geo in
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .bottom, spacing: 12) {
+                            ForEach(StripStyle.allCases) { style in
+                                chip(style, height: max(40, geo.size.height - 30)).id(style)
+                            }
                         }
+                        .padding(.horizontal, 14)
+                        .frame(height: geo.size.height)
                     }
-                    .padding(.horizontal, 12)
+                    .onAppear { proxy.scrollTo(settings.stripStyle, anchor: .center) }
                 }
-                .onAppear { proxy.scrollTo(settings.stripStyle, anchor: .center) }
             }
 
             VStack(spacing: 8) {
@@ -252,15 +273,19 @@ private struct StripPicker: View {
                         .foregroundStyle(.black)
                 }
                 .buttonStyle(.plain)
-                Button {
-                    StripCaptionPrompt.ask(settings)
-                } label: {
-                    Label(settings.stripCaption.isEmpty ? "Text" : "“\(settings.stripCaption)”", systemImage: "character.cursor.ibeam")
-                        .font(.system(size: 11, weight: .medium))
-                        .lineLimit(1)
-                        .frame(maxWidth: 110)
-                }
-                .buttonStyle(.plain)
+                // Typed right here: a separate window would open behind the tall notch.
+                TextField("Your text", text: $settings.stripCaption)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .frame(width: 120)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(.white.opacity(0.14)))
+                    .onChange(of: settings.stripCaption) { _, value in
+                        if value.count > 40 { settings.stripCaption = String(value.prefix(40)) }
+                    }
+                    .onSubmit(onStart)
                 Button(action: onClose) {
                     Text("Cancel").font(.system(size: 11)).foregroundStyle(.secondary)
                 }
@@ -271,19 +296,14 @@ private struct StripPicker: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.black.opacity(0.72))
-        .onAppear {
-            previews.update(caption: settings.stripCaption, info: StripInfo(
-                songTitle: media.info?.title ?? "Midnight Drive",
-                artist: media.info?.artist ?? "The Placeholders",
-                artwork: media.artwork
-            ))
-        }
+        .onExitCommand(perform: onClose)
+        .onAppear { previews.update(caption: settings.stripCaption, info: StripInfo(media: media, sample: true)) }
         .onChange(of: settings.stripCaption) { _, caption in
-            previews.update(caption: caption, info: StripInfo(songTitle: media.info?.title ?? "Midnight Drive", artist: media.info?.artist ?? "The Placeholders", artwork: media.artwork))
+            previews.update(caption: caption, info: StripInfo(media: media, sample: true))
         }
     }
 
-    private func chip(_ style: StripStyle) -> some View {
+    private func chip(_ style: StripStyle, height: CGFloat) -> some View {
         let selected = settings.stripStyle == style
         return Button {
             withAnimation(.spring(response: 0.3)) { settings.stripStyle = style }
@@ -298,17 +318,17 @@ private struct StripPicker: View {
                             .aspectRatio(style.isGrid ? 1 : 0.33, contentMode: .fit)
                     }
                 }
+                .frame(height: height)
                 .clipShape(RoundedRectangle(cornerRadius: 3))
                 .padding(2)
                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(.white, lineWidth: selected ? 2 : 0))
-                .scaleEffect(selected ? 1.06 : 1)
+                .opacity(selected ? 1 : 0.75)
                 Text(style.displayName)
                     .font(.system(size: 9, weight: selected ? .bold : .medium))
                     .foregroundStyle(selected ? .white : .secondary)
                     .lineLimit(1)
                     .fixedSize()
             }
-            .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .buttonStyle(.plain)
     }
@@ -489,10 +509,6 @@ private struct MirrorControls: View {
                     ForEach(StripStyle.allCases) { Text($0.displayName).tag($0) }
                 }
                 .pickerStyle(.inline)
-                Divider()
-                Button(settings.stripCaption.isEmpty ? "Custom Text…" : "Text: “\(settings.stripCaption)”…") {
-                    StripCaptionPrompt.ask(settings)
-                }
             } label: {
                 RoundedRectangle(cornerRadius: 3)
                     .fill(LinearGradient(colors: settings.stripStyle.swatch, startPoint: .top, endPoint: .bottom))
@@ -596,4 +612,9 @@ private struct ResizeHandle: View {
     private func clamp(_ height: Double) -> Double {
         min(max(height, NotchViewModel.defaultOpenHeight), NotchViewModel.maxOpenHeight)
     }
+}
+
+extension Notification.Name {
+    /// Opens the photobox style picker (the `photobox` command).
+    static let openStripPicker = Notification.Name("io.github.opennotchi.openStripPicker")
 }
