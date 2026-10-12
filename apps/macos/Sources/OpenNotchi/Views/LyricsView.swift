@@ -1,44 +1,32 @@
 import SwiftUI
 
-/// Artwork on the left, lyrics centered, mini player on the right.
-struct LyricsView: View {
-    @EnvironmentObject private var media: MediaManager
+/// Lyrics for the current song, shown in the center of Home in lyrics mode.
+struct LyricsContent: View {
     @EnvironmentObject private var lyrics: LyricsManager
+    let info: NowPlayingInfo
 
     var body: some View {
-        HStack(spacing: NotchLayout.columnSpacing) {
-            NowPlayingColumn()
-                .frame(width: NotchLayout.sideColumn, alignment: .leading)
-
-            Group {
-                if let info = media.info {
-                    content(for: info)
-                } else {
-                    message("Play something to see lyrics", icon: "music.note")
-                }
+        Group {
+            switch lyrics.state {
+            case .idle, .loading:
+                ProgressView().controlSize(.small)
+            case .synced:
+                SyncedLyricsView(info: info)
+            case .plain:
+                PlainLyricsView(info: info, text: lyrics.plainText ?? "")
+                    .overlay(alignment: .bottom) {
+                        Text("Not time-synced")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                    }
+            case .instrumental:
+                message("Instrumental", icon: "pianokeys")
+            case .notFound:
+                message("No lyrics found for this song", icon: "quote.bubble")
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            MiniPlayerColumn()
-                .frame(width: NotchLayout.sideColumn)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { lyrics.retryIfNeeded() }
-    }
-
-    @ViewBuilder
-    private func content(for info: NowPlayingInfo) -> some View {
-        switch lyrics.state {
-        case .idle, .loading:
-            ProgressView().controlSize(.small)
-        case .synced:
-            SyncedLyricsView(info: info)
-        case .plain:
-            PlainLyricsView(info: info, text: lyrics.plainText ?? "")
-        case .instrumental:
-            message("Instrumental", icon: "pianokeys")
-        case .notFound:
-            message("No lyrics found for this song", icon: "quote.bubble")
-        }
     }
 
     private func message(_ text: String, icon: String) -> some View {
@@ -50,36 +38,8 @@ struct LyricsView: View {
     }
 }
 
-private struct NowPlayingColumn: View {
-    @EnvironmentObject private var media: MediaManager
-    @EnvironmentObject private var lyrics: LyricsManager
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ArtworkView(image: media.artwork, cornerRadius: 12)
-                .frame(width: 84, height: 84)
-                .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
-            if let info = media.info {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(info.title)
-                        .font(.system(size: 12, weight: .semibold))
-                    Text(info.artist)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    if lyrics.state == .plain {
-                        Text("Not time-synced")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.tertiary)
-                            .padding(.top, 2)
-                    }
-                }
-                .lineLimit(1)
-            }
-        }
-    }
-}
-
-private struct MiniPlayerColumn: View {
+/// Compact transport controls and progress, used in the side column in lyrics mode.
+struct MiniPlayerColumn: View {
     @EnvironmentObject private var media: MediaManager
     @Environment(\.notchAccent) private var accent
 

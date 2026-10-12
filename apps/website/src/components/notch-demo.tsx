@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react"
-import { Pause, SkipBack, SkipForward } from "lucide-react"
+import { MessageSquareQuote, Pause, SkipBack, SkipForward } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 
@@ -12,7 +12,7 @@ const LINES = [
   "Turn it up for the long way home",
 ]
 const DURATION = 204
-const TABS = ["Home", "Lyrics", "Timer"] as const
+const TABS = ["Home", "Timer"] as const
 type Tab = (typeof TABS)[number]
 
 const spring = { type: "spring", stiffness: 260, damping: 28 } as const
@@ -35,6 +35,7 @@ function Wave({ bars, className }: { bars: number; className?: string }) {
 export function NotchDemo() {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<Tab>("Home")
+  const [lyricsMode, setLyricsMode] = useState(false)
   const [elapsed, setElapsed] = useState(72)
   const closeTimer = useRef<number | undefined>(undefined)
   const ref = useRef<HTMLDivElement>(null)
@@ -137,53 +138,86 @@ export function NotchDemo() {
               <div className="flex h-[calc(100%-30px)] items-center gap-5">
                 {tab === "Home" && (
                   <>
-                    <div className="art size-[84px] shrink-0 rounded-2xl shadow-2xl sm:size-[118px]" />
-                    <div className="min-w-0 flex-1 text-center">
-                      <div className="font-display text-base font-bold">Midnight Drive</div>
-                      <AnimatePresence mode="wait">
-                        <motion.div
-                          key={showLyric ? LINES[line] : "artist"}
-                          initial={{ opacity: 0, y: 4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          className={cn("mt-0.5 truncate text-[13px]", showLyric ? "text-white" : "text-neutral-400")}
-                        >
-                          {showLyric ? LINES[line] : "The Placeholders"}
-                        </motion.div>
-                      </AnimatePresence>
-                      <div className="my-3.5 flex items-center gap-2 font-mono text-[10px] text-neutral-400">
-                        <span>{fmt(elapsed)}</span>
-                        <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/20">
-                          <div className="h-full rounded-full bg-white transition-[width] duration-1000 ease-linear" style={{ width: `${(elapsed / DURATION) * 100}%` }} />
-                        </div>
-                        <span>{fmt(DURATION)}</span>
-                      </div>
-                      <div className="flex items-center justify-center gap-8">
-                        <SkipBack className="size-4 fill-white" />
-                        <Pause className="size-6 fill-white" />
-                        <SkipForward className="size-4 fill-white" />
-                      </div>
+                    <div className="art relative size-[84px] shrink-0 rounded-2xl shadow-2xl sm:size-[118px]">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setLyricsMode((m) => !m)
+                        }}
+                        title={lyricsMode ? "Show player" : "Show lyrics"}
+                        className={cn(
+                          "absolute right-1.5 bottom-1.5 grid size-[26px] place-items-center rounded-full ring-1 ring-white/25 transition",
+                          lyricsMode ? "bg-white text-black" : "bg-black/55 text-white hover:scale-110",
+                        )}
+                      >
+                        <MessageSquareQuote className="size-3" />
+                      </button>
                     </div>
-                    <Wave bars={5} className="hidden h-[30px] w-[60px] justify-end sm:flex [&>span]:w-1" />
-                  </>
-                )}
 
-                {tab === "Lyrics" && (
-                  <div className="h-full flex-1 overflow-hidden text-center [mask-image:linear-gradient(transparent,#000_25%,#000_75%,transparent)]">
-                    <motion.div animate={{ y: -line * 32 }} transition={spring} className="pt-[54px]">
-                      {LINES.map((l, i) => (
-                        <p
-                          key={l}
-                          className={cn(
-                            "font-display py-1.5 text-base font-bold transition-all duration-500",
-                            i === line ? "scale-105 text-white" : "text-white/25",
-                          )}
-                        >
-                          {l}
-                        </p>
-                      ))}
-                    </motion.div>
-                  </div>
+                    {lyricsMode ? (
+                      <>
+                        <div className="h-full flex-1 overflow-hidden text-center [mask-image:linear-gradient(transparent,#000_25%,#000_75%,transparent)]">
+                          <motion.div animate={{ y: -line * 32 }} transition={spring} className="pt-[54px]">
+                            {LINES.map((l, i) => (
+                              <p
+                                key={l}
+                                className={cn(
+                                  "font-display py-1.5 text-base font-bold transition-all duration-500",
+                                  i === line ? "scale-105 text-white" : "text-white/25",
+                                )}
+                              >
+                                {l}
+                              </p>
+                            ))}
+                          </motion.div>
+                        </div>
+                        <div className="hidden w-[110px] shrink-0 flex-col gap-3 sm:flex">
+                          <div className="flex items-center justify-center gap-4">
+                            <SkipBack className="size-3.5 fill-white" />
+                            <Pause className="size-5 fill-white" />
+                            <SkipForward className="size-3.5 fill-white" />
+                          </div>
+                          <div className="h-[3px] overflow-hidden rounded-full bg-white/15">
+                            <div className="h-full bg-white transition-[width] duration-1000 ease-linear" style={{ width: `${(elapsed / DURATION) * 100}%` }} />
+                          </div>
+                          <div className="flex justify-between font-mono text-[9px] text-neutral-400">
+                            <span>{fmt(elapsed)}</span>
+                            <span>{fmt(DURATION)}</span>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="min-w-0 flex-1 text-center">
+                          <div className="font-display text-base font-bold">Midnight Drive</div>
+                          <AnimatePresence mode="wait">
+                            <motion.div
+                              key={showLyric ? LINES[line] : "artist"}
+                              initial={{ opacity: 0, y: 4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -4 }}
+                              className={cn("mt-0.5 truncate text-[13px]", showLyric ? "text-white" : "text-neutral-400")}
+                            >
+                              {showLyric ? LINES[line] : "The Placeholders"}
+                            </motion.div>
+                          </AnimatePresence>
+                          <div className="my-3.5 flex items-center gap-2 font-mono text-[10px] text-neutral-400">
+                            <span>{fmt(elapsed)}</span>
+                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/20">
+                              <div className="h-full rounded-full bg-white transition-[width] duration-1000 ease-linear" style={{ width: `${(elapsed / DURATION) * 100}%` }} />
+                            </div>
+                            <span>{fmt(DURATION)}</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-8">
+                            <SkipBack className="size-4 fill-white" />
+                            <Pause className="size-6 fill-white" />
+                            <SkipForward className="size-4 fill-white" />
+                          </div>
+                        </div>
+                        <Wave bars={5} className="hidden h-[30px] w-[60px] justify-end sm:flex [&>span]:w-1" />
+                      </>
+                    )}
+                  </>
                 )}
 
                 {tab === "Timer" && (

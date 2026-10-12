@@ -34,6 +34,8 @@ final class AppSettings: ObservableObject {
     @Published var borderWidth: Double { didSet { defaults.set(borderWidth, forKey: "borderWidth"); AppDelegate.shared?.previewNotch() } }
     @Published var cornerRadius: Double { didSet { defaults.set(cornerRadius, forKey: "cornerRadius"); AppDelegate.shared?.previewNotch() } }
     @Published var lyricsEnabled: Bool { didSet { defaults.set(lyricsEnabled, forKey: "lyricsEnabled") } }
+    /// Home shows lyrics instead of the player (toggled from the artwork button).
+    @Published var homeLyricsMode: Bool { didSet { defaults.set(homeLyricsMode, forKey: "homeLyricsMode") } }
     @Published var lyricsOnHome: Bool { didSet { defaults.set(lyricsOnHome, forKey: "lyricsOnHome") } }
     @Published var chargingPeekEnabled: Bool { didSet { defaults.set(chargingPeekEnabled, forKey: "chargingPeekEnabled") } }
     @Published var devicePeekEnabled: Bool {
@@ -106,6 +108,7 @@ final class AppSettings: ObservableObject {
             "cornerRadius": 30.0,
             "lyricsEnabled": true,
             "lyricsOnHome": true,
+            "homeLyricsMode": false,
             "theme": NotchTheme.defaultTheme.rawValue,
             "accent": AccentChoice.white.rawValue,
             "clipboardEnabled": true,
@@ -136,6 +139,7 @@ final class AppSettings: ObservableObject {
         cornerRadius = defaults.double(forKey: "cornerRadius")
         lyricsEnabled = defaults.bool(forKey: "lyricsEnabled")
         lyricsOnHome = defaults.bool(forKey: "lyricsOnHome")
+        homeLyricsMode = defaults.bool(forKey: "homeLyricsMode")
         theme = NotchTheme(rawValue: defaults.string(forKey: "theme") ?? "") ?? NotchTheme.defaultTheme
         accent = AccentChoice(rawValue: defaults.string(forKey: "accent") ?? "") ?? .white
         clipboardEnabled = defaults.bool(forKey: "clipboardEnabled")
@@ -168,7 +172,6 @@ final class AppSettings: ObservableObject {
         NotchTab.allCases.filter { tab in
             switch tab {
             case .home, .tray: return true
-            case .lyrics: return lyricsEnabled
             case .clipboard: return clipboardEnabled
             case .timer: return timerTabEnabled
             case .mirror: return mirrorTabEnabled

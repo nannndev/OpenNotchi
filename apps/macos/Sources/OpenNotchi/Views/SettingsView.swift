@@ -251,12 +251,12 @@ private struct FeaturesPane: View {
     var body: some View {
         Form {
             Section("Tabs") {
-                Toggle("Lyrics", isOn: $settings.lyricsEnabled)
                 Toggle("Clipboard history", isOn: $settings.clipboardEnabled)
                 Toggle("Timer", isOn: $settings.timerTabEnabled)
                 Toggle("Mirror (camera)", isOn: $settings.mirrorTabEnabled)
             }
             Section("Home") {
+                Toggle("Lyrics (button on the artwork)", isOn: $settings.lyricsEnabled)
                 Toggle("Today's events next to the player", isOn: $settings.calendarEnabled)
                 Toggle("Show the current lyric line under the title", isOn: $settings.lyricsOnHome)
                     .disabled(!settings.lyricsEnabled)

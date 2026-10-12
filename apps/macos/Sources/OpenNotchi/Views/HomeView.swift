@@ -6,15 +6,30 @@ struct HomeView: View {
     @Environment(\.notchAccent) private var accent
 
     var body: some View {
+        // Lyrics mode swaps the player for lyrics and moves the controls to the side.
+        let showLyrics = settings.lyricsEnabled && settings.homeLyricsMode && media.info != nil
+
         HStack(spacing: NotchLayout.columnSpacing) {
             ArtworkView(image: media.artwork, cornerRadius: 16)
                 .frame(width: 112, height: 112)
                 .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+                .overlay(alignment: .bottomTrailing) {
+                    if settings.lyricsEnabled && media.info != nil {
+                        LyricsToggle(isOn: $settings.homeLyricsMode)
+                            .padding(6)
+                    }
+                }
                 .frame(width: NotchLayout.sideColumn, alignment: .leading)
 
             Group {
                 if let info = media.info {
-                    PlayerView(info: info)
+                    if showLyrics {
+                        LyricsContent(info: info)
+                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    } else {
+                        PlayerView(info: info)
+                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    }
                 } else {
                     StoppedView()
                 }
@@ -22,14 +37,43 @@ struct HomeView: View {
             .frame(maxWidth: .infinity)
 
             Group {
-                if settings.calendarEnabled {
+                if showLyrics {
+                    MiniPlayerColumn()
+                } else if settings.calendarEnabled {
                     CalendarWidget()
                 } else {
                     WaveformView(isPlaying: media.info?.isPlaying ?? false, barCount: 5, maxHeight: 28, color: accent.color)
                 }
             }
-            .frame(width: NotchLayout.sideColumn, alignment: settings.calendarEnabled ? .leading : .trailing)
+            .frame(width: NotchLayout.sideColumn, alignment: showLyrics || !settings.calendarEnabled ? .trailing : .leading)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showLyrics)
+    }
+}
+
+/// Small round button on the artwork that switches Home into lyrics mode.
+private struct LyricsToggle: View {
+    @Binding var isOn: Bool
+    @Environment(\.notchAccent) private var accent
+    @State private var hovering = false
+
+    var body: some View {
+        Button { isOn.toggle() } label: {
+            Image(systemName: isOn ? "quote.bubble.fill" : "quote.bubble")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(isOn ? (accent.isNeutral ? .black : .white) : .white)
+                .frame(width: 26, height: 26)
+                .background(
+                    Circle().fill(isOn ? AnyShapeStyle(accent.isNeutral ? .white : accent.color) : AnyShapeStyle(.black.opacity(0.55)))
+                )
+                .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 0.5))
+                .scaleEffect(hovering ? 1.1 : 1)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(isOn ? "Show player" : "Show lyrics")
+        .onHover { hovering = $0 }
+        .animation(.spring(response: 0.25), value: hovering)
     }
 }
 

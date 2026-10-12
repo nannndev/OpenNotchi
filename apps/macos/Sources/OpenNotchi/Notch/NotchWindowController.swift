@@ -77,7 +77,10 @@ final class NotchWindowController: NSObject {
         case "peek-volume": viewModel.showPeek(.volume(level: 0.62, muted: false))
         case "peek-brightness": viewModel.showPeek(.brightness(level: 0.4))
         case "home": viewModel.tab = .home; viewModel.open()
-        case "lyrics": viewModel.tab = .lyrics; viewModel.open()
+        case "lyrics":
+            viewModel.tab = .home
+            viewModel.open()
+            DispatchQueue.main.async { AppSettings.shared.homeLyricsMode = true }
         case "tray": viewModel.tab = .tray; viewModel.open()
         case "clipboard": viewModel.tab = .clipboard; viewModel.open()
         case "timer": viewModel.tab = .timer; viewModel.open()

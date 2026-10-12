@@ -217,7 +217,6 @@ struct ExpandedView: View {
             Group {
                 switch tab {
                 case .home: HomeView()
-                case .lyrics: LyricsView()
                 case .tray: TrayView()
                 case .clipboard: ClipboardView()
                 case .timer: TimerView()

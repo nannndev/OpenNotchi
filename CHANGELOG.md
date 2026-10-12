@@ -6,6 +6,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-12
+
 ### Added
 - Auto-update with Sparkle: "Check for Updates…" in the menu bar and Settings,
   plus automatic background checks
@@ -15,6 +17,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Weather in the notch header from Open-Meteo: search a city or use your
   location, Celsius or Fahrenheit
 - Customizable global shortcut (default ⌥⌘N)
+
+### Changed
+- Lyrics moved from their own tab into Home: tap the button on the artwork to
+  switch between the player and synced lyrics
 
 ## [0.1.0] - 2026-10-12
 
@@ -35,5 +41,6 @@ First public release.
 - Global shortcut ⌥⌘N, launch at login, sidebar Settings window
 - Monochrome brand: app icon, logo, wordmark and menu bar icon
 
-[Unreleased]: https://github.com/nannndev/OpenNotchi/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/nannndev/OpenNotchi/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/nannndev/OpenNotchi/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nannndev/OpenNotchi/releases/tag/v0.1.0
