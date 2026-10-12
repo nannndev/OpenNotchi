@@ -2,6 +2,9 @@
 
 # OpenNotchi
 
+**Website:** [opennotchi.vercel.app](https://opennotchi.vercel.app) ·
+**Download:** [latest release](https://github.com/nannndev/OpenNotchi/releases/latest)
+
 A free, open-source "dynamic notch" for macOS: hover the MacBook notch to get
 now-playing controls, battery status, and a file tray with AirDrop. An
 alternative to paid apps like NotchNook and Alcove.
@@ -129,7 +132,7 @@ locally into `apps/macos/dist/`.
 ## Website
 
 The landing page lives in [apps/website/](apps/website/) (React, Tailwind,
-shadcn/ui) and deploys to Vercel with Root Directory `apps/website`.
+shadcn/ui) and is live at [opennotchi.vercel.app](https://opennotchi.vercel.app).
 
 ## Brand
 

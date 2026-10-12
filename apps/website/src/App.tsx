@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { NotchDemo } from "@/components/notch-demo"
 import { Contributors } from "@/components/sections/contributors"
 import { Download } from "@/components/sections/download"
@@ -8,6 +9,13 @@ import { SiteNav } from "@/components/sections/site-nav"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
 export default function App() {
+  // The page renders client-side, so jump to a #section link once it exists.
+  useEffect(() => {
+    if (window.location.hash) {
+      document.querySelector(window.location.hash)?.scrollIntoView()
+    }
+  }, [])
+
   return (
     <TooltipProvider>
       <NotchDemo />
