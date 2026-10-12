@@ -124,6 +124,14 @@ private struct PlayerView: View {
             }
             .lineLimit(1)
 
+            if let device = info.remoteDevice {
+                Label("Playing on \(device)", systemImage: "hifispeaker.and.homepod.fill")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.green)
+                    .lineLimit(1)
+                    .padding(.top, -6)
+            }
+
             ProgressBar(info: info)
 
             HStack(spacing: 28) {

@@ -17,6 +17,10 @@ alternative to paid apps like NotchNook and Alcove.
   in Chrome, Brave, Edge, Arc and Safari: artwork, title/artist, seekable
   progress bar, play/pause/next/previous
 - **Live video preview** of the YouTube video right in the notch
+- **Spotify on other devices** (Spotify Connect): see and control what's
+  playing on your iPhone or speaker after connecting your Spotify account
+- **Markets**: your own watchlist of IDX (`.JK`) and global stocks, indices,
+  crypto and currencies with sparklines (delayed, for information only)
 - **Synced lyrics** from [LRCLIB](https://lrclib.net) (free, no API key): a
   Lyrics tab that follows the song, plus the current line under the title on Home
 - **Live activity** while closed: artwork and waveform beside the notch

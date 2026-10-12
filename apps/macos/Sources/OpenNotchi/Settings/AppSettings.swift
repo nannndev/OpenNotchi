@@ -18,6 +18,8 @@ final class AppSettings: ObservableObject {
     }
     @Published var spotifyEnabled: Bool { didSet { defaults.set(spotifyEnabled, forKey: "spotifyEnabled") } }
     @Published var appleMusicEnabled: Bool { didSet { defaults.set(appleMusicEnabled, forKey: "appleMusicEnabled") } }
+    @Published var spotifyRemoteEnabled: Bool { didSet { defaults.set(spotifyRemoteEnabled, forKey: "spotifyRemoteEnabled") } }
+    @Published var spotifyClientID: String { didSet { defaults.set(spotifyClientID, forKey: "spotifyClientID") } }
     @Published var youtubeEnabled: Bool { didSet { defaults.set(youtubeEnabled, forKey: "youtubeEnabled") } }
     @Published var videoPreviewEnabled: Bool { didSet { defaults.set(videoPreviewEnabled, forKey: "videoPreviewEnabled") } }
     @Published var theme: NotchTheme {
@@ -52,6 +54,9 @@ final class AppSettings: ObservableObject {
             AppDelegate.shared?.updateSystemMonitors()
         }
     }
+    @Published var marketsEnabled: Bool { didSet { defaults.set(marketsEnabled, forKey: "marketsEnabled") } }
+    @Published var showTickerInHeader: Bool { didSet { defaults.set(showTickerInHeader, forKey: "showTickerInHeader") } }
+    @Published var marketTickers: [String] { didSet { defaults.set(marketTickers, forKey: "marketTickers") } }
     @Published var weatherEnabled: Bool { didSet { defaults.set(weatherEnabled, forKey: "weatherEnabled") } }
     @Published var useFahrenheit: Bool { didSet { defaults.set(useFahrenheit, forKey: "useFahrenheit") } }
     @Published private(set) var weatherPlace: String
@@ -96,12 +101,17 @@ final class AppSettings: ObservableObject {
             "spotifyEnabled": true,
             "appleMusicEnabled": true,
             "youtubeEnabled": true,
+            "spotifyRemoteEnabled": true,
+            "spotifyClientID": "",
             "videoPreviewEnabled": true,
             "hotKeyEnabled": true,
             "chargingPeekEnabled": true,
             "devicePeekEnabled": true,
             "hudEnabled": false,
             "weatherEnabled": true,
+            "marketsEnabled": true,
+            "showTickerInHeader": true,
+            "marketTickers": ["^JKSE", "BBCA.JK", "^GSPC", "AAPL", "BTC-USD", "IDR=X"],
             "useFahrenheit": Locale.current.measurementSystem == .us,
             "weatherPlace": "",
             "hotKeyCode": 45,       // kVK_ANSI_N
@@ -127,12 +137,17 @@ final class AppSettings: ObservableObject {
         spotifyEnabled = defaults.bool(forKey: "spotifyEnabled")
         appleMusicEnabled = defaults.bool(forKey: "appleMusicEnabled")
         youtubeEnabled = defaults.bool(forKey: "youtubeEnabled")
+        spotifyRemoteEnabled = defaults.bool(forKey: "spotifyRemoteEnabled")
+        spotifyClientID = defaults.string(forKey: "spotifyClientID") ?? ""
         videoPreviewEnabled = defaults.bool(forKey: "videoPreviewEnabled")
         hotKeyEnabled = defaults.bool(forKey: "hotKeyEnabled")
         chargingPeekEnabled = defaults.bool(forKey: "chargingPeekEnabled")
         devicePeekEnabled = defaults.bool(forKey: "devicePeekEnabled")
         hudEnabled = defaults.bool(forKey: "hudEnabled")
         weatherEnabled = defaults.bool(forKey: "weatherEnabled")
+        marketsEnabled = defaults.bool(forKey: "marketsEnabled")
+        showTickerInHeader = defaults.bool(forKey: "showTickerInHeader")
+        marketTickers = defaults.stringArray(forKey: "marketTickers") ?? []
         useFahrenheit = defaults.bool(forKey: "useFahrenheit")
         weatherPlace = defaults.string(forKey: "weatherPlace") ?? ""
         weatherLatitude = defaults.double(forKey: "weatherLatitude")
@@ -181,6 +196,7 @@ final class AppSettings: ObservableObject {
             case .clipboard: return clipboardEnabled
             case .timer: return timerTabEnabled
             case .mirror: return mirrorTabEnabled
+            case .markets: return marketsEnabled
             }
         }
     }
@@ -189,6 +205,7 @@ final class AppSettings: ObservableObject {
         switch bundleID {
         case SpotifyProvider.bundleID: return spotifyEnabled
         case AppleMusicProvider.bundleID: return appleMusicEnabled
+        case SpotifyWebProvider.providerID: return spotifyRemoteEnabled
         default: return youtubeEnabled // browser YouTube providers
         }
     }

@@ -9,7 +9,8 @@ final class MediaManager: ObservableObject {
     }
     @Published private(set) var palette: ArtworkPalette?
 
-    let providers: [MediaProvider] = [AppleMusicProvider(), SpotifyProvider()] + BrowserYouTubeProvider.all
+    // Order matters: when several report the same state, the earlier one wins.
+    let providers: [MediaProvider] = [AppleMusicProvider(), SpotifyProvider()] + BrowserYouTubeProvider.all + [SpotifyWebProvider()]
 
     private let settings: AppSettings
     private var timer: Timer?

@@ -13,6 +13,8 @@ struct NowPlayingInfo: Equatable {
     var sourceID: String
     /// YouTube video ID when the source is a YouTube video (used for the live preview).
     var videoID: String? = nil
+    /// Name of the device playing it when that's not this Mac (Spotify Connect).
+    var remoteDevice: String? = nil
     var timestamp = Date()
 
     var trackKey: String { "\(sourceID)|\(title)|\(artist)|\(album)" }

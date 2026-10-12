@@ -19,6 +19,7 @@ final class NotchWindowController: NSObject {
         calendar: CalendarManager,
         lyrics: LyricsManager,
         weather: WeatherManager,
+        markets: MarketManager,
         settings: AppSettings
     ) {
         viewModel = NotchViewModel(settings: settings)
@@ -34,6 +35,7 @@ final class NotchWindowController: NSObject {
             .environmentObject(calendar)
             .environmentObject(lyrics)
             .environmentObject(weather)
+            .environmentObject(markets)
             .environmentObject(settings)
         let hosting = FirstMouseHostingView(rootView: root)
         hosting.frame = NSRect(origin: .zero, size: Self.windowSize)
@@ -85,6 +87,7 @@ final class NotchWindowController: NSObject {
         case "clipboard": viewModel.tab = .clipboard; viewModel.open()
         case "timer": viewModel.tab = .timer; viewModel.open()
         case "mirror": viewModel.tab = .mirror; viewModel.open()
+        case "markets": viewModel.tab = .markets; viewModel.open()
         default: break
         }
     }

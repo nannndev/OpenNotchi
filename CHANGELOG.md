@@ -11,6 +11,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   channel, thumbnail, progress and playback controls
 - Live video preview: a muted copy of the YouTube video plays in the notch,
   in sync with the browser, while the notch is open
+- Spotify on other devices: connect your Spotify account to see (and with
+  Premium, control) what's playing on your iPhone, speaker or TV, with lyrics
+- Markets tab: a watchlist of Indonesian and global stocks, indices, crypto and
+  currencies with intraday sparklines; tickers also rotate in the header.
+  Search and reorder tickers in Settings. Delayed quotes from Yahoo Finance.
 
 ## [0.2.0] - 2026-10-12
 

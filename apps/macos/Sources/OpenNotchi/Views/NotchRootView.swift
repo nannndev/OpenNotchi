@@ -221,6 +221,7 @@ struct ExpandedView: View {
                 case .clipboard: ClipboardView()
                 case .timer: TimerView()
                 case .mirror: MirrorView()
+                case .markets: MarketsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

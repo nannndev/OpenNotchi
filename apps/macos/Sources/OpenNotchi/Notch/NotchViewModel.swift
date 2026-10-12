@@ -7,6 +7,7 @@ enum NotchTab: String, CaseIterable {
     case clipboard = "Clipboard"
     case timer = "Timer"
     case mirror = "Mirror"
+    case markets = "Markets"
 
     var icon: String {
         switch self {
@@ -15,6 +16,7 @@ enum NotchTab: String, CaseIterable {
         case .clipboard: return "doc.on.clipboard.fill"
         case .timer: return "timer"
         case .mirror: return "camera.fill"
+        case .markets: return "chart.line.uptrend.xyaxis"
         }
     }
 }

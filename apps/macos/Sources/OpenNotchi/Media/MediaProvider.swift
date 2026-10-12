@@ -9,6 +9,8 @@ protocol MediaProvider: AnyObject {
     var notificationName: String? { get }
     /// Whether to offer this app as a launcher when nothing is playing.
     var showsInLauncher: Bool { get }
+    /// Whether the source is available right now (by default: the app is running).
+    var isRunning: Bool { get }
 
     func fetch() -> NowPlayingInfo?
     func fetchArtwork() -> NSImage?

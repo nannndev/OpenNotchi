@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let calendar = CalendarManager()
     private(set) lazy var lyrics = LyricsManager(media: media, settings: settings)
     private(set) lazy var weather = WeatherManager(settings: settings)
+    private(set) lazy var markets = MarketManager(settings: settings)
     let updater = Updater()
 
     private let bluetooth = BluetoothMonitor()
@@ -37,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             calendar: calendar,
             lyrics: lyrics,
             weather: weather,
+            markets: markets,
             settings: settings
         )
         setupStatusItem()
@@ -168,6 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .environmentObject(settings)
                     .environmentObject(media)
                     .environmentObject(weather)
+                    .environmentObject(markets)
                     .environmentObject(updater)
             )
             let window = NSWindow(contentViewController: hosting)

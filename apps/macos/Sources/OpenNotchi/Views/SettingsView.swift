@@ -281,6 +281,9 @@ private struct FeaturesPane: View {
             Section("Weather") {
                 WeatherSettings()
             }
+            Section("Markets") {
+                MarketSettings()
+            }
             Section {
                 Text("Lyrics come from LRCLIB and weather from Open-Meteo, both free and open. Only the song details and your chosen location are sent.")
                 Text("Clipboard history skips anything password managers mark as concealed.")
@@ -303,6 +306,9 @@ private struct MediaPane: View {
             Section("Apps") {
                 Toggle("Apple Music", isOn: $settings.appleMusicEnabled)
                 Toggle("Spotify", isOn: $settings.spotifyEnabled)
+            }
+            Section("Spotify on other devices") {
+                SpotifyConnectSettings()
             }
             Section("YouTube in your browser") {
                 Toggle("YouTube and YouTube Music", isOn: $settings.youtubeEnabled)

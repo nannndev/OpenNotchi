@@ -8,7 +8,7 @@ struct HeaderView: View {
     @EnvironmentObject private var weather: WeatherManager
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             ForEach(settings.visibleTabs, id: \.self) { tab in
                 TabButton(tab: tab, isSelected: vm.tab == tab, badge: tab == .tray ? tray.items.count : 0) {
                     vm.tab = tab
@@ -22,13 +22,14 @@ struct HeaderView: View {
 
             Spacer()
 
-            if settings.weatherEnabled, let snapshot = weather.snapshot {
-                WeatherBadge(snapshot: snapshot, place: settings.weatherPlace)
-                    .padding(.trailing, 8)
-            }
+            // Weather and the watchlist share one slot and take turns, so the header never overflows.
+            StatusRotator()
+                .fixedSize()
+                .padding(.trailing, 8)
 
             if battery.hasBattery {
                 BatteryView(level: battery.level, isCharging: battery.isCharging, isPluggedIn: battery.isPluggedIn)
+                    .fixedSize()
             }
 
             Menu {
@@ -60,6 +61,7 @@ private struct TabButton: View {
                 Image(systemName: tab.icon)
                 if isSelected {
                     Text(tab.rawValue)
+                        .fixedSize()
                 }
                 if badge > 0 {
                     Text("\(badge)")
@@ -70,7 +72,7 @@ private struct TabButton: View {
             }
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(isSelected ? .white : .secondary)
-            .padding(.horizontal, isSelected ? 10 : 7)
+            .padding(.horizontal, isSelected ? 9 : 6)
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 7)
@@ -81,6 +83,67 @@ private struct TabButton: View {
         .buttonStyle(.plain)
         .help(tab.rawValue)
         .animation(.spring(response: 0.3), value: isSelected)
+    }
+}
+
+/// One header slot that cycles through the weather and the watchlist tickers.
+private struct StatusRotator: View {
+    @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var weather: WeatherManager
+    @EnvironmentObject private var markets: MarketManager
+    @EnvironmentObject private var vm: NotchViewModel
+    @State private var index = 0
+
+    private enum Item: Equatable {
+        case weather(WeatherSnapshot)
+        case quote(Quote)
+
+        var id: String {
+            switch self {
+            case .weather: return "weather"
+            case .quote(let quote): return quote.symbol
+            }
+        }
+    }
+
+    private var items: [Item] {
+        var items: [Item] = []
+        if settings.weatherEnabled, let snapshot = weather.snapshot { items.append(.weather(snapshot)) }
+        // The Markets tab already shows every ticker.
+        if settings.showTickerInHeader && vm.tab != .markets {
+            items += markets.watchlist.map(Item.quote)
+        }
+        return items
+    }
+
+    var body: some View {
+        let items = self.items
+        Group {
+            if !items.isEmpty {
+                let item = items[index % items.count]
+                Group {
+                    switch item {
+                    case .weather(let snapshot):
+                        WeatherBadge(snapshot: snapshot, place: settings.weatherPlace)
+                    case .quote(let quote):
+                        HStack(spacing: 4) {
+                            Text(quote.displaySymbol).font(.system(size: 12, weight: .bold, design: .rounded))
+                            Text(quote.formattedChange)
+                                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(quote.change >= 0 ? .green : .red)
+                        }
+                        .help("\(quote.name): \(quote.formattedPrice) \(quote.currency)")
+                    }
+                }
+                .id(item.id)
+                .transition(.push(from: .bottom))
+            }
+        }
+        .clipped()
+        .onReceive(Timer.publish(every: 4, on: .main, in: .common).autoconnect()) { _ in
+            guard items.count > 1 else { return }
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) { index += 1 }
+        }
     }
 }
 
