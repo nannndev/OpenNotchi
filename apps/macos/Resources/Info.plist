@@ -2,47 +2,47 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>OpenNotchi</string>
-    <key>CFBundleDisplayName</key>
-    <string>OpenNotchi</string>
-    <key>CFBundleIdentifier</key>
-    <string>io.github.opennotchi</string>
-    <key>CFBundleExecutable</key>
-    <string>OpenNotchi</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
-    <key>LSUIElement</key>
-    <true/>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-    <key>NSAppleEventsUsageDescription</key>
-    <string>OpenNotchi controls Spotify and Apple Music to show what's playing and let you play, pause and skip tracks from the notch.</string>
-    <key>NSCameraUsageDescription</key>
-    <string>OpenNotchi shows a camera preview in the Mirror tab so you can check how you look.</string>
-    <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>OpenNotchi shows today's upcoming events next to the music player.</string>
-    <key>NSCalendarsUsageDescription</key>
-    <string>OpenNotchi shows today's upcoming events next to the music player.</string>
-    <key>SUFeedURL</key>
-    <string>https://github.com/nannndev/OpenNotchi/releases/latest/download/appcast.xml</string>
-    <key>SUPublicEDKey</key>
-    <string>wWvUMmtf/QRYgWLgsE0MRvMzIkl8YsNMxdDKsaUPzoY=</string>
-    <key>SUEnableAutomaticChecks</key>
-    <true/>
-    <key>NSBluetoothAlwaysUsageDescription</key>
-    <string>OpenNotchi shows your AirPods and other Bluetooth devices in the notch when they connect.</string>
-    <key>NSLocationUsageDescription</key>
-    <string>OpenNotchi uses your location only when you choose "Use my location" for the weather.</string>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>OpenNotchi uses your location only when you choose "Use my location" for the weather.</string>
+	<key>CFBundleDisplayName</key>
+	<string>OpenNotchi</string>
+	<key>CFBundleExecutable</key>
+	<string>OpenNotchi</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.opennotchi</string>
+	<key>CFBundleName</key>
+	<string>OpenNotchi</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.2.0</string>
+	<key>CFBundleVersion</key>
+	<string>2</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>OpenNotchi controls Spotify and Apple Music to show what's playing and let you play, pause and skip tracks from the notch.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>OpenNotchi shows your AirPods and other Bluetooth devices in the notch when they connect.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>OpenNotchi shows today's upcoming events next to the music player.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>OpenNotchi shows today's upcoming events next to the music player.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>OpenNotchi shows a camera preview in the Mirror tab so you can check how you look.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSLocationUsageDescription</key>
+	<string>OpenNotchi uses your location only when you choose "Use my location" for the weather.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>OpenNotchi uses your location only when you choose "Use my location" for the weather.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/nannndev/OpenNotchi/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>wWvUMmtf/QRYgWLgsE0MRvMzIkl8YsNMxdDKsaUPzoY=</string>
 </dict>
 </plist>
