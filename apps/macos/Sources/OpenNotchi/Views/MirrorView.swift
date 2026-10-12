@@ -3,41 +3,237 @@ import SwiftUI
 
 struct MirrorView: View {
     @EnvironmentObject private var settings: AppSettings
-    @EnvironmentObject private var vm: NotchViewModel
+    @EnvironmentObject private var tray: TrayStore
     @State private var isHovering = false
+    @State private var captureRequest = 0
+    @State private var countdown: Int?
+    @State private var flash = false
+    @State private var bursts: [UUID] = []
+    @State private var savedPhoto: URL?
 
     var body: some View {
         VStack(spacing: 4) {
-            CameraPreview(effect: settings.mirrorEffect, ringLight: settings.mirrorRingLight, cameraID: settings.mirrorCameraID)
+            CameraPreview(
+                effect: settings.mirrorEffect,
+                ringLight: settings.mirrorRingLight,
+                portrait: settings.mirrorPortrait,
+                gesturesEnabled: settings.mirrorGestures,
+                cameraID: settings.mirrorCameraID,
+                captureRequest: captureRequest,
+                onGesture: handle,
+                onPhoto: photoSaved
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay { ringLightGlow }
+            .overlay {
+                ForEach(bursts, id: \.self) { id in
+                    ConfettiBurst()
+                        .task {
+                            try? await Task.sleep(for: .seconds(2.4))
+                            bursts.removeAll { $0 == id }
+                        }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay {
-                    // Ring light: a soft white glow around the edge, like the real thing.
-                    if settings.mirrorRingLight {
-                        RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(.white.opacity(0.9), lineWidth: 3)
-                            .blur(radius: 4)
-                            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.5), lineWidth: 1))
-                            .allowsHitTesting(false)
-                            .transition(.opacity)
-                    }
+                .allowsHitTesting(false)
+            }
+            .overlay {
+                if let countdown {
+                    Text("\(countdown)")
+                        .font(.system(size: 64, weight: .heavy, design: .rounded))
+                        .shadow(color: .black.opacity(0.5), radius: 10)
+                        .id(countdown)
+                        .transition(.scale(scale: 1.6).combined(with: .opacity))
                 }
-                .overlay(alignment: .bottom) {
-                    MirrorControls()
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.white)
+                    .opacity(flash ? 0.9 : 0)
+                    .allowsHitTesting(false)
+            }
+            .overlay(alignment: .topTrailing) {
+                if let savedPhoto {
+                    SavedToast(url: savedPhoto)
                         .padding(8)
-                        .opacity(isHovering ? 1 : 0)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
-                .shadow(color: settings.mirrorRingLight ? .white.opacity(0.35) : .clear, radius: 12)
-                .onHover { inside in
-                    withAnimation(.easeInOut(duration: 0.2)) { isHovering = inside }
+            }
+            .overlay(alignment: .topLeading) {
+                if isHovering && settings.mirrorGestures && savedPhoto == nil {
+                    Text("✌️ photo   👍 confetti   ✋ light")
+                        .font(.system(size: 10, weight: .medium))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(.black.opacity(0.5)))
+                        .padding(8)
+                        .transition(.opacity)
                 }
-                .animation(.easeInOut(duration: 0.25), value: settings.mirrorRingLight)
+            }
+            .overlay(alignment: .trailing) {
+                ShutterButton(action: startCountdown)
+                    .padding(.trailing, 12)
+                    .opacity(isHovering && countdown == nil ? 1 : 0)
+            }
+            .overlay(alignment: .bottom) {
+                MirrorControls()
+                    .padding(8)
+                    .opacity(isHovering ? 1 : 0)
+            }
+            .shadow(color: settings.mirrorRingLight ? .white.opacity(0.35) : .clear, radius: 12)
+            .onHover { inside in
+                withAnimation(.easeInOut(duration: 0.2)) { isHovering = inside }
+            }
+            .animation(.easeInOut(duration: 0.25), value: settings.mirrorRingLight)
 
             ResizeHandle()
         }
     }
+
+    @ViewBuilder
+    private var ringLightGlow: some View {
+        // Ring light: a soft white glow around the edge, like the real thing.
+        if settings.mirrorRingLight {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(.white.opacity(0.9), lineWidth: 3)
+                .blur(radius: 4)
+                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.5), lineWidth: 1))
+                .allowsHitTesting(false)
+                .transition(.opacity)
+        }
+    }
+
+    private func handle(_ gesture: MirrorGesture) {
+        switch gesture {
+        case .peace: startCountdown()
+        case .thumbsUp: bursts.append(UUID())
+        case .openPalm: settings.mirrorRingLight.toggle()
+        }
+    }
+
+    /// 3, 2, 1, flash, photo.
+    private func startCountdown() {
+        guard countdown == nil else { return }
+        Task { @MainActor in
+            for n in [3, 2, 1] {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { countdown = n }
+                try? await Task.sleep(for: .milliseconds(800))
+            }
+            withAnimation(.easeOut(duration: 0.15)) { countdown = nil }
+            captureRequest += 1
+            flash = true
+            withAnimation(.easeOut(duration: 0.5)) { flash = false }
+            NSSound(named: "Tink")?.play()
+        }
+    }
+
+    private func photoSaved(_ url: URL) {
+        tray.add([url])
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { savedPhoto = url }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.5))
+            withAnimation(.easeInOut(duration: 0.3)) {
+                if savedPhoto == url { savedPhoto = nil }
+            }
+        }
+    }
 }
 
-/// Effect swatches, ring light and camera picker, shown while the pointer is over the mirror.
+private struct ShutterButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle().stroke(.white, lineWidth: 3).frame(width: 38, height: 38)
+                Circle().fill(.white).frame(width: 29, height: 29)
+            }
+            .shadow(color: .black.opacity(0.4), radius: 6)
+        }
+        .buttonStyle(.plain)
+        .help("Take a photo (or show ✌️)")
+    }
+}
+
+/// Thumbnail of the photo that was just taken.
+private struct SavedToast: View {
+    let url: URL
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let image = NSImage(contentsOf: url) {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 40, height: 28)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Saved to Tray").font(.system(size: 11, weight: .semibold))
+                Text("Pictures › OpenNotchi").font(.system(size: 9)).foregroundStyle(.secondary)
+            }
+        }
+        .padding(6)
+        .padding(.trailing, 4)
+        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.6)))
+        .onTapGesture { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+    }
+}
+
+/// Hearts, stars and confetti that shoot up and fall back down.
+private struct ConfettiBurst: View {
+    private struct Piece {
+        let symbol: String
+        let color: Color
+        let x: Double        // start, as a fraction of the width
+        let vx: Double       // points per second
+        let vy: Double
+        let spin: Double     // degrees per second
+        let size: Double
+    }
+
+    private let pieces: [Piece] = (0..<34).map { _ in
+        let kinds: [(String, Color)] = [
+            ("heart.fill", .pink), ("heart.fill", .red), ("star.fill", .yellow),
+            ("hand.thumbsup.fill", .white), ("capsule.fill", .cyan), ("capsule.fill", .green),
+            ("capsule.fill", .orange), ("sparkle", .white),
+        ]
+        let kind = kinds.randomElement()!
+        return Piece(
+            symbol: kind.0,
+            color: kind.1,
+            x: .random(in: 0.3...0.7),
+            vx: .random(in: -170...170),
+            vy: .random(in: 260...420),
+            spin: .random(in: -360...360),
+            size: .random(in: 10...20)
+        )
+    }
+    private let start = Date.now
+
+    var body: some View {
+        GeometryReader { geo in
+            TimelineView(.animation) { context in
+                let t = context.date.timeIntervalSince(start)
+                ZStack {
+                    ForEach(pieces.indices, id: \.self) { i in
+                        let piece = pieces[i]
+                        let gravity = 420.0
+                        let x = piece.x * geo.size.width + piece.vx * t
+                        let y = geo.size.height + 10 - piece.vy * t + gravity * t * t / 2
+                        Image(systemName: piece.symbol)
+                            .font(.system(size: piece.size))
+                            .foregroundStyle(piece.color)
+                            .rotationEffect(.degrees(piece.spin * t))
+                            .position(x: x, y: y)
+                            .opacity(max(0, 1 - max(0, t - 1.4) / 0.8))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Looks, portrait blur, ring light, gestures and the camera picker, shown while the pointer is over the mirror.
 private struct MirrorControls: View {
     @EnvironmentObject private var settings: AppSettings
 
@@ -64,16 +260,9 @@ private struct MirrorControls: View {
 
             Divider().frame(height: 16)
 
-            Button {
-                settings.mirrorRingLight.toggle()
-            } label: {
-                Image(systemName: settings.mirrorRingLight ? "light.max" : "light.min")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(settings.mirrorRingLight ? .yellow : .white)
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.plain)
-            .help("Ring light")
+            toggle(isOn: $settings.mirrorPortrait, on: "person.crop.rectangle.fill", off: "person.crop.rectangle", tint: .cyan, help: "Portrait: blur the background")
+            toggle(isOn: $settings.mirrorRingLight, on: "light.max", off: "light.min", tint: .yellow, help: "Ring light")
+            toggle(isOn: $settings.mirrorGestures, on: "hand.raised.fill", off: "hand.raised.slash", tint: .green, help: "Hand gestures: ✌️ photo, 👍 confetti, ✋ ring light")
 
             let cameras = CameraPreview.cameras
             if cameras.count > 1 {
@@ -103,6 +292,19 @@ private struct MirrorControls: View {
         .padding(.vertical, 6)
         .background(Capsule().fill(.black.opacity(0.55)))
         .background(Capsule().fill(.ultraThinMaterial))
+    }
+
+    private func toggle(isOn: Binding<Bool>, on: String, off: String, tint: Color, help: String) -> some View {
+        Button {
+            isOn.wrappedValue.toggle()
+        } label: {
+            Image(systemName: isOn.wrappedValue ? on : off)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isOn.wrappedValue ? tint : .white)
+                .frame(width: 22, height: 22)
+        }
+        .buttonStyle(.plain)
+        .help(help)
     }
 }
 

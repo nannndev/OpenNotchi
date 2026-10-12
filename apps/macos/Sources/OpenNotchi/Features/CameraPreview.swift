@@ -1,6 +1,8 @@
 import AVFoundation
 import CoreImage
 import SwiftUI
+import UniformTypeIdentifiers
+import Vision
 
 /// Look applied to the mirror, rendered with Core Image.
 enum MirrorEffect: String, CaseIterable, Identifiable {
@@ -74,17 +76,26 @@ enum MirrorEffect: String, CaseIterable, Identifiable {
 struct CameraPreview: NSViewRepresentable {
     var effect: MirrorEffect = .natural
     var ringLight = false
+    var portrait = false
+    var gesturesEnabled = false
     var cameraID: String = ""
+    /// Bumped by the view to request a photo.
+    var captureRequest = 0
+    var onGesture: (MirrorGesture) -> Void = { _ in }
+    var onPhoto: (URL) -> Void = { _ in }
 
     func makeNSView(context: Context) -> CameraPreviewView {
         let view = CameraPreviewView()
-        view.update(effect: effect, ringLight: ringLight)
+        updateNSView(view, context: context)
         view.start(cameraID: cameraID)
         return view
     }
 
     func updateNSView(_ nsView: CameraPreviewView, context: Context) {
-        nsView.update(effect: effect, ringLight: ringLight)
+        nsView.update(effect: effect, ringLight: ringLight, portrait: portrait, gestures: gesturesEnabled)
+        nsView.onGesture = onGesture
+        nsView.onPhoto = onPhoto
+        nsView.requestCapture(captureRequest)
         nsView.switchCamera(to: cameraID)
     }
 
@@ -113,7 +124,25 @@ final class CameraPreviewView: NSView, AVCaptureVideoDataOutputSampleBufferDeleg
     private var targetPixels = CGSize(width: 640, height: 360)
     private var effect: MirrorEffect = .natural
     private var ringLight = false
+    private var portrait = false
+    private var gestures = false
+    private var pendingCapture = false
     private var currentCameraID: String?
+    private var lastCaptureRequest: Int?
+
+    var onGesture: (MirrorGesture) -> Void = { _ in }
+    var onPhoto: (URL) -> Void = { _ in }
+
+    // Vision work, done on the camera queue.
+    private let segmentation: VNGeneratePersonSegmentationRequest = {
+        let request = VNGeneratePersonSegmentationRequest()
+        request.qualityLevel = .balanced
+        request.outputPixelFormat = kCVPixelFormatType_OneComponent8
+        return request
+    }()
+    private let handGestures = HandGestureDetector()
+    private var lastMask: CIImage?
+    private var frameCount = 0
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -142,11 +171,20 @@ final class CameraPreviewView: NSView, AVCaptureVideoDataOutputSampleBufferDeleg
         lock.withLock { targetPixels = size }
     }
 
-    func update(effect: MirrorEffect, ringLight: Bool) {
+    func update(effect: MirrorEffect, ringLight: Bool, portrait: Bool, gestures: Bool) {
         lock.withLock {
             self.effect = effect
             self.ringLight = ringLight
+            self.portrait = portrait
+            self.gestures = gestures
         }
+    }
+
+    /// Takes a photo when `request` changes (the first value only records the baseline).
+    func requestCapture(_ request: Int) {
+        defer { lastCaptureRequest = request }
+        guard let last = lastCaptureRequest, request != last else { return }
+        lock.withLock { pendingCapture = true }
     }
 
     func start(cameraID: String) {
@@ -208,32 +246,89 @@ final class CameraPreviewView: NSView, AVCaptureVideoDataOutputSampleBufferDeleg
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        let (target, effect, ringLight) = lock.withLock { (targetPixels, self.effect, self.ringLight) }
+        let (target, effect, ringLight, portrait, gestures, capture) = lock.withLock {
+            defer { pendingCapture = false }
+            return (targetPixels, self.effect, self.ringLight, self.portrait, self.gestures, pendingCapture)
+        }
+        frameCount &+= 1
 
-        var image = CIImage(cvPixelBuffer: pixelBuffer)
-        let extent = image.extent
-        // Mirror horizontally, then scale to fill the view and crop the center.
-        image = image.transformed(by: CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -extent.width, y: 0))
+        // Hand poses about 8 times a second is plenty, and keeps the CPU cool.
+        if gestures, frameCount % 4 == 0, let gesture = handGestures.process(pixelBuffer) {
+            DispatchQueue.main.async { [weak self] in self?.onGesture(gesture) }
+        }
+
+        let frame = look(for: CIImage(cvPixelBuffer: pixelBuffer), pixelBuffer: pixelBuffer, effect: effect, ringLight: ringLight, portrait: portrait)
+        if capture { savePhoto(frame) }
+
+        // Scale to fill the view and crop the center.
+        let extent = frame.extent
         let scale = max(target.width / extent.width, target.height / extent.height)
-        image = image.applyingFilter("CILanczosScaleTransform", parameters: [kCIInputScaleKey: scale, kCIInputAspectRatioKey: 1])
+        let scaled = frame.applyingFilter("CILanczosScaleTransform", parameters: [kCIInputScaleKey: scale, kCIInputAspectRatioKey: 1])
         let crop = CGRect(
-            x: (image.extent.width - target.width) / 2,
-            y: (image.extent.height - target.height) / 2,
+            x: scaled.extent.minX + (scaled.extent.width - target.width) / 2,
+            y: scaled.extent.minY + (scaled.extent.height - target.height) / 2,
             width: target.width,
             height: target.height
         ).integral
-        image = image.cropped(to: crop)
 
+        guard let cgImage = context.createCGImage(scaled, from: crop) else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.layer?.contents = cgImage
+        }
+    }
+
+    /// The full-resolution, mirrored frame with portrait blur, ring light and the selected look.
+    private func look(for source: CIImage, pixelBuffer: CVPixelBuffer, effect: MirrorEffect, ringLight: Bool, portrait: Bool) -> CIImage {
+        let extent = source.extent
+        var image = source
+
+        if portrait {
+            // Segment every other frame and reuse the mask in between.
+            if frameCount % 2 == 0 || lastMask == nil {
+                let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+                if (try? handler.perform([segmentation])) != nil, let mask = segmentation.results?.first?.pixelBuffer {
+                    let maskImage = CIImage(cvPixelBuffer: mask)
+                    lastMask = maskImage.transformed(by: CGAffineTransform(
+                        scaleX: extent.width / maskImage.extent.width,
+                        y: extent.height / maskImage.extent.height
+                    ))
+                }
+            }
+            if let mask = lastMask {
+                let background = image
+                    .clampedToExtent()
+                    .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 22])
+                    .cropped(to: extent)
+                    .applyingFilter("CIColorControls", parameters: [kCIInputBrightnessKey: -0.04])
+                image = image.applyingFilter("CIBlendWithMask", parameters: [
+                    kCIInputBackgroundImageKey: background,
+                    kCIInputMaskImageKey: mask,
+                ])
+            }
+        } else {
+            lastMask = nil
+        }
+
+        image = image.transformed(by: CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -extent.width, y: 0))
         if ringLight {
             image = image
                 .applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: 0.45])
                 .applyingFilter("CIHighlightShadowAdjust", parameters: ["inputShadowAmount": 0.6, "inputHighlightAmount": 0.9])
         }
-        image = effect.apply(to: image).cropped(to: crop)
+        return effect.apply(to: image).cropped(to: image.extent)
+    }
 
-        guard let cgImage = context.createCGImage(image, from: crop) else { return }
-        DispatchQueue.main.async { [weak self] in
-            self?.layer?.contents = cgImage
-        }
+    /// Saves the frame as a JPEG in ~/Pictures/OpenNotchi.
+    private func savePhoto(_ image: CIImage) {
+        let folder = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0].appendingPathComponent("OpenNotchi")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        let url = folder.appendingPathComponent("Mirror \(formatter.string(from: .now)).jpg")
+
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              (try? context.writeJPEGRepresentation(of: image, to: url, colorSpace: colorSpace, options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.92])) != nil
+        else { return }
+        DispatchQueue.main.async { [weak self] in self?.onPhoto(url) }
     }
 }

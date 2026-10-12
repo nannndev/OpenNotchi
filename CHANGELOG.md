@@ -19,6 +19,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Mirror: drag the bottom edge to make it taller (double-click to toggle),
   seven looks (Natural, Vivid, Warm, Cool, Film, Mono, Dreamy), a ring light
   that brightens your face, and a camera picker
+- Mirror photos: a shutter button with a 3-2-1 countdown and flash; photos
+  are saved to Pictures › OpenNotchi and dropped into the Tray
+- Mirror hand gestures, recognized on your Mac: ✌️ takes a photo, 👍 throws
+  confetti, ✋ toggles the ring light
+- Mirror portrait mode: blurs the background behind you
 
 ### Changed
 - The location in Settings is shared by weather and prayer times

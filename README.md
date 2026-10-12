@@ -38,7 +38,8 @@ alternative to paid apps like NotchNook and Alcove.
   Hanafi Asr; Imsak and iftar during Ramadan)
 - **Timer**: Pomodoro-style presets, countdown shown beside the notch while closed,
   sound + notification when done
-- **Mirror**: camera preview up to 1080p, drag to resize, with looks and a ring light
+- **Mirror**: camera preview up to 1080p, drag to resize, with looks, a ring light,
+  portrait blur, photos straight to the Tray and hand gestures (✌️ 👍 ✋)
 - **Live activities**: charger connected, AirPods / Bluetooth devices with
   battery, and an optional volume & brightness HUD in the notch
 - **Weather** in the notch header (Open-Meteo, no API key): search a city or

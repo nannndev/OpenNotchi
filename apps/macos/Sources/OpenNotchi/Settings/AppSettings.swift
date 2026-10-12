@@ -79,6 +79,8 @@ final class AppSettings: ObservableObject {
     @Published var mirrorHeight: Double { didSet { defaults.set(mirrorHeight, forKey: "mirrorHeight") } }
     @Published var mirrorEffect: MirrorEffect { didSet { defaults.set(mirrorEffect.rawValue, forKey: "mirrorEffect") } }
     @Published var mirrorRingLight: Bool { didSet { defaults.set(mirrorRingLight, forKey: "mirrorRingLight") } }
+    @Published var mirrorPortrait: Bool { didSet { defaults.set(mirrorPortrait, forKey: "mirrorPortrait") } }
+    @Published var mirrorGestures: Bool { didSet { defaults.set(mirrorGestures, forKey: "mirrorGestures") } }
     @Published var mirrorCameraID: String { didSet { defaults.set(mirrorCameraID, forKey: "mirrorCameraID") } }
     @Published var calendarEnabled: Bool { didSet { defaults.set(calendarEnabled, forKey: "calendarEnabled") } }
     /// Minutes before a calendar event to show the reminder; 0 turns it off.
@@ -149,6 +151,8 @@ final class AppSettings: ObservableObject {
             "mirrorEffect": MirrorEffect.natural.rawValue,
             "mirrorRingLight": false,
             "mirrorCameraID": "",
+            "mirrorPortrait": false,
+            "mirrorGestures": true,
             "meetingReminderMinutes": 5,
             "meetingRemindersOnlyWithLink": false,
             "reminderSound": false,
@@ -200,6 +204,8 @@ final class AppSettings: ObservableObject {
         mirrorEffect = MirrorEffect(rawValue: defaults.string(forKey: "mirrorEffect") ?? "") ?? .natural
         mirrorRingLight = defaults.bool(forKey: "mirrorRingLight")
         mirrorCameraID = defaults.string(forKey: "mirrorCameraID") ?? ""
+        mirrorPortrait = defaults.bool(forKey: "mirrorPortrait")
+        mirrorGestures = defaults.bool(forKey: "mirrorGestures")
         meetingReminderMinutes = defaults.integer(forKey: "meetingReminderMinutes")
         meetingRemindersOnlyWithLink = defaults.bool(forKey: "meetingRemindersOnlyWithLink")
         reminderSound = defaults.bool(forKey: "reminderSound")
