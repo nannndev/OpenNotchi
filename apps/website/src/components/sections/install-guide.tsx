@@ -104,7 +104,7 @@ export function InstallGuide() {
             </div>
             <ol className="grid gap-6">
               <Step n={1} title="Open the app once">
-                macOS shows <b>“OpenNotchi” Not Opened</b>. Click <b>Done</b>.
+                macOS says Apple couldn't verify OpenNotchi. Click <b>Done</b> (not Move to Trash).
               </Step>
               <Step n={2} title="Allow it in System Settings">
                 Open <b>System Settings → Privacy &amp; Security</b>, scroll down to <b>“OpenNotchi” was blocked</b> and click <b>Open Anyway</b>. Confirm with your password or Touch ID.
@@ -113,7 +113,9 @@ export function InstallGuide() {
                 That's it. Move the pointer to the notch (or press <b>⌥⌘N</b>) and it opens.
               </Step>
             </ol>
-            <p className="mt-8 text-sm text-neutral-400">Prefer Terminal? This removes the quarantine flag instead:</p>
+            <p className="mt-8 text-sm text-neutral-400">
+              No Terminal needed. Only if you prefer it, this does the same as <b className="text-neutral-200">Open Anyway</b>:
+            </p>
             <CopyCommand command="xattr -dr com.apple.quarantine /Applications/OpenNotchi.app" />
           </TabsContent>
 

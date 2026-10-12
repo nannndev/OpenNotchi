@@ -1,6 +1,6 @@
-import { Check, Coffee, GitFork, Heart, Share2, Star } from "lucide-react"
+import { Check, Coffee, GitFork, HandHeart, Heart, Share2, Star } from "lucide-react"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { formatCount, useRepo } from "@/hooks/use-github"
 import { REPO_URL, SITE_URL, SUPPORT_LINKS } from "@/lib/site"
 
@@ -35,14 +35,29 @@ export function Support() {
 
       {SUPPORT_LINKS.length > 0 && (
         <div className="mt-10 flex flex-wrap justify-center gap-3">
-          {SUPPORT_LINKS.map((link) => (
-            <Button key={link.url} size="lg" asChild className="h-12 rounded-full px-6">
-              <a href={link.url} target="_blank" rel="noopener" title={link.description}>
-                <Coffee className="size-4" />
-                {link.name}
+          {SUPPORT_LINKS.map((link) => {
+            const Icon = link.brand === "buymeacoffee" ? Coffee : HandHeart
+            return (
+              <a
+                key={link.url}
+                href={link.url}
+                target="_blank"
+                rel="noopener"
+                className={cn(
+                  "group inline-flex items-center gap-3 rounded-full py-2.5 pr-6 pl-2.5 text-left transition hover:-translate-y-0.5",
+                  link.brand === "buymeacoffee" ? "bg-[#FFDD00] text-black" : "bg-[#FAAE2B] text-black",
+                )}
+              >
+                <span className="grid size-9 place-items-center rounded-full bg-black/10">
+                  <Icon className="size-[18px]" />
+                </span>
+                <span className="flex flex-col leading-tight">
+                  <span className="font-display text-[15px] font-bold">{link.name}</span>
+                  <span className="text-xs opacity-70">{link.description}</span>
+                </span>
               </a>
-            </Button>
-          ))}
+            )
+          })}
         </div>
       )}
 
