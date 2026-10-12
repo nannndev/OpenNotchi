@@ -43,8 +43,8 @@ struct VideoPreview: NSViewRepresentable {
         <!doctype html><html><head><meta name="viewport" content="width=device-width">
         <style>
           html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
-          /* Fill the square and zoom in a little so the YouTube title bar and logo fall outside. */
-          #p { position: absolute; top: 50%; left: 50%; height: 100%; aspect-ratio: 16 / 9; transform: translate(-50%, -50%) scale(1.45); pointer-events: none; }
+          /* Cover the frame and zoom in a little so YouTube's title bar and logo fall outside. */
+          #p { position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; transform: translate(-50%, -50%) scale(1.25); pointer-events: none; }
         </style></head><body>
         <div id="p"></div>
         <script src="https://www.youtube.com/iframe_api"></script>
@@ -58,11 +58,14 @@ struct VideoPreview: NSViewRepresentable {
               events: { onReady: (e) => { e.target.mute(); \(isPlaying ? "e.target.playVideo();" : "e.target.pauseVideo();") ready = true; } }
             });
           }
+          // States: -1 unstarted, 1 playing, 2 paused, 3 buffering, 5 cued. Only act on a real mismatch;
+          // each play/pause call makes YouTube flash its big play/pause icon.
           function sync(t, playing) {
             if (!ready) return;
-            if (Math.abs(player.getCurrentTime() - t) > 1.5) player.seekTo(t, true);
             const state = player.getPlayerState();
-            if (playing && state !== 1) player.playVideo();
+            if (state === 3) return;
+            if (Math.abs(player.getCurrentTime() - t) > 3) player.seekTo(t, true);
+            if (playing && (state === -1 || state === 2 || state === 5)) player.playVideo();
             if (!playing && state === 1) player.pauseVideo();
           }
         </script></body></html>

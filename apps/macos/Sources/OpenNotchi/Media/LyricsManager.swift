@@ -55,6 +55,12 @@ final class LyricsManager: ObservableObject {
         trackKey = info.trackKey
         task?.cancel()
 
+        // YouTube videos (not YouTube Music songs) almost never have lyrics; don't look them up.
+        if info.videoID != nil {
+            apply(.notFound, [], nil, key: nil)
+            return
+        }
+
         if let cached = cache[info.trackKey] {
             apply(cached.0, cached.1, cached.2, key: info.trackKey)
             return

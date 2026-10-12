@@ -6,20 +6,23 @@ struct HomeView: View {
     @Environment(\.notchAccent) private var accent
 
     var body: some View {
+        // YouTube videos get a landscape preview and no lyrics button (videos rarely have lyrics).
+        let isVideo = media.info?.videoID != nil
+        let lyricsAvailable = settings.lyricsEnabled && media.info != nil && !isVideo
         // Lyrics mode swaps the player for lyrics and moves the controls to the side.
-        let showLyrics = settings.lyricsEnabled && settings.homeLyricsMode && media.info != nil
+        let showLyrics = lyricsAvailable && settings.homeLyricsMode
 
         HStack(spacing: NotchLayout.columnSpacing) {
             artwork
-                .frame(width: 112, height: 112)
+                .frame(width: isVideo ? 112 * 16 / 9 : 112, height: 112)
                 .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
                 .overlay(alignment: .bottomTrailing) {
-                    if settings.lyricsEnabled && media.info != nil {
+                    if lyricsAvailable {
                         LyricsToggle(isOn: $settings.homeLyricsMode)
                             .padding(6)
                     }
                 }
-                .frame(width: NotchLayout.sideColumn, alignment: .leading)
+                .frame(width: isVideo ? 112 * 16 / 9 : NotchLayout.sideColumn, alignment: .leading)
 
             Group {
                 if let info = media.info {
@@ -48,6 +51,7 @@ struct HomeView: View {
             .frame(width: NotchLayout.sideColumn, alignment: showLyrics || !settings.calendarEnabled ? .trailing : .leading)
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showLyrics)
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isVideo)
     }
 }
 

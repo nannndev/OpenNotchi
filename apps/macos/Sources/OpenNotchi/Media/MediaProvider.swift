@@ -7,6 +7,8 @@ protocol MediaProvider: AnyObject {
     var displayName: String { get }
     /// Distributed notification the app posts when playback changes.
     var notificationName: String? { get }
+    /// Whether to offer this app as a launcher when nothing is playing.
+    var showsInLauncher: Bool { get }
 
     func fetch() -> NowPlayingInfo?
     func fetchArtwork() -> NSImage?
@@ -17,7 +19,6 @@ protocol MediaProvider: AnyObject {
 }
 
 extension MediaProvider {
-    /// Whether to offer this app as a launcher when nothing is playing.
     var showsInLauncher: Bool { true }
 
     var appURL: URL? { NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) }
