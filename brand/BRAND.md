@@ -79,4 +79,9 @@ real album art, videos or personal data. To refresh it:
    folder as `home.png`, `lyrics.png`, `markets.png`, `timer.png`,
    `closed-music.png`, `peek-charging.png`, `peek-airpods.png`, `peek-volume.png`.
 3. `swift brand/marketing/showcase.swift <folder> brand/marketing/showcase.png`
-4. Post `demo-off` when done.
+4. For the link preview, add `og`:
+   `swift brand/marketing/showcase.swift <folder> og2x.png og`, then
+   `sips -z 630 1200 og2x.png --out apps/website/public/og.png` and copy it to
+   `brand/social/og.png`. Bump `?v=` on the `og:image` URL in
+   `apps/website/index.html` so feeds fetch the new image.
+5. Post `demo-off` when done.

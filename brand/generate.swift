@@ -586,27 +586,8 @@ for dark in [true, false] {
     try! lockupSVG(dark: dark, width: lockupW).write(to: logoDir.appendingPathComponent("\(name).svg"), atomically: true, encoding: .utf8)
 }
 
-// Social card (Open Graph, 1200×630)
-let socialDir = brandDir.appendingPathComponent("social")
-try? fm.createDirectory(at: socialDir, withIntermediateDirectories: true)
-let og = makeContext(1200, 630)
-og.setFillColor(Brand.black.cg()); og.fill(CGRect(x: 0, y: 0, width: 1200, height: 630))
-radialGlow(og, center: CGPoint(x: 600, y: 0), radius: 700, color: Brand.white, alpha: 0.12)
-// A wide notch hanging from the top edge, like the real thing.
-fill(og, notchPath(x: 380, y: 0, width: 440, height: 120, ear: 22, bottom: 44), Brand.charcoal.cg())
-let ogBars = barsPath(cx: 600, cy: 60, barWidth: 14, gap: 11, heights: barHeights.map { $0 * 70 })
-og.saveGState(); og.setShadow(offset: .zero, blur: 16, color: CGColor(gray: 1, alpha: 0.5)); fill(og, ogBars, Brand.white.cg()); og.restoreGState()
-let ogFont = roundedFont(96)
-let ogWidth = textWidth("OpenNotchi", font: ogFont)
-let openW = drawText(og, "Open", x: (1200 - ogWidth) / 2, baseline: 360, font: ogFont, color: Brand.white.cg())
-drawText(og, "Notchi", x: (1200 - ogWidth) / 2 + openW, baseline: 360, font: ogFont, color: Brand.ash.cg())
-let tagFont = CTFontCreateWithName("SF Pro Text" as CFString, 34, nil)
-let tagline = "The free, open-source Dynamic Notch for macOS"
-drawText(og, tagline, x: (1200 - textWidth(tagline, font: tagFont)) / 2, baseline: 430, font: tagFont, color: Brand.silver.cg())
-let pillFont = roundedFont(24)
-let pill = "Music · Lyrics · AirDrop · Clipboard · Timer"
-drawText(og, pill, x: (1200 - textWidth(pill, font: pillFont)) / 2, baseline: 520, font: pillFont, color: Brand.ash.cg())
-savePNG(og, socialDir.appendingPathComponent("og.png"))
+// The social card (brand/social/og.png) is rendered from real notch captures by
+// brand/marketing/showcase.swift, so it is not generated here.
 
 // Web assets for the landing page.
 let publicDir = root.appendingPathComponent("apps/website/public")
@@ -615,7 +596,7 @@ for (name, px) in [("icon.png", 512), ("apple-touch-icon.png", 180)] {
     let c = makeContext(px, px); drawIcon(c, size: CGFloat(px))
     savePNG(c, publicDir.appendingPathComponent(name))
 }
-for (source, name) in [(socialDir.appendingPathComponent("og.png"), "og.png"), (logoDir.appendingPathComponent("mark.svg"), "favicon.svg")] {
+for (source, name) in [(logoDir.appendingPathComponent("mark.svg"), "favicon.svg")] {
     let target = publicDir.appendingPathComponent(name)
     try? fm.removeItem(at: target)
     try! fm.copyItem(at: source, to: target)

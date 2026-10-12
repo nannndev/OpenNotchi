@@ -2,7 +2,9 @@ import AppKit
 
 let dir = CommandLine.arguments[1]
 let out = CommandLine.arguments[2]
-let W: CGFloat = 2400, H: CGFloat = 1350
+/// `og` renders the 1200×630 link preview (drawn at 2x) instead of the full showcase.
+let isOG = CommandLine.arguments.count > 3 && CommandLine.arguments[3] == "og"
+let W: CGFloat = 2400, H: CGFloat = isOG ? 1260 : 1350
 
 func load(_ name: String) -> NSBitmapImageRep {
     NSBitmapImageRep(data: try! Data(contentsOf: URL(fileURLWithPath: "\(dir)/\(name).png")))!
@@ -34,12 +36,39 @@ func text(_ string: String, font: NSFont, color: NSColor, center x: CGFloat, top
     return size.width
 }
 
-let canvas = NSImage(size: NSSize(width: W, height: H), flipped: true) { _ in
+func drawBackground() {
     // Background: graphite gradient so the black notch UI stands out, plus soft light from the top.
     NSGradient(colors: [NSColor(white: 0.20, alpha: 1), NSColor(white: 0.07, alpha: 1)])!
         .draw(in: NSRect(x: 0, y: 0, width: W, height: H), angle: -90)
     NSGradient(colors: [NSColor(white: 1, alpha: 0.12), NSColor(white: 1, alpha: 0)])!
         .draw(fromCenter: NSPoint(x: W / 2, y: 0), radius: 0, toCenter: NSPoint(x: W / 2, y: 0), radius: 1200, options: [])
+
+}
+
+/// Link preview: hero notch, wordmark, tagline and a feature line. Text stays large so it reads in a feed.
+func drawOG() {
+    drawBackground()
+    let hero = trimmed("home", pad: 40)
+    let heroW: CGFloat = 1640
+    let heroH = hero.size.height * heroW / hero.size.width
+    hero.draw(in: NSRect(x: (W - heroW) / 2, y: 0, width: heroW, height: heroH))
+
+    var y = heroH + 150
+    let mark = NSAttributedString(string: "Open", attributes: [.font: rounded(170, .heavy), .foregroundColor: NSColor.white])
+    let notchi = NSAttributedString(string: "Notchi", attributes: [.font: rounded(170, .heavy), .foregroundColor: NSColor(white: 0.56, alpha: 1)])
+    let total = mark.size().width + notchi.size().width
+    mark.draw(at: NSPoint(x: (W - total) / 2, y: y))
+    notchi.draw(at: NSPoint(x: (W - total) / 2 + mark.size().width, y: y))
+    y += 235
+    _ = text("Your notch, but alive.", font: rounded(64, .semibold), color: NSColor(white: 0.88, alpha: 1), center: W / 2, top: y)
+    y += 120
+    _ = text("Music · Lyrics · YouTube · AirDrop · Markets · Clipboard · Timer", font: NSFont.systemFont(ofSize: 40, weight: .medium), color: NSColor(white: 0.55, alpha: 1), center: W / 2, top: y)
+    y += 76
+    _ = text("Free & open source for macOS", font: NSFont.systemFont(ofSize: 40, weight: .semibold), color: NSColor(white: 0.75, alpha: 1), center: W / 2, top: y)
+}
+
+func drawShowcase() {
+    drawBackground()
 
     // Hero: the open notch hanging from the top edge.
     let hero = trimmed("home", pad: 40)
@@ -94,6 +123,10 @@ let canvas = NSImage(size: NSSize(width: W, height: H), flipped: true) { _ in
         image.draw(in: NSRect(x: x, y: y, width: w, height: peekH))
         x += w + peekGap
     }
+}
+
+let canvas = NSImage(size: NSSize(width: W, height: H), flipped: true) { _ in
+    isOG ? drawOG() : drawShowcase()
     return true
 }
 
