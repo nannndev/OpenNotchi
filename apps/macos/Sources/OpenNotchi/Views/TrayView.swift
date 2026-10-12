@@ -1,3 +1,4 @@
+import QuickLookThumbnailing
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -51,20 +52,46 @@ struct TrayView: View {
 }
 
 private struct AirDropDropZone: View {
+    @EnvironmentObject private var airDrop: AirDropService
     @State private var isTargeted = false
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "airplayaudio")
-                .symbolVariant(.circle.fill)
-                .font(.system(size: 30))
-                .foregroundStyle(.blue)
+            ZStack {
+                switch airDrop.state {
+                case .sending(_, let progress?):
+                    AirDropProgressRing(progress: progress, lineWidth: 4)
+                        .frame(width: 40, height: 40)
+                    Text("\(Int(progress * 100))%")
+                        .font(.system(size: 10, weight: .bold).monospacedDigit())
+                case .choosing, .sending(_, nil):
+                    ProgressView().controlSize(.small)
+                        .frame(width: 40, height: 40)
+                case .sent:
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 34))
+                        .foregroundStyle(.green)
+                        .transition(.scale.combined(with: .opacity))
+                case .failed:
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 34))
+                        .foregroundStyle(.orange)
+                case .idle:
+                    Image(systemName: "airplayaudio")
+                        .symbolVariant(.circle.fill)
+                        .font(.system(size: 30))
+                        .foregroundStyle(.blue)
+                }
+            }
+            .frame(height: 40)
             Text("AirDrop")
                 .font(.system(size: 13, weight: .semibold))
-            Text("Drop to send")
+            Text(statusText)
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: airDrop.state)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 14)
@@ -76,18 +103,57 @@ private struct AirDropDropZone: View {
             TrayStore.loadFileURLs(from: providers) { AirDropService.send($0) }
         }
     }
+
+    private var statusText: String {
+        switch airDrop.state {
+        case .idle: return "Drop to send"
+        case .choosing: return "Pick a device…"
+        case .sending(let count, _): return count == 1 ? "Sending…" : "Sending \(count) files…"
+        case .sent(let count): return count == 1 ? "Sent" : "Sent \(count) files"
+        case .failed: return "Couldn't send"
+        }
+    }
+}
+
+/// Circular progress used by the AirDrop zone and the live activity.
+struct AirDropProgressRing: View {
+    let progress: Double
+    var lineWidth: CGFloat = 3
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(.white.opacity(0.2), lineWidth: lineWidth)
+            Circle()
+                .trim(from: 0, to: max(0.02, progress))
+                .stroke(.blue, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.easeOut(duration: 0.3), value: progress)
+        }
+    }
 }
 
 private struct TrayItemView: View {
     @EnvironmentObject private var tray: TrayStore
     let url: URL
     @State private var hovering = false
+    @State private var thumbnail: NSImage?
 
     var body: some View {
         VStack(spacing: 4) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                .resizable()
-                .frame(width: 48, height: 48)
+            Group {
+                if let thumbnail {
+                    Image(nsImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+                } else {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                        .resizable()
+                }
+            }
+            .frame(width: 48, height: 48)
+            .task(id: url) { thumbnail = await Self.thumbnail(for: url) }
             Text(url.lastPathComponent)
                 .font(.system(size: 10))
                 .lineLimit(2)
@@ -117,5 +183,11 @@ private struct TrayItemView: View {
             Button("Remove from Tray") { tray.remove(url) }
         }
         .help(url.path)
+    }
+
+    /// Quick Look preview of the file (photos, PDFs, videos…), or nil to fall back to the icon.
+    static func thumbnail(for url: URL) async -> NSImage? {
+        let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: 96, height: 96), scale: 2, representationTypes: .thumbnail)
+        return try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
     }
 }

@@ -31,6 +31,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   Write your own text on the strip, or keep each style's title
 - Mirror pane in Settings with live previews of every photobox style
 
+- AirDrop progress: the AirDrop zone shows "Pick a device", a progress ring
+  while sending and a check when done, also beside the closed notch
+- Tray items show real thumbnails (photos, PDFs, videos) instead of file icons
+
+### Fixed
+- AirDrop window closing by itself or never finishing, because the sharing
+  service was released right after it opened
+
 ### Changed
 - The location in Settings is shared by weather and prayer times
 - Reminders that arrive while the notch is open show once it closes

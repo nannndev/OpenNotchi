@@ -6,10 +6,11 @@ struct NotchRootView: View {
     @EnvironmentObject private var tray: TrayStore
     @EnvironmentObject private var timer: TimerManager
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var airDrop: AirDropService
 
     private var showActivity: Bool {
         guard !vm.isOpen else { return false }
-        if vm.peek != nil { return true }
+        if vm.peek != nil || airDrop.isTransferring { return true }
         return settings.showLiveActivity && (timer.isActive || (media.info?.isPlaying ?? false))
     }
 
@@ -90,9 +91,10 @@ struct NotchRootView: View {
 }
 
 /// Compact "live activity" shown beside the physical notch.
-/// Priority: a peek (charger, device, HUD), then a running timer, then music.
+/// Priority: a peek (charger, device, HUD), then an AirDrop transfer, then a running timer, then music.
 struct ClosedActivityView: View {
     @EnvironmentObject private var vm: NotchViewModel
+    @EnvironmentObject private var airDrop: AirDropService
     @EnvironmentObject private var media: MediaManager
     @EnvironmentObject private var timer: TimerManager
     @Environment(\.notchAccent) private var accent
@@ -110,6 +112,26 @@ struct ClosedActivityView: View {
         HStack {
             if let peek = vm.peek {
                 PeekView(peek: peek, height: height)
+            } else if airDrop.isTransferring {
+                Image(systemName: "airplayaudio")
+                    .symbolVariant(.circle.fill)
+                    .font(.system(size: height * 0.5))
+                    .foregroundStyle(.blue)
+                    .frame(width: height - 10)
+                Spacer()
+                Group {
+                    switch airDrop.state {
+                    case .sending(_, let progress?):
+                        AirDropProgressRing(progress: progress, lineWidth: 2.5)
+                    case .sent:
+                        Image(systemName: "checkmark.circle.fill").resizable().foregroundStyle(.green)
+                    case .failed:
+                        Image(systemName: "exclamationmark.circle.fill").resizable().foregroundStyle(.orange)
+                    default:
+                        ProgressView().controlSize(.mini)
+                    }
+                }
+                .frame(width: height - 14, height: height - 14)
             } else if timer.isActive {
                 Image(systemName: timer.isRunning ? "timer" : "pause.fill")
                     .font(.system(size: height * 0.45, weight: .semibold))

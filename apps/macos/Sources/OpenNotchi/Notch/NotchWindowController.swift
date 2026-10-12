@@ -39,6 +39,7 @@ final class NotchWindowController: NSObject {
             .environmentObject(markets)
             .environmentObject(prayers)
             .environmentObject(settings)
+            .environmentObject(AirDropService.shared)
         let hosting = FirstMouseHostingView(rootView: root)
         hosting.frame = NSRect(origin: .zero, size: Self.windowSize)
         panel.contentView = hosting
