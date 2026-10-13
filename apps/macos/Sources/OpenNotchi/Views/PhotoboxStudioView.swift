@@ -708,26 +708,28 @@ private struct InteractiveStickerView: View {
         )
     }
 
+    // Sizes are worked out up front: one long chain of `x * scale` modifiers was too slow
+    // for the compiler to type-check on CI.
     private func stampBadgeView(_ sticker: PlacedSticker) -> some View {
         let color = badgeColor(sticker.badgeColor)
-        return Text(sticker.content.uppercased())
-            .font(.system(size: 12 * sticker.scale, weight: .heavy))
+        let s: CGFloat = sticker.scale
+        let fontSize: CGFloat = 12 * s
+        let outer = RoundedRectangle(cornerRadius: 4 * s)
+        let inner = RoundedRectangle(cornerRadius: 3 * s)
+        let outerLine: CGFloat = 2 * s
+        let innerLine: CGFloat = 0.8 * s
+        let innerInset: CGFloat = 2 * s
+
+        let label = Text(sticker.content.uppercased())
+            .font(.system(size: fontSize, weight: .heavy))
             .tracking(1.5)
-            .padding(.horizontal, 8 * sticker.scale)
-            .padding(.vertical, 4 * sticker.scale)
-            .background(
-                RoundedRectangle(cornerRadius: 4 * sticker.scale)
-                    .fill(color.opacity(0.12))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 4 * sticker.scale)
-                    .stroke(color.opacity(0.9), lineWidth: 2 * sticker.scale)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 3 * sticker.scale)
-                    .stroke(color.opacity(0.5), lineWidth: 0.8 * sticker.scale)
-                    .padding(2 * sticker.scale)
-            )
+            .padding(.horizontal, 8 * s)
+            .padding(.vertical, 4 * s)
+        let framed = label
+            .background(outer.fill(color.opacity(0.12)))
+            .overlay(outer.stroke(color.opacity(0.9), lineWidth: outerLine))
+            .overlay(inner.stroke(color.opacity(0.5), lineWidth: innerLine).padding(innerInset))
+        return framed
             .foregroundStyle(color)
             .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
     }
