@@ -78,19 +78,27 @@ final class MediaManager: ObservableObject {
     /// A soft monochrome "album cover" drawn in code.
     private static func demoArtwork() -> NSImage {
         NSImage(size: NSSize(width: 600, height: 600), flipped: false) { rect in
-            // A night drive into the sunset: colorful, so the album-art theme has something to show.
+            // Calm, natural tones (morning sky over sand and sage hills), so screenshots stay neutral.
             NSGradient(colors: [
-                NSColor(red: 0.12, green: 0.08, blue: 0.32, alpha: 1),
-                NSColor(red: 0.55, green: 0.12, blue: 0.42, alpha: 1),
-                NSColor(red: 0.98, green: 0.45, blue: 0.25, alpha: 1),
+                NSColor(red: 0.62, green: 0.76, blue: 0.84, alpha: 1),
+                NSColor(red: 0.86, green: 0.88, blue: 0.84, alpha: 1),
+                NSColor(red: 0.93, green: 0.87, blue: 0.76, alpha: 1),
             ])?.draw(in: rect, angle: -90)
-            NSGradient(colors: [NSColor(red: 1, green: 0.85, blue: 0.45, alpha: 1), NSColor(red: 1, green: 0.55, blue: 0.3, alpha: 0)])?
-                .draw(fromCenter: NSPoint(x: 300, y: 190), radius: 0, toCenter: NSPoint(x: 300, y: 190), radius: 150, options: [])
-            NSColor(red: 0.08, green: 0.05, blue: 0.2, alpha: 1).setFill()
-            NSBezierPath(rect: NSRect(x: 0, y: 0, width: 600, height: 120)).fill()
-            NSColor(red: 1, green: 0.8, blue: 0.5, alpha: 0.9).setFill()
-            for x in stride(from: 40.0, to: 600, by: 90) {
-                NSBezierPath(rect: NSRect(x: x, y: 58, width: 46, height: 6)).fill() // road markings
+            NSGradient(colors: [NSColor(white: 1, alpha: 0.9), NSColor(white: 1, alpha: 0)])?
+                .draw(fromCenter: NSPoint(x: 410, y: 400), radius: 0, toCenter: NSPoint(x: 410, y: 400), radius: 120, options: [])
+            let hills: [(NSColor, CGFloat)] = [
+                (NSColor(red: 0.62, green: 0.70, blue: 0.58, alpha: 1), 230),
+                (NSColor(red: 0.45, green: 0.55, blue: 0.43, alpha: 1), 150),
+            ]
+            for (color, height) in hills {
+                color.setFill()
+                let hill = NSBezierPath()
+                hill.move(to: NSPoint(x: 0, y: 0))
+                hill.line(to: NSPoint(x: 0, y: height))
+                hill.curve(to: NSPoint(x: 600, y: height - 30), controlPoint1: NSPoint(x: 200, y: height + 80), controlPoint2: NSPoint(x: 380, y: height - 90))
+                hill.line(to: NSPoint(x: 600, y: 0))
+                hill.close()
+                hill.fill()
             }
             return true
         }
