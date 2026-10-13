@@ -1,7 +1,9 @@
 import { AnimatePresence, motion } from "motion/react"
 import {
+  Calendar,
   Check,
   Copy,
+  Gauge,
   Heart,
   MessageSquareQuote,
   Pause,
@@ -11,7 +13,9 @@ import {
   Shuffle,
   SkipBack,
   SkipForward,
+  SlidersHorizontal,
   Terminal,
+  Video,
   Volume2,
   VolumeX,
   XCircle,
@@ -28,7 +32,7 @@ const LINES = [
   "Turn it up for the long way home",
 ]
 const DURATION = 204
-const TABS = ["Home", "Dev", "Timer"] as const
+const TABS = ["Home", "Prompter", "Dev", "Timer"] as const
 type Tab = (typeof TABS)[number]
 
 const spring = { type: "spring", stiffness: 260, damping: 28 } as const
@@ -70,6 +74,12 @@ export function NotchDemo() {
     { port: "8080", name: "Go API", pid: "1204" },
   ])
   const [peekToast, setPeekToast] = useState<string | null>(null)
+  const [deckMode, setDeckMode] = useState<"vu" | "spectrum" | "calendar">("vu")
+  const [prompterSpeed, setPrompterSpeed] = useState<number>(1)
+  const [prompterPlaying, setPrompterPlaying] = useState<boolean>(true)
+  const [prompterMirrored, setPrompterMirrored] = useState<boolean>(false)
+  const prompterText = "Good morning team. Today I'm excited to showcase OpenNotchi v0.7.0. By positioning this teleprompter right under your Mac camera, you maintain 100% natural eye contact during video calls and keynotes without looking away."
+
 
   const closeTimer = useRef<number | undefined>(undefined)
   const ref = useRef<HTMLDivElement>(null)
@@ -96,10 +106,13 @@ export function NotchDemo() {
       hide(3200)
     }, 900)
     const outside = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && hide(0)
+    const onScroll = () => hide(0)
     document.addEventListener("click", outside)
+    window.addEventListener("scroll", onScroll, { passive: true })
     return () => {
       window.clearTimeout(peek)
       document.removeEventListener("click", outside)
+      window.removeEventListener("scroll", onScroll)
     }
   }, [])
 
@@ -125,7 +138,7 @@ export function NotchDemo() {
         initial={false}
         animate={{
           width: open ? "min(680px, calc(100vw - 24px))" : 320,
-          height: open ? 228 : 34,
+          height: open ? 242 : 34,
           borderBottomLeftRadius: open ? 34 : 14,
           borderBottomRightRadius: open ? 34 : 14,
         }}
@@ -152,7 +165,7 @@ export function NotchDemo() {
               exit={{ opacity: 0, transition: { duration: 0.1 } }}
               className="absolute inset-0 flex items-center justify-between px-3.5"
             >
-              {/* Closed Activity: Mini artwork + Waveform (tap toggles play/pause) */}
+              {/* Closed Activity: Mini Spinning Vinyl Record + Waveform (tap toggles play/pause) */}
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -161,8 +174,23 @@ export function NotchDemo() {
                 title={isPlaying ? "Click to Pause" : "Click to Play"}
                 className="group flex items-center gap-2 hover:opacity-85 transition"
               >
-                <div className="art size-[22px] rounded-md relative flex items-center justify-center">
-                  {!isPlaying && <Play className="size-2.5 fill-white text-white opacity-80" />}
+                <div className="relative size-[22px] rounded-full shrink-0 flex items-center justify-center overflow-hidden border border-white/20 shadow-md">
+                  <div
+                    className={cn(
+                      "absolute inset-0 rounded-full spin-vinyl",
+                      !isPlaying && "spin-vinyl-paused",
+                    )}
+                    style={{
+                      background: "radial-gradient(circle at center, #27272a 0%, #18181b 50%, #09090b 100%)",
+                    }}
+                  >
+                    <div className="absolute inset-1 rounded-full border border-white/10" />
+                    <div className="absolute inset-0 rounded-full [background:conic-gradient(from_0deg,transparent,rgba(255,255,255,0.18),transparent,rgba(255,255,255,0.18),transparent)]" />
+                  </div>
+                  <div className="art size-2.5 rounded-full border border-white/30 relative z-10 flex items-center justify-center">
+                    <div className="size-0.5 rounded-full bg-black" />
+                  </div>
+                  {!isPlaying && <Play className="size-2 fill-white text-white opacity-90 absolute z-20" />}
                 </div>
                 {peekToast && (
                   <span className="text-[11px] font-semibold text-emerald-400 animate-in fade-in zoom-in-95">
@@ -222,49 +250,75 @@ export function NotchDemo() {
               <div className="flex h-[calc(100%-32px)] items-center gap-4 sm:gap-6">
                 {tab === "Home" && (
                   <>
-                    {/* Vinyl Record Deck & Sleeve */}
-                    <div className="relative h-[96px] w-[116px] sm:h-[110px] sm:w-[130px] shrink-0">
-                      {/* Vinyl Record Disc (Slides out & spins) */}
+                    {/* Turntable Vinyl Deck with Interactive Tonearm Needle */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setIsPlaying((p) => !p)
+                      }}
+                      title={isPlaying ? "Click record to pause (needle lifts)" : "Click record to play (needle drops)"}
+                      className="relative size-[96px] sm:size-[104px] shrink-0 rounded-2xl border border-white/15 bg-gradient-to-b from-white/10 to-black/70 backdrop-blur-md p-1.5 flex items-center justify-center shadow-2xl cursor-pointer group hover:border-white/30 transition select-none overflow-hidden"
+                    >
+                      {/* Turntable Platter Base Ring */}
+                      <div className="absolute inset-2 rounded-full border border-white/10 bg-neutral-900 shadow-inner" />
+
+                      {/* Rotating Vinyl Disc */}
                       <div
                         className={cn(
-                          "absolute top-1/2 -translate-y-1/2 size-[88px] sm:size-[100px] rounded-full shadow-2xl transition-all duration-500",
-                          isPlaying ? "left-6 sm:left-7 spin-vinyl" : "left-2 spin-vinyl spin-vinyl-paused",
+                          "relative size-[82px] sm:size-[90px] rounded-full shadow-2xl transition-all duration-300",
+                          isPlaying ? "spin-vinyl" : "spin-vinyl spin-vinyl-paused",
                         )}
                         style={{
-                          background: "radial-gradient(circle at center, #1b1b1e 0%, #0d0d10 55%, #050506 100%)",
+                          background: "radial-gradient(circle at center, #1c1c1f 0%, #0d0d10 55%, #050506 100%)",
                         }}
                       >
                         {/* Concentric Grooves */}
                         <div className="absolute inset-1 rounded-full border border-white/[0.04]" />
                         <div className="absolute inset-2.5 rounded-full border border-white/[0.07]" />
                         <div className="absolute inset-4 rounded-full border border-white/[0.05]" />
-                        <div className="absolute inset-6 rounded-full border border-white/[0.06]" />
+                        <div className="absolute inset-5.5 rounded-full border border-white/[0.06]" />
                         {/* Specular Vinyl Reflection Sheen */}
-                        <div className="absolute inset-0 rounded-full [background:conic-gradient(from_0deg,transparent,rgba(255,255,255,0.14),transparent,rgba(255,255,255,0.05),transparent,rgba(255,255,255,0.14),transparent)]" />
+                        <div className="absolute inset-0 rounded-full [background:conic-gradient(from_0deg,transparent,rgba(255,255,255,0.15),transparent,rgba(255,255,255,0.06),transparent,rgba(255,255,255,0.15),transparent)]" />
                         {/* Center Album Art Label */}
                         <div className="art absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-7 sm:size-8 rounded-full border border-white/20 shadow-inner flex items-center justify-center">
                           <div className="size-2 rounded-full bg-black border border-white/40" />
                         </div>
                       </div>
 
-                      {/* Album Jacket Sleeve */}
-                      <div className="art relative size-[92px] sm:size-[104px] shrink-0 rounded-2xl shadow-2xl overflow-hidden border border-white/15">
-                        <div className="absolute left-0 inset-y-0 w-0.5 bg-gradient-to-r from-white/30 to-transparent" />
-                        <div className="absolute right-0 inset-y-0 w-2.5 bg-gradient-to-l from-black/60 to-transparent" />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setLyricsMode((m) => !m)
-                          }}
-                          title={lyricsMode ? "Show player" : "Show lyrics"}
-                          className={cn(
-                            "absolute right-1.5 bottom-1.5 grid size-[24px] place-items-center rounded-full ring-1 ring-white/25 transition z-10",
-                            lyricsMode ? "bg-white text-black" : "bg-black/60 text-white hover:scale-110",
-                          )}
-                        >
-                          <MessageSquareQuote className="size-3" />
-                        </button>
+                      {/* Mechanical Stylus Tonearm Assembly */}
+                      <div
+                        className="absolute top-0 right-0 pointer-events-none z-20 transition-transform duration-500 ease-out origin-[82px_14px] sm:origin-[88px_14px]"
+                        style={{
+                          transform: isPlaying ? "rotate(22deg)" : "rotate(2deg)",
+                        }}
+                      >
+                        {/* Tonearm Gimbal Pivot Base */}
+                        <div className="absolute right-2 top-2 size-4 rounded-full bg-gradient-to-br from-neutral-100 via-neutral-300 to-neutral-600 shadow-md border border-white/60 flex items-center justify-center">
+                          <div className="size-1.5 rounded-full bg-neutral-900 border border-white/40" />
+                        </div>
+                        {/* Tonearm Metallic Wand Rod */}
+                        <div className="absolute right-3.5 top-3.5 h-[52px] sm:h-[58px] w-[2.5px] bg-gradient-to-b from-white via-neutral-300 to-neutral-500 shadow-sm rotate-[-12deg] origin-top rounded-full" />
+                        {/* Cartridge Headshell & Ruby Stylus Needle */}
+                        <div className="absolute right-[16px] sm:right-[18px] top-[48px] sm:top-[54px] w-2.5 h-3.5 bg-neutral-900 rounded-[2px] border border-white/50 shadow-md flex flex-col items-center justify-end pb-0.5">
+                          {/* Ruby Stylus Tip */}
+                          <div className={cn("size-1.5 rounded-full bg-rose-500", isPlaying ? "shadow-[0_0_8px_#f43f5e]" : "opacity-70")} />
+                        </div>
                       </div>
+
+                      {/* Lyrics Mode Toggle Button in Corner */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setLyricsMode((m) => !m)
+                        }}
+                        title={lyricsMode ? "Show player" : "Show lyrics"}
+                        className={cn(
+                          "absolute left-1.5 bottom-1.5 grid size-[22px] place-items-center rounded-full ring-1 ring-white/25 transition z-30 shadow-lg",
+                          lyricsMode ? "bg-white text-black" : "bg-black/70 text-white hover:scale-110",
+                        )}
+                      >
+                        <MessageSquareQuote className="size-3" />
+                      </button>
                     </div>
 
                     {lyricsMode ? (
@@ -419,10 +473,201 @@ export function NotchDemo() {
                           </div>
                         </div>
 
-                        <Wave bars={5} isPlaying={isPlaying} className="hidden h-[30px] w-[50px] justify-end sm:flex [&>span]:w-1" />
+                        {/* Symmetrical 104x104 Deck Card (Dual VU Meter / Spectrum / Calendar) */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeckMode((m) => (m === "vu" ? "spectrum" : m === "spectrum" ? "calendar" : "vu"))
+                          }}
+                          title="Click to cycle: Dual VU Meter / Spectrum Analyzer / Calendar"
+                          className="hidden sm:flex relative size-[96px] sm:size-[104px] shrink-0 rounded-2xl border border-white/15 bg-gradient-to-b from-white/10 to-black/70 backdrop-blur-md p-2 flex-col justify-between overflow-hidden shadow-2xl cursor-pointer group hover:border-white/30 transition select-none"
+                        >
+                          {/* Header Badge */}
+                          <div className="flex items-center justify-between text-[8.5px] font-mono font-semibold tracking-wider text-neutral-400 uppercase">
+                            <span className="flex items-center gap-1 text-white/90">
+                              {deckMode === "vu" && <Gauge className="size-2.5 text-amber-400" />}
+                              {deckMode === "spectrum" && <SlidersHorizontal className="size-2.5 text-cyan-400" />}
+                              {deckMode === "calendar" && <Calendar className="size-2.5 text-rose-400" />}
+                              {deckMode === "vu" ? "Dual VU" : deckMode === "spectrum" ? "Spectrum" : "Calendar"}
+                            </span>
+                            <span className="text-[7.5px] text-white/40 group-hover:text-white/80 transition">TAP</span>
+                          </div>
+
+                          {deckMode === "vu" && (
+                            <div className="relative flex-1 flex flex-col justify-center items-center py-0.5">
+                              {/* Vintage Analog VU Meter Face */}
+                              <div className="relative w-full h-[58px] rounded-lg bg-gradient-to-b from-[#fbf5dc] via-[#f5e8b8] to-[#edd99c] text-neutral-900 px-1 py-0.5 flex flex-col justify-between overflow-hidden shadow-inner border border-amber-900/30">
+                                {/* Scale Arc Labels */}
+                                <div className="flex justify-between text-[6.5px] font-mono font-extrabold text-neutral-800 px-1">
+                                  <span>-20</span>
+                                  <span>-7</span>
+                                  <span>0</span>
+                                  <span className="text-rose-600 font-black">+3</span>
+                                </div>
+
+                                {/* Needle Chamber with Dual L & R Needles */}
+                                <div className="relative h-6 w-full overflow-hidden">
+                                  {/* Curved Scale Line */}
+                                  <div className="absolute inset-x-1.5 top-0.5 h-6 rounded-[100%] border-t-[1.5px] border-neutral-700/60" />
+                                  <div className="absolute right-1.5 top-0.5 w-4 h-6 rounded-tr-[100%] border-t-2 border-rose-600" />
+
+                                  {/* L Channel Needle */}
+                                  <div
+                                    className={cn(
+                                      "absolute bottom-0 left-[28%] h-6 w-[1.5px] bg-neutral-950 origin-bottom shadow-sm",
+                                      isPlaying ? "animate-[vu-bounce_1.2s_ease-in-out_infinite]" : "rotate-[-26deg]",
+                                    )}
+                                  />
+                                  {/* R Channel Needle */}
+                                  <div
+                                    className={cn(
+                                      "absolute bottom-0 left-[68%] h-6 w-[1.5px] bg-neutral-950 origin-bottom shadow-sm",
+                                      isPlaying ? "animate-[vu-bounce_1.4s_ease-in-out_infinite_0.15s]" : "rotate-[-20deg]",
+                                    )}
+                                  />
+                                </div>
+
+                                {/* Bottom Sub-Labels L/R & Peak indicator */}
+                                <div className="flex justify-between items-center text-[7px] font-mono font-bold text-neutral-700 px-1.5">
+                                  <span>CH-L</span>
+                                  <span className="flex items-center gap-0.5">
+                                    <span className={cn("size-1 rounded-full", isPlaying ? "bg-rose-500 shadow-[0_0_4px_#ef4444]" : "bg-rose-900/40")} />
+                                    <span className="text-[6px] text-rose-800 font-extrabold">PEAK</span>
+                                  </span>
+                                  <span>CH-R</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {deckMode === "spectrum" && (
+                            <div className="flex-1 flex items-end justify-between gap-[2px] px-0.5 py-1">
+                              {[
+                                { h: "50%", delay: "0.1s", color: "from-emerald-400 to-teal-500" },
+                                { h: "75%", delay: "0.22s", color: "from-teal-400 to-cyan-500" },
+                                { h: "95%", delay: "0.05s", color: "from-cyan-400 to-blue-500" },
+                                { h: "65%", delay: "0.32s", color: "from-blue-400 to-indigo-500" },
+                                { h: "85%", delay: "0.18s", color: "from-indigo-400 to-purple-500" },
+                                { h: "55%", delay: "0.4s", color: "from-purple-400 to-pink-500" },
+                                { h: "90%", delay: "0.12s", color: "from-pink-400 to-rose-500" },
+                                { h: "70%", delay: "0.28s", color: "from-rose-400 to-amber-500" },
+                              ].map((bar, i) => (
+                                <div key={i} className="flex-1 h-full flex items-end">
+                                  <div
+                                    className={cn(
+                                      "w-full rounded-t-sm bg-gradient-to-t shadow-sm transition-all duration-300",
+                                      bar.color,
+                                    )}
+                                    style={{
+                                      height: isPlaying ? bar.h : "15%",
+                                      animation: isPlaying ? "pulse-glow 0.8s ease-in-out infinite" : "none",
+                                      animationDelay: bar.delay,
+                                    }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {deckMode === "calendar" && (
+                            <div className="flex-1 flex flex-col items-center justify-center p-0.5">
+                              <div className="w-full rounded-xl bg-gradient-to-b from-neutral-900 to-black border border-white/15 overflow-hidden shadow-lg flex flex-col items-center">
+                                <div className="w-full bg-rose-600/90 py-0.5 text-center text-[7.5px] font-bold tracking-wider text-white">
+                                  OCTOBER
+                                </div>
+                                <div className="py-1 flex flex-col items-center">
+                                  <span className="font-display text-2xl font-black leading-none text-white tracking-tight">13</span>
+                                  <span className="text-[7px] font-semibold text-neutral-400 uppercase tracking-wider">Tuesday</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </>
                     )}
                   </>
+                )}
+
+                {/* Teleprompter Showcase Tab */}
+                {tab === "Prompter" && (
+                  <div className="flex w-full items-center justify-between gap-4 text-xs h-full py-0.5">
+                    {/* Left: Eye Contact Camera Mirror Viewfinder */}
+                    <div className="relative w-[130px] sm:w-[150px] h-[98px] rounded-xl bg-black/80 border border-white/15 overflow-hidden shrink-0 flex flex-col justify-between p-2">
+                      {/* Top Camera Status */}
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-[9px] text-emerald-400 font-semibold font-mono">
+                          <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          CAM ACTIVE
+                        </span>
+                        <Video className="size-3 text-white/50" />
+                      </div>
+
+                      {/* Center Simulated Selfie Eye Target */}
+                      <div className="relative flex-1 flex flex-col items-center justify-center">
+                        <div className="size-8 rounded-full border border-emerald-400/40 bg-emerald-400/10 flex items-center justify-center">
+                          <span className="text-xs">👀</span>
+                        </div>
+                        {/* Notch Eye-Level Target Line */}
+                        <div className="absolute top-1 inset-x-0 flex items-center justify-center gap-1">
+                          <div className="h-px flex-1 bg-gradient-to-r from-transparent to-emerald-400/60" />
+                          <span className="text-[7px] font-mono text-emerald-300 font-semibold uppercase tracking-wider bg-black/70 px-1 rounded">
+                            Eye Contact Line
+                          </span>
+                          <div className="h-px flex-1 bg-gradient-to-l from-transparent to-emerald-400/60" />
+                        </div>
+                      </div>
+
+                      <div className="text-[8px] text-center font-mono text-neutral-400">
+                        Natural Gaze Mode
+                      </div>
+                    </div>
+
+                    {/* Right: Live Auto-Scrolling Teleprompter Script */}
+                    <div className="flex-1 h-[98px] flex flex-col justify-between bg-white/[0.04] border border-white/10 rounded-xl p-2.5 overflow-hidden">
+                      {/* Script Auto-Scroll Box */}
+                      <div className="relative flex-1 overflow-hidden [mask-image:linear-gradient(transparent,#000_15%,#000_85%,transparent)]">
+                        <div
+                          className={cn(
+                            "text-neutral-200 font-medium text-[11px] sm:text-xs leading-relaxed select-none transition-transform duration-1000",
+                            prompterMirrored && "-scale-x-100",
+                          )}
+                          style={{
+                            animation: prompterPlaying ? `float-reverse ${9 / prompterSpeed}s linear infinite` : "none",
+                          }}
+                        >
+                          {prompterText}
+                        </div>
+                      </div>
+
+                      {/* Prompter Controls Bar */}
+                      <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[10px]">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setPrompterPlaying((p) => !p)}
+                            className="flex items-center gap-1 rounded bg-white/15 px-2 py-0.5 hover:bg-white/25 transition font-semibold text-white"
+                          >
+                            {prompterPlaying ? <Pause className="size-2.5 fill-white" /> : <Play className="size-2.5 fill-white" />}
+                            {prompterPlaying ? "Pause" : "Scroll"}
+                          </button>
+                          <button
+                            onClick={() => setPrompterSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2.5 : 1))}
+                            className="rounded bg-white/10 px-1.5 py-0.5 text-neutral-300 hover:text-white font-mono text-[9px]"
+                          >
+                            {prompterSpeed}x
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => setPrompterMirrored((m) => !m)}
+                          className={cn(
+                            "rounded px-1.5 py-0.5 text-[9px] transition font-mono",
+                            prompterMirrored ? "bg-purple-500/30 text-purple-300 font-bold" : "text-neutral-400 hover:text-white",
+                          )}
+                        >
+                          {prompterMirrored ? "🪞 Mirrored" : "Mirror"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* Developer Tools Showcase Tab */}
