@@ -1,5 +1,4 @@
 import { useEffect } from "react"
-import { NotchDemo } from "@/components/notch-demo"
 import { Contributors } from "@/components/sections/contributors"
 import { Download } from "@/components/sections/download"
 import { Features } from "@/components/sections/features"
@@ -21,7 +20,6 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      <NotchDemo />
       <SiteNav />
       <main id="top">
         <Hero />

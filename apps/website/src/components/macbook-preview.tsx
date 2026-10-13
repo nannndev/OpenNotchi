@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react"
-import { AnimatePresence, motion, useInView, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react"
+import { type ReactNode, useEffect, useRef, useState } from "react"
+import { AppleIcon } from "@/components/icons"
+import { animate, AnimatePresence, motion, useInView, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react"
 
 /** Screenshots of the real app in demo mode. `width` is the notch's width in points on a 1512-point-wide screen. */
 const STATES = [
@@ -16,8 +17,10 @@ const STATES = [
 const SCREEN_POINTS = 1512
 const CYCLE_MS = 3600
 
-export function MacBookPreview() {
+/** `wallpaper` is drawn on the desktop under the notch (the hero copy, on wide screens). */
+export function MacBookPreview({ wallpaper }: { wallpaper?: ReactNode }) {
   const reduce = useReducedMotion()
+  const track = useRef<HTMLDivElement>(null)
   const stage = useRef<HTMLDivElement>(null)
   const inView = useInView(stage, { margin: "-15% 0px" })
   // The lid opens once, the first time the laptop comes into view.
@@ -32,11 +35,23 @@ export function MacBookPreview() {
   const tiltY = useSpring(useTransform(pointerX, [-1, 1], [-7, 7]), { stiffness: 80, damping: 18 })
   const tiltX = useSpring(useTransform(pointerY, [-1, 1], [4, -4]), { stiffness: 80, damping: 18 })
 
-  // As the page scrolls, the camera comes down from above the laptop to face it.
+  // The laptop stays pinned while you scroll through its track: the lid closes slowly and the camera
+  // rises a little, then the page carries on once it's shut.
   // (A negative rotateX brings the top toward you, which is what looking from above looks like.)
-  const { scrollYProgress } = useScroll({ target: stage, offset: ["start end", "center center"] })
-  const scrollTilt = useTransform(scrollYProgress, [0, 1], reduce ? [-14, -14] : [-30, -14])
+  const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] })
+  const scrollTilt = useTransform(scrollYProgress, [0, 0.9], reduce ? [-12, -12] : [-12, -26])
   const rotateX = useTransform([scrollTilt, tiltX], ([a, b]: number[]) => a + b)
+  const scrollLid = useTransform(scrollYProgress, [0.05, 0.88], reduce ? [8, 8] : [8, -86])
+  const pickerOpacity = useTransform(scrollYProgress, [0.04, 0.28], reduce ? [1, 1] : [1, 0])
+
+  // The lid opens once on arrival, then follows the scroll: closed (-86°) + how far it's open × the scroll angle.
+  const openAmount = useMotionValue(reduce ? 1 : 0)
+  const lidAngle = useTransform([openAmount, scrollLid], ([o, l]: number[]) => -86 + (l + 86) * o)
+  useEffect(() => {
+    if (!opened || reduce) return
+    const controls = animate(openAmount, 1, { type: "spring", stiffness: 38, damping: 13, mass: 1.2, delay: 0.15 })
+    return () => controls.stop()
+  }, [opened, reduce, openAmount])
 
   // Cycle through the notch states while visible, unless someone just picked one.
   useEffect(() => {
@@ -56,10 +71,15 @@ export function MacBookPreview() {
   const state = STATES[index]
 
   return (
-    <div className="mx-auto w-full max-w-[1040px]">
+    <div ref={track} className={reduce ? "" : "relative h-[185svh]"}>
+    <div
+      className={`mx-auto flex w-full flex-col items-center [--lw:min(92vw,1040px,calc((100svh-320px)*1.08))] ${
+        reduce ? "" : "sticky top-0 h-svh justify-center pt-12"
+      }`}
+    >
       <div
         ref={stage}
-        className="relative mx-auto w-[min(92vw,880px)] [perspective:3600px] [perspective-origin:50%_30%]"
+        className="relative mx-auto w-[var(--lw)] [perspective:3600px] [perspective-origin:50%_30%]"
         onPointerMove={(e) => {
           if (reduce) return
           const r = e.currentTarget.getBoundingClientRect()
@@ -74,29 +94,37 @@ export function MacBookPreview() {
         {/* Floor shadow */}
         <div className="pointer-events-none absolute inset-x-[6%] bottom-[-4%] h-[14%] rounded-[50%] bg-black/70 blur-2xl" />
 
-        <motion.div style={{ rotateX, rotateY: tiltY }} className="relative [transform-style:preserve-3d]">
+        {/* The 3D wrapper itself must not catch clicks: with the lid tilted back, its flat box sits in front of
+            the screen and would swallow them. Only the screen takes pointer events again. */}
+        <motion.div style={{ rotateX, rotateY: tiltY }} className="pointer-events-none relative [transform-style:preserve-3d]">
           {/* Lid */}
-          <motion.div
-            initial={false}
-            animate={{ rotateX: opened ? 8 : -86 }}
-            transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 38, damping: 13, mass: 1.2, delay: 0.15 }}
-            className="relative aspect-[1.54] w-full origin-bottom [transform-style:preserve-3d]"
-          >
-            {/* Back of the lid: aluminum, seen while it's closed. */}
-            <div className="absolute inset-0 rounded-[3.2%/4.9%] bg-[linear-gradient(160deg,#e4e6ea,#a9adb4)] [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(1px)]" />
+          <motion.div style={{ rotateX: lidAngle }} className="relative aspect-[1.54] w-full origin-bottom [transform-style:preserve-3d]">
+            {/* Back of the lid: aluminum with the polished logo, seen while it's closed. */}
+            <div className="absolute inset-0 grid place-items-center rounded-[3.2%/4.9%] bg-[linear-gradient(160deg,#e4e6ea,#a9adb4)] [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(1px)]">
+              <AppleIcon className="w-[12.5%] text-[#8d9198] [&_path]:fill-[url(#lid-logo)] drop-shadow-[0_1px_0_rgba(255,255,255,0.6)]" />
+              <svg width="0" height="0" className="absolute" aria-hidden>
+                <defs>
+                  <linearGradient id="lid-logo" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stopColor="#f6f7f9" />
+                    <stop offset="0.45" stopColor="#9a9ea6" />
+                    <stop offset="1" stopColor="#d5d8dc" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
             {/* Front: black bezel around the display. */}
-            <div className="absolute inset-0 rounded-[3.2%/4.9%] bg-[#0a0a0b] p-[1.6%] shadow-[inset_0_0_0_1.5px_#3a3b3f] [backface-visibility:hidden]">
-              <Screen state={state} />
+            <div className="pointer-events-auto absolute inset-0 rounded-[3.2%/4.9%] bg-[#0a0a0b] p-[1.6%] shadow-[inset_0_0_0_1.5px_#3a3b3f] [backface-visibility:hidden]">
+              <Screen state={state}>{wallpaper}</Screen>
             </div>
           </motion.div>
 
           {/* Base, folded flat toward the viewer. */}
           <div className="absolute top-full left-[-1.5%] w-[103%] origin-top [transform:rotateX(90deg)] [transform-style:preserve-3d]">
             <div className="relative aspect-[1.48] rounded-b-[4%] bg-[linear-gradient(180deg,#d9dce0,#b9bdc3)] shadow-[inset_0_2px_0_#f2f3f5]">
-              {/* Keyboard well */}
-              <div className="absolute top-[7%] left-[9%] h-[44%] w-[82%] rounded-[1.5%] bg-[#1b1c1f] p-[0.8%]">
-                <div className="h-full w-full rounded-[1%] bg-[repeating-linear-gradient(0deg,transparent_0_15.6%,#1b1c1f_15.6%_16.67%),repeating-linear-gradient(90deg,#2a2b2f_0_5%,#1b1c1f_5%_5.55%)]" />
-              </div>
+              {/* Speaker grilles either side of the keyboard */}
+              <div className="absolute top-[7%] left-[3.2%] h-[44%] w-[5.2%] bg-[radial-gradient(circle,#6f737a_0.9px,transparent_1.2px)] bg-[length:5px_5px] opacity-70" />
+              <div className="absolute top-[7%] right-[3.2%] h-[44%] w-[5.2%] bg-[radial-gradient(circle,#6f737a_0.9px,transparent_1.2px)] bg-[length:5px_5px] opacity-70" />
+              <Keyboard />
               {/* Trackpad */}
               <div className="absolute bottom-[8%] left-1/2 h-[34%] w-[42%] -translate-x-1/2 rounded-[3%] bg-[linear-gradient(180deg,#cfd2d6,#c3c6cb)] shadow-[inset_0_0_0_1px_#aeb2b8]" />
             </div>
@@ -108,8 +136,8 @@ export function MacBookPreview() {
         </motion.div>
       </div>
 
-      {/* State picker */}
-      <div className="mt-[clamp(84px,29vw,330px)]">
+      {/* State picker, below the base (which takes about a fifth of the laptop's width on screen) */}
+      <motion.div style={{ opacity: pickerOpacity }} className="mt-[calc(var(--lw)*0.3)] w-full select-none">
         <div role="tablist" aria-label="What the notch can show" className="flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:flex-wrap sm:justify-center">
           {STATES.map((s, i) => (
             <button
@@ -128,15 +156,75 @@ export function MacBookPreview() {
         <p aria-live="polite" className="mx-auto mt-4 max-w-md px-4 text-center text-[15px] text-neutral-400">
           {state.caption}
         </p>
-      </div>
+      </motion.div>
+    </div>
     </div>
   )
 }
 
-function Screen({ state }: { state: (typeof STATES)[number] }) {
+/** Rows of a MacBook keyboard: [label, width in key units]. Every row adds up to 14.5 units. */
+const KEY_ROWS: [string, number][][] = [
+  [["esc", 1.5], ...["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"].map((k): [string, number] => [k, 1]), ["", 1]],
+  [...["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="].map((k): [string, number] => [k, 1]), ["delete", 1.5]],
+  [["tab", 1.5], ...["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "[", "]", "\\"].map((k): [string, number] => [k, 1])],
+  [["caps lock", 1.8], ...["A", "S", "D", "F", "G", "H", "J", "K", "L", ";", "'"].map((k): [string, number] => [k, 1]), ["return", 1.7]],
+  [["shift", 2.3], ...["Z", "X", "C", "V", "B", "N", "M", ",", ".", "/"].map((k): [string, number] => [k, 1]), ["shift", 2.2]],
+  [["fn", 1], ["control", 1], ["option", 1], ["command", 1.25], ["", 5], ["command", 1.25], ["option", 1]],
+]
+
+function Key({ label, units, short }: { label: string; units: number; short?: boolean }) {
+  const isWord = label.length > 2
+  return (
+    <div
+      style={{ flexGrow: units, flexBasis: 0 }}
+      className={`relative min-w-0 rounded-[0.35cqw] bg-[linear-gradient(180deg,#2c2d31,#232427)] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_1px_0_#0c0c0e] ${
+        short ? "h-[62%] self-end" : "h-full"
+      }`}
+    >
+      {label && (
+        <span
+          className={`absolute leading-none font-medium text-white/75 ${
+            isWord ? "bottom-[14%] text-[0.72cqw]" : "inset-0 grid place-items-center text-[1.15cqw]"
+          } ${isWord && label !== "return" && label !== "delete" ? "left-[10%]" : isWord ? "right-[10%]" : ""}`}
+        >
+          {label}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** A MacBook keyboard: function row, letters, modifiers and the inverted-T arrow keys. */
+function Keyboard() {
+  return (
+    <div className="absolute top-[7%] left-1/2 flex h-[44%] w-[84%] -translate-x-1/2 flex-col gap-[1.6%] rounded-[1.2%] bg-[#141517] p-[0.9%] [container-type:inline-size]">
+      {KEY_ROWS.map((row, r) => (
+        <div key={r} className={`flex gap-[0.55%] ${r === 0 ? "h-[11%]" : "flex-1"}`}>
+          {row.map(([label, units], i) => (
+            <Key key={i} label={label} units={units} />
+          ))}
+          {r === KEY_ROWS.length - 1 && (
+            // Arrow keys: left, up over down, right; up and down share one key's height.
+            <div className="flex gap-[0.55%]" style={{ flexGrow: 3, flexBasis: 0 }}>
+              <Key label="◀" units={1} short />
+              <div className="flex flex-col gap-[6%]" style={{ flexGrow: 1, flexBasis: 0 }}>
+                <Key label="▲" units={1} />
+                <Key label="▼" units={1} />
+              </div>
+              <Key label="▶" units={1} short />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Screen({ state, children }: { state: (typeof STATES)[number]; children?: ReactNode }) {
   return (
     <div className="relative h-full w-full overflow-hidden rounded-[1.8%/2.8%] bg-[#0d0e10] [container-type:inline-size]">
       <Wallpaper />
+      {children && <div className="absolute inset-x-0 top-[34%] bottom-[5%] hidden sm:block">{children}</div>}
 
       {/* Menu bar, leaving the camera housing clear */}
       <div className="absolute inset-x-0 top-0 flex h-[3.4cqw] items-center justify-between bg-black/35 px-[1.6cqw] text-[1.15cqw] font-medium text-white/85 backdrop-blur-sm">
