@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { Analytics } from "@vercel/analytics/react"
 import { NotchDemo } from "@/components/notch-demo"
 import { Contributors } from "@/components/sections/contributors"
 import { Download } from "@/components/sections/download"
@@ -33,6 +34,7 @@ export default function App() {
         <Support />
       </main>
       <SiteFooter />
+      <Analytics />
     </TooltipProvider>
   )
 }
