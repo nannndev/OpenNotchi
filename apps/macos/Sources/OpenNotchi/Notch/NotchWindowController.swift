@@ -147,6 +147,7 @@ final class NotchWindowController: NSObject {
             viewModel.open()
             DispatchQueue.main.async { AppSettings.shared.homeLyricsMode = true }
         case "tray": viewModel.tab = .tray; viewModel.open()
+        case "prompter": viewModel.tab = .prompter; viewModel.open()
         case "clipboard": viewModel.tab = .clipboard; viewModel.open()
         case "timer": viewModel.tab = .timer; viewModel.open()
         case "mirror": viewModel.tab = .mirror; viewModel.open()

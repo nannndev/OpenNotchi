@@ -122,6 +122,27 @@ enum PlayerArtworkStyle: String, CaseIterable, Identifiable {
     }
 }
 
+enum AudioDeckStyle: String, CaseIterable, Identifiable {
+    case vuMeter = "vuMeter"
+    case spectrum = "spectrum"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .vuMeter: return "Analog VU Meter"
+        case .spectrum: return "9-Band Spectrum"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .vuMeter: return "gauge.with.needle.fill"
+        case .spectrum: return "waveform"
+        }
+    }
+}
+
 /// User preferences, persisted in UserDefaults.
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
@@ -213,6 +234,15 @@ final class AppSettings: ObservableObject {
     @Published var timerTabEnabled: Bool { didSet { defaults.set(timerTabEnabled, forKey: "timerTabEnabled") } }
     @Published var mirrorTabEnabled: Bool { didSet { defaults.set(mirrorTabEnabled, forKey: "mirrorTabEnabled") } }
     @Published var devToolsEnabled: Bool { didSet { defaults.set(devToolsEnabled, forKey: "devToolsEnabled") } }
+    @Published var prompterTabEnabled: Bool { didSet { defaults.set(prompterTabEnabled, forKey: "prompterTabEnabled") } }
+    @Published var prompterHeight: Double { didSet { defaults.set(prompterHeight, forKey: "prompterHeight") } }
+    @Published var prompterStaysOpen: Bool { didSet { defaults.set(prompterStaysOpen, forKey: "prompterStaysOpen") } }
+    @Published var prompterScrollSpeed: Double { didSet { defaults.set(prompterScrollSpeed, forKey: "prompterScrollSpeed") } }
+    @Published var prompterFontSize: Double { didSet { defaults.set(prompterFontSize, forKey: "prompterFontSize") } }
+    @Published var prompterOpacity: Double { didSet { defaults.set(prompterOpacity, forKey: "prompterOpacity") } }
+    @Published var prompterShowCameraPreview: Bool { didSet { defaults.set(prompterShowCameraPreview, forKey: "prompterShowCameraPreview") } }
+    @Published var prompterMirrorText: Bool { didSet { defaults.set(prompterMirrorText, forKey: "prompterMirrorText") } }
+    @Published var prompterScript: String { didSet { defaults.set(prompterScript, forKey: "prompterScript") } }
     /// Height of the open notch on the Mirror tab, set by dragging its bottom edge.
     @Published var mirrorHeight: Double { didSet { defaults.set(mirrorHeight, forKey: "mirrorHeight") } }
     @Published var mirrorEffect: MirrorEffect { didSet { defaults.set(mirrorEffect.rawValue, forKey: "mirrorEffect") } }
@@ -227,6 +257,8 @@ final class AppSettings: ObservableObject {
     @Published var mirrorGestures: Bool { didSet { defaults.set(mirrorGestures, forKey: "mirrorGestures") } }
     @Published var mirrorCameraID: String { didSet { defaults.set(mirrorCameraID, forKey: "mirrorCameraID") } }
     @Published var calendarEnabled: Bool { didSet { defaults.set(calendarEnabled, forKey: "calendarEnabled") } }
+    @Published var audioDeckEnabled: Bool { didSet { defaults.set(audioDeckEnabled, forKey: "audioDeckEnabled") } }
+    @Published var audioDeckStyle: AudioDeckStyle { didSet { defaults.set(audioDeckStyle.rawValue, forKey: "audioDeckStyle") } }
     /// Minutes before a calendar event to show the reminder; 0 turns it off.
     @Published var meetingReminderMinutes: Int { didSet { defaults.set(meetingReminderMinutes, forKey: "meetingReminderMinutes") } }
     @Published var meetingRemindersOnlyWithLink: Bool { didSet { defaults.set(meetingRemindersOnlyWithLink, forKey: "meetingRemindersOnlyWithLink") } }
@@ -298,6 +330,8 @@ final class AppSettings: ObservableObject {
             "mirrorTabEnabled": false,
             "devToolsEnabled": true,
             "calendarEnabled": true,
+            "audioDeckEnabled": true,
+            "audioDeckStyle": AudioDeckStyle.vuMeter.rawValue,
             "mirrorHeight": 200.0,
             "mirrorEffect": MirrorEffect.natural.rawValue,
             "mirrorRingLight": false,
@@ -318,6 +352,25 @@ final class AppSettings: ObservableObject {
             "prayerIndonesianNames": Locale.current.region?.identifier == "ID" || Locale.current.language.languageCode?.identifier == "id",
             "prayerNotify": true,
             "prayerReminderMinutes": 0,
+            "prompterTabEnabled": true,
+            "prompterHeight": 320.0,
+            "prompterStaysOpen": true,
+            "prompterScrollSpeed": 28.0,
+            "prompterFontSize": 18.0,
+            "prompterOpacity": 0.88,
+            "prompterShowCameraPreview": false,
+            "prompterMirrorText": false,
+            "prompterScript": """
+            Hello everyone! Welcome to today's meeting.
+
+            [Look right at this camera line — your gaze is 100% natural]
+
+            OpenNotchi transforms your MacBook notch into a living, intelligent dynamic hub.
+
+            From spinning turntable vinyl decks with haptic grooves, to synced karaoke lyrics, developer tools, and this real-time eye-contact teleprompter — it turns unused screen space into your favorite daily companion.
+
+            I'd love to walk you through our latest milestones today!
+            """,
         ])
         hoverDelay = defaults.double(forKey: "hoverDelay")
         hapticsEnabled = defaults.bool(forKey: "hapticsEnabled")
@@ -367,6 +420,8 @@ final class AppSettings: ObservableObject {
         mirrorTabEnabled = defaults.bool(forKey: "mirrorTabEnabled")
         devToolsEnabled = defaults.bool(forKey: "devToolsEnabled")
         calendarEnabled = defaults.bool(forKey: "calendarEnabled")
+        audioDeckEnabled = defaults.bool(forKey: "audioDeckEnabled")
+        audioDeckStyle = AudioDeckStyle(rawValue: defaults.string(forKey: "audioDeckStyle") ?? "") ?? .vuMeter
         mirrorHeight = defaults.double(forKey: "mirrorHeight")
         mirrorEffect = MirrorEffect(rawValue: defaults.string(forKey: "mirrorEffect") ?? "") ?? .natural
         mirrorRingLight = defaults.bool(forKey: "mirrorRingLight")
@@ -387,6 +442,15 @@ final class AppSettings: ObservableObject {
         prayerIndonesianNames = defaults.bool(forKey: "prayerIndonesianNames")
         prayerNotify = defaults.bool(forKey: "prayerNotify")
         prayerReminderMinutes = defaults.integer(forKey: "prayerReminderMinutes")
+        prompterTabEnabled = defaults.object(forKey: "prompterTabEnabled") != nil ? defaults.bool(forKey: "prompterTabEnabled") : true
+        prompterHeight = defaults.double(forKey: "prompterHeight") > 0 ? defaults.double(forKey: "prompterHeight") : 320.0
+        prompterStaysOpen = defaults.object(forKey: "prompterStaysOpen") != nil ? defaults.bool(forKey: "prompterStaysOpen") : true
+        prompterScrollSpeed = defaults.double(forKey: "prompterScrollSpeed") > 0 ? defaults.double(forKey: "prompterScrollSpeed") : 28.0
+        prompterFontSize = defaults.double(forKey: "prompterFontSize") > 0 ? defaults.double(forKey: "prompterFontSize") : 18.0
+        prompterOpacity = defaults.double(forKey: "prompterOpacity") > 0 ? defaults.double(forKey: "prompterOpacity") : 0.88
+        prompterShowCameraPreview = defaults.bool(forKey: "prompterShowCameraPreview")
+        prompterMirrorText = defaults.bool(forKey: "prompterMirrorText")
+        prompterScript = defaults.string(forKey: "prompterScript") ?? "Hello everyone! Welcome to today's meeting."
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
@@ -413,6 +477,7 @@ final class AppSettings: ObservableObject {
         NotchTab.allCases.filter { tab in
             switch tab {
             case .home, .tray: return true
+            case .prompter: return prompterTabEnabled
             case .clipboard: return clipboardEnabled
             case .timer: return timerTabEnabled
             case .mirror: return mirrorTabEnabled

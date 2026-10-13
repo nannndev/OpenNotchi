@@ -6,6 +6,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-13
+
+### Added
+- **Webcam Eye-Contact Teleprompter Tab**: Smooth auto-scrolling presentation script directly beneath the camera notch for natural 100% eye contact during Zoom, Google Meet, and Teams video calls. Features adjustable scroll speed presets (Slow, Normal, Fast, Turbo), live camera preview guide, spacebar pause/resume, font scaling, and transparent HUD background.
+- **Dual Analog VU Meter & 9-Band Spectrum Deck**: 112×112pt hi-fi audio deck with dual ballistic stylus needles, overload redline scale, responsive peak LED indicators, and 9-band digital equalizer with falling peak caps. One-tap interactive toggle between Analog VU Meter and Graphic Spectrum Analyzer.
+- **Symmetrical Apple Desk Calendar Glass Card**: Symmetrical 112×112pt desk calendar companion card matching the left vinyl turntable with clean day number, weekday accent banner, upcoming event status, and video meeting join button.
+- **Keyless Ad-Hoc Keychain Safety**: Suppressed unwanted Keychain authorization alerts when Spotify Remote is disabled for a smoother first-launch experience.
+
 ## [0.6.0] - 2026-10-13
 
 ### Added

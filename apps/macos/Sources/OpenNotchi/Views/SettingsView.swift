@@ -350,6 +350,7 @@ private struct FeaturesPane: View {
     var body: some View {
         Form {
             Section("Tabs") {
+                Toggle("Eye-Contact Teleprompter", isOn: $settings.prompterTabEnabled)
                 Toggle("Clipboard history", isOn: $settings.clipboardEnabled)
                 Toggle("Timer", isOn: $settings.timerTabEnabled)
                 Toggle("Mirror (camera)", isOn: $settings.mirrorTabEnabled)
@@ -357,7 +358,10 @@ private struct FeaturesPane: View {
             }
             Section("Home") {
                 Toggle("Lyrics (button on the artwork)", isOn: $settings.lyricsEnabled)
-                Toggle("Today's events next to the player", isOn: $settings.calendarEnabled)
+                Toggle("Today's calendar widget next to the player", isOn: $settings.calendarEnabled)
+                if !settings.calendarEnabled {
+                    Toggle("Audio spectrum deck next to the player", isOn: $settings.audioDeckEnabled)
+                }
                 Toggle("Show the current lyric line under the title", isOn: $settings.lyricsOnHome)
                     .disabled(!settings.lyricsEnabled)
             }

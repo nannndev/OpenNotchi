@@ -1,8 +1,10 @@
 import { motion } from "motion/react"
-import { AirplayIcon, CalendarClock, Camera, CandlestickChart, Clipboard, CloudSun, Disc, Inbox, MessageSquareQuote, MoonStar, Palette, ScanFace, ShieldCheck, Smartphone, Sparkles, Terminal, Timer, type LucideIcon } from "lucide-react"
+import { AirplayIcon, CalendarClock, Camera, CandlestickChart, Clipboard, CloudSun, Disc, Gauge, Inbox, MessageSquareQuote, MoonStar, Palette, ScanFace, ShieldCheck, Smartphone, Sparkles, Terminal, Timer, Video, type LucideIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
+  { icon: Video, title: "Webcam Eye-Contact Teleprompter", body: "Read presentation notes right beneath your Mac camera. Auto-scrolls smoothly so you maintain 100% natural eye contact during video calls." },
+  { icon: Gauge, title: "Analog VU Meter & Audio Deck", body: "Dual ballistic stylus needles with peak indicators and 9-band digital spectrum analyzer flanking your turntable in 100% geometric symmetry." },
   { icon: Disc, title: "Interactive Vinyl & Turntable", body: "Realistic tonearm with ruby needle, DJ scratching with haptic grooves, 4 artwork styles, and live spinning disc in the closed notch." },
   { icon: Sparkles, title: "6 Notch Animation Physics", body: "Customize notch opening: Bouncy Island (jelly spring), Waterfall Drop (-65pt cascade), Snappy Pro (160ms), Elastic Pop, or Gentle Float." },
   { icon: Terminal, title: "Developer Tools & Audio Routing", body: "Built-in localhost port inspector with process killer, screen color eyedropper, input mic selector, and audio device manager." },

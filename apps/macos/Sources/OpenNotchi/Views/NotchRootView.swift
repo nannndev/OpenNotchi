@@ -724,6 +724,7 @@ struct ExpandedView: View {
                 switch tab {
                 case .home: HomeView()
                 case .tray: TrayView()
+                case .prompter: PrompterView()
                 case .clipboard: ClipboardView()
                 case .timer: TimerView()
                 case .mirror: MirrorView()

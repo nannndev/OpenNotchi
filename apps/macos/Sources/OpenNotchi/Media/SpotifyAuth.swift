@@ -38,8 +38,10 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
 
     private override init() {
         super.init()
-        tokens = Keychain.load()
-        isLoggedIn = tokens != nil
+        if AppSettings.shared.spotifyRemoteEnabled {
+            tokens = Keychain.load()
+            isLoggedIn = tokens != nil
+        }
         accountName = UserDefaults.standard.string(forKey: "spotifyAccountName")
     }
 

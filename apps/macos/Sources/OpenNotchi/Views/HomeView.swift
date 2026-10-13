@@ -41,13 +41,34 @@ struct HomeView: View {
                 Group {
                     if showLyrics {
                         MiniPlayerColumn()
+                            .padding(8)
+                            .frame(width: 112, height: 112)
+                            .background {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(.white.opacity(0.05))
+                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.12), lineWidth: 0.5))
+                            }
+                            .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
                     } else if settings.calendarEnabled {
                         CalendarWidget()
+                    } else if settings.audioDeckEnabled {
+                        AudioDeckCard()
                     } else {
-                        WaveformView(isPlaying: media.info?.isPlaying ?? false, barCount: 5, maxHeight: 28, color: accent.color)
+                        Color.clear
+                            .frame(width: 112, height: 112)
+                            .contentShape(Rectangle())
+                            .contextMenu {
+                                Button {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        settings.calendarEnabled = true
+                                    }
+                                } label: {
+                                    Label("Show Calendar Widget", systemImage: "calendar")
+                                }
+                            }
                     }
                 }
-                .frame(width: NotchLayout.sideColumn, alignment: showLyrics || !settings.calendarEnabled ? .trailing : .leading)
+                .frame(width: NotchLayout.sideColumn, alignment: .trailing)
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showLyrics)

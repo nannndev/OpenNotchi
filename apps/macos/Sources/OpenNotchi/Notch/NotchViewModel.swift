@@ -4,6 +4,7 @@ import SwiftUI
 enum NotchTab: String, CaseIterable {
     case home = "Home"
     case tray = "Tray"
+    case prompter = "Prompter"
     case clipboard = "Clipboard"
     case timer = "Timer"
     case mirror = "Mirror"
@@ -14,6 +15,7 @@ enum NotchTab: String, CaseIterable {
         switch self {
         case .home: return "house.fill"
         case .tray: return "tray.fill"
+        case .prompter: return "text.viewfinder"
         case .clipboard: return "doc.on.clipboard.fill"
         case .timer: return "timer"
         case .mirror: return "camera.fill"
@@ -54,6 +56,8 @@ final class NotchViewModel: ObservableObject {
             height = Self.maxOpenHeight
         } else if tab == .mirror && settings.mirrorTabEnabled {
             height = min(max(settings.mirrorHeight, Self.defaultOpenHeight), Self.maxOpenHeight)
+        } else if tab == .prompter && settings.prompterTabEnabled {
+            height = min(max(settings.prompterHeight, 240), Self.maxOpenHeight)
         } else if tab == .dev {
             height = 230
         } else {
@@ -105,9 +109,9 @@ final class NotchViewModel: ObservableObject {
         }
     }
 
-    /// The Mirror tab stays open when the pointer leaves; a click elsewhere closes it.
+    /// The Mirror or Prompter tab stays open when the pointer leaves; a click elsewhere closes it.
     private var staysOpenOnHoverExit: Bool {
-        isOpen && (pinned || (tab == .mirror && settings.mirrorStaysOpen))
+        isOpen && (pinned || (tab == .mirror && settings.mirrorStaysOpen) || (tab == .prompter && settings.prompterStaysOpen))
     }
 
     /// Keeps the notch open regardless of the pointer (the `pin` command, for demos and screenshots).
