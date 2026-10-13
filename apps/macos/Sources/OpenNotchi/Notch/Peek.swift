@@ -56,6 +56,11 @@ enum Peek: Equatable {
     }
 }
 
+enum BannerActionType: String, Equatable {
+    case openURL
+    case triggerUpdate
+}
+
 struct Banner: Equatable {
     var icon: String
     var tint: Color
@@ -65,5 +70,6 @@ struct Banner: Equatable {
     var subtitle: String?
     var actionTitle: String?
     var actionURL: URL?
+    var actionType: BannerActionType = .openURL
 }
 

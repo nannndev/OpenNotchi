@@ -6,7 +6,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-10-13
+## [0.6.0] - 2026-10-13
+
+### Added
+- **Interactive Turntable Deck & Vinyl Stylus**: Realistic tonearm with ruby stylus cartridge that drops onto the record when playing and lifts when paused.
+- **4 Selectable Artwork & Vinyl Styles**: Vinyl Only (Turntable), Center Cover with Vinyl Platter (Halo), Slide-out Vinyl Sleeve, and Standard Square artwork.
+- **Interactive DJ Scratching**: Drag circularly on the vinyl record to scratch with haptic feedback ticks on every groove and real-time audio scrub seeking.
+- **Closed Notch Live Vinyl Activity**: Matching mini spinning vinyl disc in the closed notch pill with real grooves, center label, spindle hole, tap-to-toggle play/pause, and right-click style switcher.
+- **6 Notch Open Animation Styles**: Choose your notch opening personality: Fluid Classic (Apple balanced), Bouncy Island (jelly spring), Waterfall Drop (-65pt cascade from bezel), Snappy Pro (160ms instant), Elastic Pop (0.58 scale 3D pop), and Gentle Float (0.68s slow-motion).
+- **Dynamic Island Update Notification Banner**: Real-time drop-down update notification banner directly from the notch when a new release is available, with one-click update and header pill indicator.
+- **Device Access Control & Audio Routing**: Microphone input selection, input gain calibration, and output device routing directly in DevTools and Settings.
 
 ### Added
 - **Spinning Vinyl Record Deck & Sleeve**: Interactive album jacket where a grooved vinyl disc slides out and spins continuously while playing, featuring concentric microgrooves, specular sheen, and circular center artwork label

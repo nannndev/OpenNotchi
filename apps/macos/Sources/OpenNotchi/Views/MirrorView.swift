@@ -17,6 +17,7 @@ struct MirrorView: View {
     @State private var bursts: [UUID] = []
     @State private var savedPhoto: URL?
     @State private var studioSession: PhotoboxSession?
+    @State private var cameraAuthStatus = AVCaptureDevice.authorizationStatus(for: .video)
 
     var body: some View {
         VStack(spacing: 4) {
@@ -30,6 +31,52 @@ struct MirrorView: View {
                             .aspectRatio(contentMode: .fill)
                     }
                     .clipped()
+                } else if cameraAuthStatus == .denied || cameraAuthStatus == .restricted {
+                    VStack(spacing: 8) {
+                        Image(systemName: "camera.slash.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.secondary)
+                        Text("Camera Access Restricted")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("OpenNotchi needs camera access to preview your camera and take photobox snapshots.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                        Button("Open Privacy Settings") {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .padding(.top, 4)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.opacity(0.85))
+                } else if cameraAuthStatus == .notDetermined {
+                    VStack(spacing: 8) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.secondary)
+                        Text("Camera Access Required")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("Grant camera access to use Mirror and photobox booth features.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                        Button("Allow Camera Access") {
+                            AVCaptureDevice.requestAccess(for: .video) { granted in
+                                DispatchQueue.main.async {
+                                    cameraAuthStatus = granted ? .authorized : .denied
+                                }
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .padding(.top, 4)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.opacity(0.85))
                 } else {
                     CameraPreview(
                         effect: settings.mirrorEffect,
@@ -172,6 +219,12 @@ struct MirrorView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openStripPicker)) { _ in
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { choosingStrip = true }
+        }
+        .onAppear {
+            cameraAuthStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            cameraAuthStatus = AVCaptureDevice.authorizationStatus(for: .video)
         }
         .onDisappear {
             vm.holdOpen = false

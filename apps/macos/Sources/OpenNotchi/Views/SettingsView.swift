@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 enum SettingsPane: String, CaseIterable, Identifiable {
@@ -171,7 +172,101 @@ private struct AppearancePane: View {
                     }
                 }
             }
+
+            Section("Open Animation") {
+                VStack(spacing: 5) {
+                    ForEach(NotchAnimationStyle.allCases) { style in
+                        AnimationRowView(
+                            style: style,
+                            isSelected: settings.openAnimation == style,
+                            onSelect: {
+                                settings.openAnimation = style
+                            },
+                            onPreview: {
+                                settings.openAnimation = style
+                                AppDelegate.shared?.previewNotch()
+                            }
+                        )
+                    }
+                }
+                .padding(.vertical, 2)
+            }
         }
+    }
+}
+
+private struct AnimationRowView: View {
+    let style: NotchAnimationStyle
+    let isSelected: Bool
+    let onSelect: () -> Void
+    let onPreview: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button(action: onSelect) {
+                HStack(spacing: 12) {
+                    Image(systemName: style.icon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(isSelected ? .white : .secondary)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(isSelected ? AnyShapeStyle(Color.accentColor.gradient) : AnyShapeStyle(Color.white.opacity(0.08)))
+                        )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(style.displayName)
+                                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                                .foregroundStyle(.primary)
+
+                            if isSelected {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+
+                        Text(style.subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onPreview) {
+                HStack(spacing: 4) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 9))
+                    Text("Test")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.white.opacity(0.08))
+                )
+                .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Preview this open animation on the notch")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(isSelected ? Color.accentColor.opacity(0.3) : Color.white.opacity(0.05), lineWidth: 1)
+                )
+        )
     }
 }
 
@@ -331,6 +426,24 @@ private struct MirrorPane: View {
                 PhotoboxSettings()
             }
             Section("Mirror") {
+                Picker("Camera Device", selection: $settings.mirrorCameraID) {
+                    Text("Automatic (Default)").tag("")
+                    ForEach(CameraPreview.cameras, id: \.uniqueID) { camera in
+                        Text(camera.localizedName).tag(camera.uniqueID)
+                    }
+                }
+                if AVCaptureDevice.authorizationStatus(for: .video) == .denied || AVCaptureDevice.authorizationStatus(for: .video) == .restricted {
+                    HStack {
+                        Label("Camera access is disabled in macOS Privacy Settings.", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .font(.caption)
+                        Spacer()
+                        Button("Open Settings") {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!)
+                        }
+                        .controlSize(.small)
+                    }
+                }
                 Picker("Look", selection: $settings.mirrorEffect) {
                     ForEach(MirrorEffect.allCases) { Text($0.displayName).tag($0) }
                 }
@@ -355,7 +468,11 @@ private struct MediaPane: View {
     var body: some View {
         Form {
             Section("Playback & Style") {
-                Toggle("Spinning vinyl record style", isOn: $settings.vinylModeEnabled)
+                Picker("Artwork Style", selection: $settings.artworkStyle) {
+                    ForEach(PlayerArtworkStyle.allCases) { style in
+                        Label(style.displayName, systemImage: style.icon).tag(style)
+                    }
+                }
                 Toggle("Ambient artwork aura glow", isOn: $settings.ambientAuraEnabled)
                 Toggle("Show lyrics on home player", isOn: $settings.lyricsOnHome)
             }
@@ -409,16 +526,37 @@ private struct AboutPane: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            if updater.isAvailable {
-                VStack(spacing: 8) {
-                    Button("Check for Updates…") { updater.checkForUpdates() }
-                        .disabled(!updater.canCheckForUpdates)
-                    Toggle("Check for updates automatically", isOn: $updater.automaticallyChecks)
-                        .toggleStyle(.checkbox)
-                        .font(.callout)
+            VStack(spacing: 8) {
+                if let update = updater.availableUpdate {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.cyan)
+                        Text("Update v\(update.version) tersedia!")
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(.cyan)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.cyan.opacity(0.15)))
                 }
-                .padding(.top, 12)
+
+                Button(updater.isChecking ? "Checking…" : "Check for Updates…") {
+                    updater.checkForUpdates()
+                }
+                .disabled(updater.isChecking)
+
+                Toggle("Check for updates automatically", isOn: $updater.automaticallyChecks)
+                    .toggleStyle(.checkbox)
+                    .font(.callout)
+
+                Button("Test Notch Update Banner") {
+                    updater.simulateUpdateNotification()
+                }
+                .buttonStyle(.link)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
+            .padding(.top, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

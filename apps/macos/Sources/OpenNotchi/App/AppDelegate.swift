@@ -47,7 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             weather: weather,
             markets: markets,
             prayers: prayers,
-            settings: settings
+            settings: settings,
+            updater: updater
         )
         setupStatusItem()
         updateHotKey()
@@ -100,6 +101,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         reminders.onBanner = { [weak self] banner in
+            self?.notchController?.showPeek(.banner(banner))
+        }
+
+        updater.onUpdateBanner = { [weak self] banner in
             self?.notchController?.showPeek(.banner(banner))
         }
 
@@ -200,9 +205,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.makeKeyAndOrderFront(nil)
     }
 
-    /// Opens the notch so theme changes in Settings are visible right away.
+    /// Opens the notch so theme and animation changes in Settings are visible right away.
     func previewNotch() {
-        notchController?.open()
+        notchController?.previewAnimation()
     }
 
     @objc private func toggleNotch() {

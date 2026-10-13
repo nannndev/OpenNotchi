@@ -326,7 +326,7 @@ private struct AudioControlsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Label("Audio & Mic", systemImage: "speaker.wave.2.fill")
+                Label("Audio & Mic Control", systemImage: "speaker.wave.2.fill")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -377,6 +377,7 @@ private struct AudioControlsCard: View {
                         audioDevice.setOutputDevice(device.id)
                     } label: {
                         HStack {
+                            Image(systemName: device.icon)
                             Text(device.name)
                             if device.isDefaultOutput {
                                 Image(systemName: "checkmark")
@@ -388,7 +389,7 @@ private struct AudioControlsCard: View {
                 HStack(spacing: 5) {
                     Image(systemName: outputDeviceIcon(name: audioDevice.defaultOutputName))
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(accent.highlight)
 
                     Text(audioDevice.defaultOutputName)
                         .font(.system(size: 9, weight: .medium))
@@ -406,7 +407,46 @@ private struct AudioControlsCard: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .help("Switch Audio Output")
+            .help("Switch Audio Output Device")
+
+            // Microphone Input Device Selector Menu
+            Menu {
+                ForEach(audioDevice.inputDevices) { device in
+                    Button {
+                        audioDevice.setInputDevice(device.id)
+                    } label: {
+                        HStack {
+                            Image(systemName: device.icon)
+                            Text(device.name)
+                            if device.isDefaultInput {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: inputDeviceIcon(name: audioDevice.defaultInputName))
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(audioDevice.isMicMuted ? .red : .green)
+
+                    Text(audioDevice.defaultInputName)
+                        .font(.system(size: 9, weight: .medium))
+                        .lineLimit(1)
+
+                    Spacer(minLength: 2)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 7))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 6).fill(.white.opacity(0.05)))
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .help("Switch Microphone Input Device")
         }
         .padding(7)
         .background(RoundedRectangle(cornerRadius: 9).fill(.white.opacity(0.06)))
@@ -417,7 +457,17 @@ private struct AudioControlsCard: View {
         if lower.contains("airpod") { return "airpodspro" }
         if lower.contains("headphone") { return "headphones" }
         if lower.contains("display") || lower.contains("hdmi") { return "display" }
+        if lower.contains("macbook") || lower.contains("speaker") { return "laptopcomputer" }
         return "hifispeaker.fill"
+    }
+
+    private func inputDeviceIcon(name: String) -> String {
+        let lower = name.lowercased()
+        if lower.contains("airpod") { return "airpodspro" }
+        if lower.contains("iphone") { return "iphone" }
+        if lower.contains("ipad") { return "ipad" }
+        if lower.contains("headphone") || lower.contains("headset") { return "headphones" }
+        return "mic.fill"
     }
 }
 
@@ -1185,43 +1235,91 @@ private struct FullToolsView: View {
                 }
                 .buttonStyle(.plain)
 
-                // Output Selector
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Active Sound Output:")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.secondary)
+                // Output and Input Device Selectors
+                HStack(alignment: .top, spacing: 8) {
+                    // Output Selector
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Active Sound Output:")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
 
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 3) {
-                            ForEach(audioDevice.outputDevices) { device in
-                                Button {
-                                    audioDevice.setOutputDevice(device.id)
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: device.isDefaultOutput ? "speaker.wave.3.fill" : "speaker")
-                                            .font(.system(size: 9))
-                                            .foregroundStyle(device.isDefaultOutput ? accent.highlight : .secondary)
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(spacing: 3) {
+                                ForEach(audioDevice.outputDevices) { device in
+                                    Button {
+                                        audioDevice.setOutputDevice(device.id)
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: device.icon)
+                                                .font(.system(size: 9))
+                                                .foregroundStyle(device.isDefaultOutput ? accent.highlight : .secondary)
 
-                                        Text(device.name)
-                                            .font(.system(size: 10, weight: device.isDefaultOutput ? .semibold : .regular))
-                                            .foregroundStyle(device.isDefaultOutput ? .white : .secondary)
+                                            Text(device.name)
+                                                .font(.system(size: 9, weight: device.isDefaultOutput ? .semibold : .regular))
+                                                .foregroundStyle(device.isDefaultOutput ? .white : .secondary)
+                                                .lineLimit(1)
 
-                                        Spacer()
+                                            Spacer(minLength: 2)
 
-                                        if device.isDefaultOutput {
-                                            Image(systemName: "checkmark")
-                                                .font(.system(size: 9, weight: .bold))
-                                                .foregroundStyle(accent.highlight)
+                                            if device.isDefaultOutput {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 8, weight: .bold))
+                                                    .foregroundStyle(accent.highlight)
+                                            }
                                         }
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3.5)
+                                        .background(RoundedRectangle(cornerRadius: 5).fill(device.isDefaultOutput ? .white.opacity(0.12) : .white.opacity(0.03)))
                                     }
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(RoundedRectangle(cornerRadius: 6).fill(device.isDefaultOutput ? .white.opacity(0.1) : .clear))
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
+                        .frame(maxHeight: 72)
                     }
+                    .frame(maxWidth: .infinity)
+
+                    // Input Selector
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Active Microphone:")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(spacing: 3) {
+                                ForEach(audioDevice.inputDevices) { device in
+                                    Button {
+                                        audioDevice.setInputDevice(device.id)
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: device.icon)
+                                                .font(.system(size: 9))
+                                                .foregroundStyle(device.isDefaultInput ? .green : .secondary)
+
+                                            Text(device.name)
+                                                .font(.system(size: 9, weight: device.isDefaultInput ? .semibold : .regular))
+                                                .foregroundStyle(device.isDefaultInput ? .white : .secondary)
+                                                .lineLimit(1)
+
+                                            Spacer(minLength: 2)
+
+                                            if device.isDefaultInput {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 8, weight: .bold))
+                                                    .foregroundStyle(.green)
+                                            }
+                                        }
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3.5)
+                                        .background(RoundedRectangle(cornerRadius: 5).fill(device.isDefaultInput ? Color.green.opacity(0.15) : .white.opacity(0.03)))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 72)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
 
                 // Dynamic Island HUD Quick Tester

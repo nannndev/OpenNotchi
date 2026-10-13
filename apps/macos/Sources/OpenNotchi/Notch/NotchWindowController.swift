@@ -21,7 +21,8 @@ final class NotchWindowController: NSObject {
         weather: WeatherManager,
         markets: MarketManager,
         prayers: PrayerTimesManager,
-        settings: AppSettings
+        settings: AppSettings,
+        updater: Updater
     ) {
         viewModel = NotchViewModel(settings: settings)
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.windowSize))
@@ -39,6 +40,7 @@ final class NotchWindowController: NSObject {
             .environmentObject(markets)
             .environmentObject(prayers)
             .environmentObject(settings)
+            .environmentObject(updater)
             .environmentObject(AirDropService.shared)
             .environmentObject(AudioDeviceManager.shared)
             .environmentObject(ColorPickerManager.shared)
@@ -97,6 +99,8 @@ final class NotchWindowController: NSObject {
         case "demo-on": AppDelegate.shared?.media.startDemo()
         case "demo-off": AppDelegate.shared?.media.stopDemo()
         // Previews for the live activities, handy when designing them.
+        case "peek-update":
+            AppDelegate.shared?.updater.simulateUpdateNotification()
         case "peek-charging": viewModel.showPeek(.charging(level: 85))
         case "peek-airpods":
             viewModel.showPeek(.device(
@@ -164,6 +168,10 @@ final class NotchWindowController: NSObject {
 
     func open() {
         viewModel.open()
+    }
+
+    func previewAnimation() {
+        viewModel.replayAnimation(duration: 2.2)
     }
 
     func showPeek(_ peek: Peek) {

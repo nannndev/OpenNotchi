@@ -6,6 +6,7 @@ struct HeaderView: View {
     @EnvironmentObject private var battery: BatteryMonitor
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var weather: WeatherManager
+    @EnvironmentObject private var updater: Updater
 
     var body: some View {
         HStack(spacing: 2) {
@@ -23,18 +24,59 @@ struct HeaderView: View {
                 .fixedSize()
                 .padding(.trailing, 8)
 
+            if let update = updater.availableUpdate {
+                Button {
+                    updater.checkForUpdates()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 8, weight: .bold))
+                        Text(update.version)
+                            .font(.system(size: 9.5, weight: .bold))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.cyan.opacity(0.2)))
+                    .overlay(Capsule().stroke(Color.cyan.opacity(0.5), lineWidth: 0.8))
+                    .foregroundStyle(.cyan)
+                }
+                .buttonStyle(.plain)
+                .help("OpenNotchi \(update.version) available. Click to update.")
+                .padding(.trailing, 4)
+            }
+
             if battery.hasBattery {
                 BatteryView(level: battery.level, isCharging: battery.isCharging, isPluggedIn: battery.isPluggedIn)
                     .fixedSize()
             }
 
             Menu {
+                if let update = updater.availableUpdate {
+                    Button("Update to \(update.version)…") {
+                        updater.checkForUpdates()
+                    }
+                    Divider()
+                }
                 Menu("Visible Tabs") {
                     Toggle("Clipboard", isOn: $settings.clipboardEnabled)
                     Toggle("Timer", isOn: $settings.timerTabEnabled)
                     Toggle("Mirror", isOn: $settings.mirrorTabEnabled)
                     Toggle("Markets", isOn: $settings.marketsEnabled)
                     Toggle("Dev Tools", isOn: $settings.devToolsEnabled)
+                }
+                Menu("Open Animation") {
+                    ForEach(NotchAnimationStyle.allCases) { style in
+                        Button {
+                            settings.openAnimation = style
+                        } label: {
+                            HStack {
+                                Label(style.displayName, systemImage: style.icon)
+                                if settings.openAnimation == style {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
                 }
                 Divider()
                 Button("Settings…") { AppDelegate.shared?.showSettings() }

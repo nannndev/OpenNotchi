@@ -179,4 +179,20 @@ final class NotchViewModel: ObservableObject {
         pending = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
+
+    /// Replays the open animation for live previews (e.g. testing animation styles in Settings).
+    func replayAnimation(duration: TimeInterval = 2.2) {
+        pending?.cancel()
+        if isOpen {
+            isOpen = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak self] in
+                guard let self else { return }
+                self.isOpen = true
+                self.scheduleClose(after: duration)
+            }
+        } else {
+            isOpen = true
+            scheduleClose(after: duration)
+        }
+    }
 }

@@ -3,8 +3,9 @@ import { AirplayIcon, CalendarClock, Camera, CandlestickChart, Clipboard, CloudS
 import { Card, CardContent } from "@/components/ui/card"
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
-  { icon: Disc, title: "Vinyl & Ambient Aura", body: "Interactive grooved vinyl record slides out and spins continuously, bathed in a living color aura matched to your cover art." },
-  { icon: Terminal, title: "Developer Tools", body: "Built-in localhost port inspector with process killer, screen eyedropper color picker, and audio device manager." },
+  { icon: Disc, title: "Interactive Vinyl & Turntable", body: "Realistic tonearm with ruby needle, DJ scratching with haptic grooves, 4 artwork styles, and live spinning disc in the closed notch." },
+  { icon: Sparkles, title: "6 Notch Animation Physics", body: "Customize notch opening: Bouncy Island (jelly spring), Waterfall Drop (-65pt cascade), Snappy Pro (160ms), Elastic Pop, or Gentle Float." },
+  { icon: Terminal, title: "Developer Tools & Audio Routing", body: "Built-in localhost port inspector with process killer, screen color eyedropper, input mic selector, and audio device manager." },
   { icon: MessageSquareQuote, title: "Interactive Lyrics", body: "Flip to synced lyrics with depth blur. Hover for instant play cues or click any line to seek there." },
   { icon: Camera, title: "Photobox & Deco Studio", body: "Snap into 18 frames, customize with Korean stickers, doodle frames, pins, tape, and drop straight to the Tray." },
   { icon: Sparkles, title: "AirPods & Fluid HUD", body: "Left/Right/Case battery drop-down card and springy fluid HUD capsule for system volume, brightness and mic." },

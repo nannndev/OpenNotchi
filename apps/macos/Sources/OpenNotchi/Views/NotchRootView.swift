@@ -33,7 +33,8 @@ struct NotchRootView: View {
         if showActivity {
             // HUD peeks need room for a level bar on the right. Network speed needs room for text.
             let isNetOnly = isNetworkSpeedVisible && !timer.isActive && !(media.info?.isPlaying ?? false) && vm.peek == nil && !airDrop.isTransferring
-            let side = vm.peek?.isHUD == true ? size.height + 76 : isNetOnly ? size.height + 44 : size.height + 8
+            let extraForSleeve: CGFloat = (settings.artworkStyle == .vinylSleeve && (media.info?.isPlaying ?? false)) ? 6 : 0
+            let side = vm.peek?.isHUD == true ? size.height + 76 : isNetOnly ? size.height + 44 : size.height + 8 + extraForSleeve
             size.width += 2 * side
         }
         return size
@@ -56,7 +57,7 @@ struct NotchRootView: View {
                     ExpandedView()
                         .padding(.horizontal, topRadius + 18)
                         .padding(.bottom, 14)
-                        .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .top)))
+                        .transition(settings.openAnimation.contentTransition)
                 } else if showActivity {
                     ClosedActivityView(height: vm.notchSize.height)
                         .padding(.horizontal, topRadius + 6)
@@ -80,6 +81,8 @@ struct NotchRootView: View {
             }
             .contentShape(shape)
             .shadow(color: .black.opacity(vm.isOpen ? 0.45 : 0), radius: 14, y: 4)
+            .animation(settings.openAnimation.springAnimation, value: vm.isOpen)
+            .animation(vm.isResizing ? nil : settings.openAnimation.springAnimation, value: vm.openSize.height)
             .onHover { vm.hoverChanged($0) }
             .onDrop(of: [.fileURL], isTargeted: $vm.isDropTargeted) { providers in
                 tray.handleDrop(providers)
@@ -92,13 +95,11 @@ struct NotchRootView: View {
         .preferredColorScheme(.dark)
         .environment(\.notchAccent, accent)
         .animation(.easeInOut(duration: 0.6), value: accent)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: vm.isOpen)
-        // Follow the pointer directly while resizing; animate tab switches that change the height.
-        .animation(vm.isResizing ? nil : .spring(response: 0.38, dampingFraction: 0.86), value: vm.openSize.height)
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showActivity)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: vm.peek?.isHUD)
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: vm.peek?.isBanner)
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: vm.peek?.isDeviceCard)
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showActivity)
+        .animation(settings.openAnimation.springAnimation, value: vm.isOpen)
     }
 }
 
@@ -183,11 +184,15 @@ struct ClosedActivityView: View {
                 .frame(width: height + 36, alignment: .trailing)
             } else {
                 let isPlaying = media.info?.isPlaying ?? false
-                ArtworkView(image: media.artwork, cornerRadius: 5)
-                    .frame(width: height - 10, height: height - 10)
-                    .contentShape(Rectangle())
-                    .onTapGesture { media.playPause() }
-                    .help(isPlaying ? "Pause music" : "Play music")
+                CompactArtworkView(
+                    image: media.artwork,
+                    style: settings.artworkStyle,
+                    isPlaying: isPlaying,
+                    size: height - 10
+                )
+                .contentShape(Rectangle())
+                .onTapGesture { media.playPause() }
+                .help(isPlaying ? "Pause music" : "Play music")
                 Spacer()
                 WaveformView(isPlaying: isPlaying, barCount: 4, maxHeight: height - 16, color: accent.color)
                     .frame(width: height - 10)
@@ -197,6 +202,155 @@ struct ClosedActivityView: View {
             }
         }
         .frame(height: height)
+    }
+}
+
+struct CompactArtworkView: View {
+    let image: NSImage?
+    let style: PlayerArtworkStyle
+    let isPlaying: Bool
+    let size: CGFloat
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        Group {
+            switch style {
+            case .standard:
+                ArtworkView(image: image, cornerRadius: 4.5)
+                    .frame(width: size, height: size)
+
+            case .vinylDisc:
+                // Mini spinning turntable vinyl disc
+                MiniSpinningVinylDisc(image: image, isPlaying: isPlaying, size: size)
+
+            case .vinylCoverCenter:
+                // Floating center cover surrounded by spinning vinyl platter
+                ZStack {
+                    MiniSpinningVinylDisc(image: nil, isPlaying: isPlaying, size: size, showCenter: false)
+                    ArtworkView(image: image, cornerRadius: 2.5)
+                        .frame(width: size * 0.65, height: size * 0.65)
+                        .shadow(color: .black.opacity(0.6), radius: 2)
+                }
+                .frame(width: size, height: size)
+
+            case .vinylSleeve:
+                // Mini album jacket with spinning vinyl disc peeking out
+                let sleeveSize = size * 0.84
+                let discSize = size * 0.84
+                ZStack(alignment: .leading) {
+                    MiniSpinningVinylDisc(image: image, isPlaying: isPlaying, size: discSize)
+                        .offset(x: isPlaying ? 7 : 3)
+                        .shadow(color: .black.opacity(0.4), radius: 1.5)
+
+                    ArtworkView(image: image, cornerRadius: 2.5)
+                        .frame(width: sleeveSize, height: sleeveSize)
+                        .shadow(color: .black.opacity(0.4), radius: 2)
+                }
+                .frame(width: size + 6, height: size, alignment: .leading)
+            }
+        }
+        .contextMenu {
+            Section("Artwork & Vinyl Style") {
+                ForEach(PlayerArtworkStyle.allCases) { item in
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            settings.artworkStyle = item
+                        }
+                    } label: {
+                        HStack {
+                            Label(item.displayName, systemImage: item.icon)
+                            if style == item {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Mini spinning turntable disc for the closed notch.
+struct MiniSpinningVinylDisc: View {
+    let image: NSImage?
+    let isPlaying: Bool
+    var size: CGFloat = 22
+    var showCenter: Bool = true
+
+    var body: some View {
+        TimelineView(.animation(paused: !isPlaying)) { context in
+            let angle = (context.date.timeIntervalSinceReferenceDate * 50).truncatingRemainder(dividingBy: 360)
+
+            ZStack {
+                // Outer Vinyl Body
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(red: 0.16, green: 0.16, blue: 0.18),
+                                Color(red: 0.05, green: 0.05, blue: 0.06)
+                            ],
+                            center: .center,
+                            startRadius: size * 0.15,
+                            endRadius: size * 0.5
+                        )
+                    )
+                    .frame(width: size, height: size)
+
+                // Groove ring
+                Circle()
+                    .stroke(Color.white.opacity(0.08), lineWidth: 0.6)
+                    .frame(width: size * 0.85, height: size * 0.85)
+
+                Circle()
+                    .stroke(Color.white.opacity(0.05), lineWidth: 0.5)
+                    .frame(width: size * 0.68, height: size * 0.68)
+
+                // Specular Shine
+                AngularGradient(
+                    gradient: Gradient(colors: [
+                        .clear,
+                        .white.opacity(0.18),
+                        .clear,
+                        .white.opacity(0.18),
+                        .clear
+                    ]),
+                    center: .center
+                )
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+
+                // Circular Center Album Art & Spindle
+                if showCenter {
+                    let labelSize = size * 0.44
+                    ZStack {
+                        if let image {
+                            Image(nsImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: labelSize, height: labelSize)
+                                .clipShape(Circle())
+                        } else {
+                            Circle()
+                                .fill(Color(white: 0.25))
+                                .frame(width: labelSize, height: labelSize)
+                        }
+
+                        Circle()
+                            .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
+                            .frame(width: labelSize, height: labelSize)
+
+                        // Center spindle hole
+                        Circle()
+                            .fill(Color.black)
+                            .frame(width: max(2.0, size * 0.1), height: max(2.0, size * 0.1))
+                    }
+                }
+            }
+            .rotationEffect(.degrees(angle))
+        }
+        .frame(width: size, height: size)
+        .shadow(color: .black.opacity(0.35), radius: 2)
     }
 }
 
@@ -236,16 +390,20 @@ struct BannerView: View {
                     }
                 }
                 Spacer(minLength: 4)
-                if let title = banner.actionTitle, let url = banner.actionURL {
+                if let title = banner.actionTitle {
                     Button {
-                        NSWorkspace.shared.open(url)
+                        if banner.actionType == .triggerUpdate {
+                            AppDelegate.shared?.updater.checkForUpdates()
+                        } else if let url = banner.actionURL {
+                            NSWorkspace.shared.open(url)
+                        }
                         vm.dismissPeek()
                     } label: {
-                        Label(title, systemImage: "video.fill")
+                        Label(title, systemImage: banner.actionType == .triggerUpdate ? "arrow.triangle.2.circlepath" : "video.fill")
                             .font(.system(size: 12, weight: .semibold))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(Capsule().fill(.green))
+                            .background(Capsule().fill(banner.actionType == .triggerUpdate ? Color.cyan : Color.green))
                             .foregroundStyle(.white)
                     }
                     .buttonStyle(.plain)

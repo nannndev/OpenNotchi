@@ -96,21 +96,16 @@ extension HomeView {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             // Keeps clicks for the notch (the web view would swallow them).
             .overlay(Color.clear.contentShape(Rectangle()))
-        } else if settings.vinylModeEnabled && media.info != nil {
-            VinylArtworkView(
+        } else if media.info != nil {
+            PlayerArtworkView(
                 image: media.artwork,
+                style: settings.artworkStyle,
                 isPlaying: media.info?.isPlaying ?? false,
                 lyricsAvailable: lyricsAvailable,
                 isLyricsMode: $settings.homeLyricsMode
             )
         } else {
             ArtworkView(image: media.artwork, cornerRadius: 16)
-                .overlay(alignment: .bottomTrailing) {
-                    if lyricsAvailable {
-                        LyricsToggle(isOn: $settings.homeLyricsMode)
-                            .padding(6)
-                    }
-                }
         }
     }
 }
@@ -492,65 +487,334 @@ struct PlayerVolumeBar: View {
     }
 }
 
-struct VinylArtworkView: View {
+struct PlayerArtworkView: View {
     let image: NSImage?
+    let style: PlayerArtworkStyle
     let isPlaying: Bool
     let lyricsAvailable: Bool
     @Binding var isLyricsMode: Bool
+    @EnvironmentObject private var media: MediaManager
     @Environment(\.notchAccent) private var accent
     @State private var isHovering = false
 
-    var body: some View {
-        ZStack(alignment: .leading) {
-            // Vinyl Record Disc (slides out from sleeve)
-            VinylDiscView(image: image, isPlaying: isPlaying)
-                .offset(x: (isPlaying || isHovering) ? 22 : 6)
-                .scaleEffect((isPlaying || isHovering) ? 1.0 : 0.96)
-                .shadow(color: .black.opacity(0.45), radius: 5, x: 2, y: 2)
+    // Sleeve drag gesture state
+    @State private var sleeveDragOffset: CGFloat = 0
+    @State private var isDraggingSleeve = false
 
-            // Album Jacket Sleeve
-            ZStack(alignment: .trailing) {
-                ArtworkView(image: image, cornerRadius: 12)
-                    .frame(width: 96, height: 96)
-                    .overlay(alignment: .leading) {
-                        Rectangle()
-                            .fill(LinearGradient(colors: [.white.opacity(0.3), .clear], startPoint: .leading, endPoint: .trailing))
-                            .frame(width: 2)
-                    }
-                    .overlay(alignment: .trailing) {
-                        Rectangle()
-                            .fill(LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .leading, endPoint: .trailing))
-                            .frame(width: 6)
-                    }
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(.white.opacity(0.18), lineWidth: 0.8)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+    var body: some View {
+        Group {
+            switch style {
+            case .standard:
+                standardView
+            case .vinylDisc:
+                vinylDiscOnlyView
+            case .vinylCoverCenter:
+                vinylCoverCenterView
+            case .vinylSleeve:
+                vinylSleeveView
             }
-            .frame(width: 96, height: 96)
-            .shadow(color: .black.opacity(0.35), radius: 6, x: -1, y: 2)
+        }
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .contextMenu {
+            Section("Artwork & Vinyl Style") {
+                ForEach(PlayerArtworkStyle.allCases) { item in
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            AppSettings.shared.artworkStyle = item
+                        }
+                    } label: {
+                        HStack {
+                            Label(item.displayName, systemImage: item.icon)
+                            if style == item {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func handleScratchSeek(_ deltaSeconds: Double) {
+        guard let info = media.info else { return }
+        let currentPos = info.position
+        let maxDuration = info.duration > 0 ? info.duration : 9999
+        let target = max(0, min(maxDuration, currentPos + deltaSeconds))
+        media.seek(to: target)
+    }
+
+    private func handleTapToggle() {
+        media.playPause()
+    }
+
+    // 1. Standard Album Cover (Square)
+    private var standardView: some View {
+        ArtworkView(image: image, cornerRadius: 14)
+            .frame(width: 104, height: 104)
             .overlay(alignment: .bottomTrailing) {
                 if lyricsAvailable {
                     LyricsToggle(isOn: $isLyricsMode)
                         .padding(5)
                 }
             }
+            .onTapGesture { handleTapToggle() }
+            .help("Click to play/pause • Right-click to change style")
+    }
+
+    // 2. Full Vinyl Disc Only (Turntable with Tonearm)
+    private var vinylDiscOnlyView: some View {
+        ZStack(alignment: .topTrailing) {
+            VinylDiscView(
+                image: image,
+                isPlaying: isPlaying,
+                size: 104,
+                centerLabelSize: 46,
+                interactive: true,
+                onScratchSeek: { handleScratchSeek($0) },
+                onTapToggle: { handleTapToggle() }
+            )
+            .shadow(color: .black.opacity(0.48), radius: 8, x: 0, y: 3)
+            .scaleEffect(isHovering ? 1.02 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isHovering)
+
+            // Realistic Tonearm with Stylus Needle
+            TurntableTonearmView(isPlaying: isPlaying, size: 104)
+
+            // Lyrics button at bottom-trailing
+            if lyricsAvailable {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        LyricsToggle(isOn: $isLyricsMode)
+                            .padding(4)
+                    }
+                }
+            }
         }
-        .frame(width: 120, height: 96, alignment: .leading)
-        .onHover { isHovering = $0 }
-        .animation(.spring(response: 0.45, dampingFraction: 0.78), value: isPlaying)
+        .frame(width: 104, height: 104)
+        .help("Click to play/pause • Drag to scratch / spin record")
+    }
+
+    // 3. Album Cover centered inside spinning Vinyl Platter (Halo)
+    private var vinylCoverCenterView: some View {
+        ZStack {
+            // Spinning outer vinyl ring halo (interactive scratch)
+            VinylDiscView(
+                image: nil,
+                isPlaying: isPlaying,
+                size: 106,
+                centerLabelSize: 0,
+                showCenterImage: false,
+                interactive: true,
+                onScratchSeek: { handleScratchSeek($0) },
+                onTapToggle: { handleTapToggle() }
+            )
+            .shadow(color: .black.opacity(0.38), radius: 6, x: 0, y: 2)
+
+            // Center square album art floating over the vinyl platter
+            ArtworkView(image: image, cornerRadius: 10)
+                .frame(width: 68, height: 68)
+                .shadow(color: .black.opacity(0.55), radius: 6, x: 0, y: 2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(.white.opacity(0.18), lineWidth: 0.8)
+                )
+                .onTapGesture { handleTapToggle() }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if lyricsAvailable {
+                LyricsToggle(isOn: $isLyricsMode)
+                    .padding(3)
+            }
+        }
+        .frame(width: 108, height: 108)
+        .help("Click to play/pause • Drag vinyl ring to spin")
+    }
+
+    // 4. Vinyl Sleeve (Interactive Slide-out)
+    private var vinylSleeveView: some View {
+        let baseOffset: CGFloat = (isPlaying || isHovering) ? 36 : 6
+        let effectiveOffset = max(6, min(54, baseOffset + sleeveDragOffset))
+
+        return ZStack(alignment: .leading) {
+            // Vinyl Record Disc (pull out with drag gesture or click)
+            VinylDiscView(
+                image: image,
+                isPlaying: isPlaying,
+                size: 88,
+                centerLabelSize: 38,
+                interactive: true,
+                onScratchSeek: { handleScratchSeek($0) },
+                onTapToggle: { handleTapToggle() }
+            )
+            .offset(x: effectiveOffset)
+            .scaleEffect((isPlaying || isHovering) ? 1.0 : 0.95)
+            .shadow(color: .black.opacity(0.45), radius: 5, x: 2, y: 2)
+            .gesture(
+                DragGesture()
+                    .onChanged { val in
+                        isDraggingSleeve = true
+                        sleeveDragOffset = val.translation.width
+                    }
+                    .onEnded { val in
+                        isDraggingSleeve = false
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) {
+                            if val.translation.width > 18 {
+                                if !isPlaying { media.playPause() }
+                            } else if val.translation.width < -18 {
+                                if isPlaying { media.playPause() }
+                            }
+                            sleeveDragOffset = 0
+                        }
+                    }
+            )
+
+            // Album Jacket Sleeve
+            ZStack(alignment: .trailing) {
+                ArtworkView(image: image, cornerRadius: 10)
+                    .frame(width: 88, height: 88)
+                    .overlay(alignment: .leading) {
+                        Rectangle()
+                            .fill(LinearGradient(colors: [.white.opacity(0.25), .clear], startPoint: .leading, endPoint: .trailing))
+                            .frame(width: 2)
+                    }
+                    .overlay(alignment: .trailing) {
+                        Rectangle()
+                            .fill(LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .leading, endPoint: .trailing))
+                            .frame(width: 5)
+                    }
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(.white.opacity(0.15), lineWidth: 0.8)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .frame(width: 88, height: 88)
+            .shadow(color: .black.opacity(0.35), radius: 6, x: -1, y: 2)
+            .onTapGesture { handleTapToggle() }
+            .overlay(alignment: .bottomTrailing) {
+                if lyricsAvailable {
+                    LyricsToggle(isOn: $isLyricsMode)
+                        .padding(4)
+                }
+            }
+        }
+        .frame(width: 124, height: 88, alignment: .leading)
+        .animation(.spring(response: 0.45, dampingFraction: 0.76), value: isPlaying)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isHovering)
+        .help("Click to play/pause • Drag vinyl to pull out")
+    }
+}
+
+struct TurntableTonearmView: View {
+    let isPlaying: Bool
+    var size: CGFloat = 104
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            // Tonearm assembly pivoted at top right
+            VStack(alignment: .trailing, spacing: 0) {
+                // Pivot Base Cylinder
+                ZStack {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(white: 0.8),
+                                    Color(white: 0.4),
+                                    Color(white: 0.15)
+                                ],
+                                center: .center,
+                                startRadius: 2,
+                                endRadius: 8
+                            )
+                        )
+                        .frame(width: 15, height: 15)
+                        .shadow(color: .black.opacity(0.55), radius: 3, x: 1, y: 1)
+
+                    Circle()
+                        .stroke(Color.white.opacity(0.35), lineWidth: 0.8)
+                        .frame(width: 15, height: 15)
+
+                    // Pivot Center Screw
+                    Circle()
+                        .fill(Color(white: 0.22))
+                        .frame(width: 4.5, height: 4.5)
+                }
+                .frame(width: 15, height: 15)
+
+                // Arm Rod & Cartridge with Needle
+                ZStack(alignment: .top) {
+                    // Brushed Metallic Arm Rod
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(white: 0.88),
+                                    Color(white: 0.6),
+                                    Color(white: 0.8)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: 2.2, height: size * 0.46)
+                        .shadow(color: .black.opacity(0.4), radius: 2, x: -1, y: 1)
+
+                    // Headshell / Cartridge & Stylus
+                    VStack(spacing: 0) {
+                        Spacer()
+                        ZStack(alignment: .bottom) {
+                            // Angled Cartridge
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .fill(Color(red: 0.16, green: 0.16, blue: 0.18))
+                                .frame(width: 5, height: 10)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 1.5)
+                                        .stroke(Color.white.opacity(0.35), lineWidth: 0.5)
+                                )
+
+                            // Stylus Ruby Needle
+                            Circle()
+                                .fill(Color(red: 0.95, green: 0.28, blue: 0.25))
+                                .frame(width: 2.5, height: 2.5)
+                                .offset(y: 2)
+                        }
+                    }
+                    .frame(height: size * 0.46)
+                }
+                .offset(x: -6, y: -2)
+                .rotationEffect(.degrees(isPlaying ? 28 : 2), anchor: .top)
+                .animation(.spring(response: 0.55, dampingFraction: 0.75), value: isPlaying)
+            }
+        }
+        .frame(width: size, height: size, alignment: .topTrailing)
+        .allowsHitTesting(false)
     }
 }
 
 struct VinylDiscView: View {
     let image: NSImage?
     let isPlaying: Bool
+    var size: CGFloat = 104
+    var centerLabelSize: CGFloat = 44
+    var showCenterImage: Bool = true
+    var interactive: Bool = true
+    var onScratchSeek: ((Double) -> Void)? = nil
+    var onTapToggle: (() -> Void)? = nil
+
+    @State private var dragRotation: Double = 0
+    @State private var lastDragAngle: Double = 0
+    @State private var isDragging: Bool = false
+    @State private var accumulatedScrubAngle: Double = 0
+    @State private var lastHapticAngle: Double = 0
 
     var body: some View {
-        TimelineView(.animation(paused: !isPlaying)) { context in
-            let angle = (context.date.timeIntervalSinceReferenceDate * 50).truncatingRemainder(dividingBy: 360)
+        TimelineView(.animation(paused: !isPlaying && !isDragging)) { context in
+            let baseAngle = (context.date.timeIntervalSinceReferenceDate * 45).truncatingRemainder(dividingBy: 360)
+            let totalAngle = baseAngle + dragRotation
 
             ZStack {
                 // Outer Vinyl Disc Body
@@ -558,74 +822,128 @@ struct VinylDiscView: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                Color(red: 0.12, green: 0.12, blue: 0.13),
-                                Color(red: 0.05, green: 0.05, blue: 0.06)
+                                Color(red: 0.14, green: 0.14, blue: 0.16),
+                                Color(red: 0.06, green: 0.06, blue: 0.07)
                             ],
                             center: .center,
-                            startRadius: 18,
-                            endRadius: 46
+                            startRadius: size * 0.18,
+                            endRadius: size * 0.5
                         )
                     )
-                    .frame(width: 92, height: 92)
+                    .frame(width: size, height: size)
 
                 // Microgroove Concentric Rings
                 Group {
-                    Circle().stroke(Color.white.opacity(0.04), lineWidth: 1.2).frame(width: 86, height: 86)
-                    Circle().stroke(Color.white.opacity(0.07), lineWidth: 0.8).frame(width: 78, height: 78)
-                    Circle().stroke(Color.white.opacity(0.05), lineWidth: 1.0).frame(width: 70, height: 70)
-                    Circle().stroke(Color.white.opacity(0.08), lineWidth: 0.8).frame(width: 62, height: 62)
-                    Circle().stroke(Color.white.opacity(0.05), lineWidth: 1.0).frame(width: 54, height: 54)
-                    Circle().stroke(Color.white.opacity(0.06), lineWidth: 0.8).frame(width: 46, height: 46)
+                    Circle().stroke(Color.white.opacity(0.04), lineWidth: 1.0).frame(width: size * 0.94, height: size * 0.94)
+                    Circle().stroke(Color.white.opacity(0.07), lineWidth: 0.8).frame(width: size * 0.86, height: size * 0.86)
+                    Circle().stroke(Color.white.opacity(0.05), lineWidth: 0.9).frame(width: size * 0.78, height: size * 0.78)
+                    Circle().stroke(Color.white.opacity(0.07), lineWidth: 0.8).frame(width: size * 0.70, height: size * 0.70)
+                    Circle().stroke(Color.white.opacity(0.05), lineWidth: 0.9).frame(width: size * 0.62, height: size * 0.62)
+                    Circle().stroke(Color.white.opacity(0.06), lineWidth: 0.8).frame(width: size * 0.54, height: size * 0.54)
                 }
 
                 // Specular Light Reflections across grooves (vinyl shine)
                 AngularGradient(
                     gradient: Gradient(colors: [
                         .clear,
-                        .white.opacity(0.14),
+                        .white.opacity(0.12),
                         .clear,
                         .white.opacity(0.04),
                         .clear,
-                        .white.opacity(0.14),
+                        .white.opacity(0.12),
                         .clear
                     ]),
                     center: .center
                 )
-                .frame(width: 92, height: 92)
+                .frame(width: size, height: size)
                 .clipShape(Circle())
 
-                // Center Label with miniature circular album art
-                ZStack {
-                    Circle()
-                        .fill(Color(red: 0.18, green: 0.18, blue: 0.22))
-                        .frame(width: 36, height: 36)
+                // Center Label
+                if showCenterImage && centerLabelSize > 0 {
+                    ZStack {
+                        Circle()
+                            .fill(Color(red: 0.18, green: 0.18, blue: 0.22))
+                            .frame(width: centerLabelSize, height: centerLabelSize)
 
-                    if let image {
-                        Image(nsImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 34, height: 34)
-                            .clipShape(Circle())
-                    } else {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.4))
+                        if let image {
+                            Image(nsImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: centerLabelSize - 2, height: centerLabelSize - 2)
+                                .clipShape(Circle())
+                        } else {
+                            Image(systemName: "music.note")
+                                .font(.system(size: centerLabelSize * 0.35))
+                                .foregroundStyle(.white.opacity(0.4))
+                        }
+
+                        Circle()
+                            .stroke(Color.white.opacity(0.25), lineWidth: 0.8)
+                            .frame(width: centerLabelSize, height: centerLabelSize)
+
+                        // Spindle Hole
+                        Circle()
+                            .fill(Color.black)
+                            .frame(width: 8, height: 8)
+                            .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 0.8))
                     }
-
-                    Circle()
-                        .stroke(Color.white.opacity(0.25), lineWidth: 0.8)
-                        .frame(width: 36, height: 36)
-
-                    // Spindle Hole
-                    Circle()
-                        .fill(Color.black)
-                        .frame(width: 8, height: 8)
-                        .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 0.8))
                 }
             }
-            .rotationEffect(.degrees(angle))
+            .rotationEffect(.degrees(totalAngle))
+            .gesture(interactive ? interactiveGesture : nil)
         }
-        .frame(width: 92, height: 92)
+        .frame(width: size, height: size)
+    }
+
+    private var interactiveGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let center = CGPoint(x: size / 2, y: size / 2)
+                let currentAngle = angle(from: center, to: value.location)
+
+                if !isDragging {
+                    isDragging = true
+                    lastDragAngle = currentAngle
+                    accumulatedScrubAngle = 0
+                    lastHapticAngle = 0
+                } else {
+                    var delta = currentAngle - lastDragAngle
+                    if delta > 180 { delta -= 360 }
+                    if delta < -180 { delta += 360 }
+
+                    dragRotation += delta
+                    accumulatedScrubAngle += delta
+                    lastDragAngle = currentAngle
+
+                    // Haptic tick every ~30 degrees of manual spin
+                    if abs(accumulatedScrubAngle - lastHapticAngle) >= 30 {
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
+                        lastHapticAngle = accumulatedScrubAngle
+                    }
+                }
+            }
+            .onEnded { _ in
+                let totalMoved = abs(accumulatedScrubAngle)
+                isDragging = false
+
+                if totalMoved > 14 {
+                    // DJ Scratch Scrub
+                    let secondsDelta = (accumulatedScrubAngle / 360.0) * 4.0
+                    onScratchSeek?(secondsDelta)
+                } else {
+                    // Tap to play/pause
+                    onTapToggle?()
+                }
+            }
+    }
+
+    private func angle(from center: CGPoint, to point: CGPoint) -> Double {
+        let dx = point.x - center.x
+        let dy = point.y - center.y
+        let rad = atan2(dy, dx)
+        var deg = rad * 180 / .pi
+        if deg < 0 { deg += 360 }
+        return deg
     }
 }
 

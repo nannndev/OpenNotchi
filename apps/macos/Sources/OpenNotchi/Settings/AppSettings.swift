@@ -1,5 +1,126 @@
 import Foundation
 import ServiceManagement
+import SwiftUI
+
+enum NotchAnimationStyle: String, CaseIterable, Identifiable {
+    case fluid = "fluid"         // Fluid & Natural (Default)
+    case bouncy = "bouncy"       // Bouncy Island (Playful spring)
+    case waterfall = "waterfall" // Waterfall Slide (Drops down)
+    case snappy = "snappy"       // Snappy Pro (Ultra fast)
+    case pop = "pop"             // Elastic Pop (Magnetic punch)
+    case gentle = "gentle"       // Gentle Float (Cinematic & soft)
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .fluid: return "Fluid Classic"
+        case .bouncy: return "Bouncy Island"
+        case .waterfall: return "Waterfall Drop"
+        case .snappy: return "Snappy Pro"
+        case .pop: return "Elastic Pop"
+        case .gentle: return "Gentle Float"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .fluid: return "Halus, natural & seimbang (standar macOS)"
+        case .bouncy: return "Elastis & membal seperti Dynamic Island"
+        case .waterfall: return "Meluncur turun dari balik kamera notch"
+        case .snappy: return "Sangat responsif tanpa jeda untuk produktivitas"
+        case .pop: return "Penuh energi dengan hentakan skala magnetik"
+        case .gentle: return "Gerakan mengambang lembut & sinematik"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .fluid: return "waveform.path"
+        case .bouncy: return "arrow.up.and.down.and.sparkles"
+        case .waterfall: return "arrow.down.to.line.compact"
+        case .snappy: return "bolt.fill"
+        case .pop: return "circle.circle.fill"
+        case .gentle: return "wind"
+        }
+    }
+
+    var springAnimation: Animation {
+        switch self {
+        case .fluid:
+            return .spring(response: 0.36, dampingFraction: 0.82)
+        case .bouncy:
+            return .spring(response: 0.46, dampingFraction: 0.52)
+        case .waterfall:
+            return .spring(response: 0.40, dampingFraction: 0.78)
+        case .snappy:
+            return .spring(response: 0.16, dampingFraction: 0.98)
+        case .pop:
+            return .spring(response: 0.50, dampingFraction: 0.46)
+        case .gentle:
+            return .spring(response: 0.68, dampingFraction: 0.88)
+        }
+    }
+
+    var contentTransition: AnyTransition {
+        switch self {
+        case .fluid:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top)),
+                removal: .opacity.combined(with: .scale(scale: 0.95, anchor: .top))
+            )
+        case .bouncy:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.76, anchor: .top)),
+                removal: .opacity.combined(with: .scale(scale: 0.88, anchor: .top))
+            )
+        case .waterfall:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .offset(y: -65)),
+                removal: .opacity.combined(with: .offset(y: -45))
+            )
+        case .snappy:
+            return .opacity
+        case .pop:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.58, anchor: .top)),
+                removal: .opacity.combined(with: .scale(scale: 0.80, anchor: .top))
+            )
+        case .gentle:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)),
+                removal: .opacity
+            )
+        }
+    }
+}
+
+enum PlayerArtworkStyle: String, CaseIterable, Identifiable {
+    case vinylDisc = "vinylDisc"               // Full spinning vinyl record
+    case vinylCoverCenter = "vinylCoverCenter" // Album cover framed in center of spinning vinyl
+    case vinylSleeve = "vinylSleeve"           // Classic vinyl sliding out of its jacket
+    case standard = "standard"                 // Modern square album art
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .vinylDisc: return "Vinyl Only (Turntable)"
+        case .vinylCoverCenter: return "Cover di Tengah Vinyl (Halo)"
+        case .vinylSleeve: return "Vinyl Sleeve (Slide-out)"
+        case .standard: return "Standard Cover (Kotak)"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .vinylDisc: return "opticaldisc"
+        case .vinylCoverCenter: return "record.circle.fill"
+        case .vinylSleeve: return "rectangle.stack.fill"
+        case .standard: return "square.fill"
+        }
+    }
+}
 
 /// User preferences, persisted in UserDefaults.
 final class AppSettings: ObservableObject {
@@ -37,10 +158,22 @@ final class AppSettings: ObservableObject {
     @Published var borderStyle: BorderStyle { didSet { defaults.set(borderStyle.rawValue, forKey: "borderStyle"); AppDelegate.shared?.previewNotch() } }
     @Published var borderWidth: Double { didSet { defaults.set(borderWidth, forKey: "borderWidth"); AppDelegate.shared?.previewNotch() } }
     @Published var cornerRadius: Double { didSet { defaults.set(cornerRadius, forKey: "cornerRadius"); AppDelegate.shared?.previewNotch() } }
+    @Published var openAnimation: NotchAnimationStyle {
+        didSet {
+            defaults.set(openAnimation.rawValue, forKey: "openAnimation")
+            AppDelegate.shared?.previewNotch()
+        }
+    }
     @Published var lyricsEnabled: Bool { didSet { defaults.set(lyricsEnabled, forKey: "lyricsEnabled") } }
     /// Home shows lyrics instead of the player (toggled from the artwork button).
     @Published var homeLyricsMode: Bool { didSet { defaults.set(homeLyricsMode, forKey: "homeLyricsMode") } }
     @Published var lyricsOnHome: Bool { didSet { defaults.set(lyricsOnHome, forKey: "lyricsOnHome") } }
+    @Published var artworkStyle: PlayerArtworkStyle {
+        didSet {
+            defaults.set(artworkStyle.rawValue, forKey: "artworkStyle")
+            vinylModeEnabled = (artworkStyle != .standard)
+        }
+    }
     @Published var vinylModeEnabled: Bool { didSet { defaults.set(vinylModeEnabled, forKey: "vinylModeEnabled") } }
     @Published var ambientAuraEnabled: Bool { didSet { defaults.set(ambientAuraEnabled, forKey: "ambientAuraEnabled") } }
     @Published var chargingPeekEnabled: Bool { didSet { defaults.set(chargingPeekEnabled, forKey: "chargingPeekEnabled") } }
@@ -151,9 +284,11 @@ final class AppSettings: ObservableObject {
             "borderStyle": BorderStyle.none.rawValue,
             "borderWidth": 1.5,
             "cornerRadius": 30.0,
+            "openAnimation": NotchAnimationStyle.fluid.rawValue,
             "lyricsEnabled": true,
             "lyricsOnHome": true,
             "homeLyricsMode": false,
+            "artworkStyle": PlayerArtworkStyle.vinylDisc.rawValue,
             "vinylModeEnabled": true,
             "ambientAuraEnabled": true,
             "theme": NotchTheme.defaultTheme.rawValue,
@@ -214,9 +349,15 @@ final class AppSettings: ObservableObject {
         borderStyle = BorderStyle(rawValue: defaults.string(forKey: "borderStyle") ?? "") ?? .none
         borderWidth = defaults.double(forKey: "borderWidth")
         cornerRadius = defaults.double(forKey: "cornerRadius")
+        openAnimation = NotchAnimationStyle(rawValue: defaults.string(forKey: "openAnimation") ?? "") ?? .fluid
         lyricsEnabled = defaults.bool(forKey: "lyricsEnabled")
         lyricsOnHome = defaults.bool(forKey: "lyricsOnHome")
         homeLyricsMode = defaults.bool(forKey: "homeLyricsMode")
+        if let rawStyle = defaults.string(forKey: "artworkStyle"), let style = PlayerArtworkStyle(rawValue: rawStyle) {
+            artworkStyle = style
+        } else {
+            artworkStyle = defaults.bool(forKey: "vinylModeEnabled") ? .vinylDisc : .standard
+        }
         vinylModeEnabled = defaults.bool(forKey: "vinylModeEnabled")
         ambientAuraEnabled = defaults.bool(forKey: "ambientAuraEnabled")
         theme = NotchTheme(rawValue: defaults.string(forKey: "theme") ?? "") ?? NotchTheme.defaultTheme
