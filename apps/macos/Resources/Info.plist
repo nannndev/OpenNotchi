@@ -15,9 +15,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.6.0</string>
+	<string>0.7.0</string>
 	<key>CFBundleVersion</key>
-	<string>6</string>
+	<string>7</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
@@ -32,14 +32,14 @@
 	<string>OpenNotchi shows today's upcoming events next to the music player.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>OpenNotchi shows a camera preview in the Mirror tab so you can check how you look.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>OpenNotchi manages audio input switching and microphone mute controls.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocationUsageDescription</key>
 	<string>OpenNotchi uses your location only when you choose "Use my location" for the weather.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>OpenNotchi uses your location only when you choose "Use my location" for the weather.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>OpenNotchi manages audio input switching and microphone mute controls.</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
