@@ -3,6 +3,7 @@ import SwiftUI
 
 enum NotchTab: String, CaseIterable {
     case home = "Home"
+    case smarthome = "Smarthome"
     case tray = "Tray"
     case prompter = "Prompter"
     case clipboard = "Clipboard"
@@ -14,6 +15,7 @@ enum NotchTab: String, CaseIterable {
     var icon: String {
         switch self {
         case .home: return "house.fill"
+        case .smarthome: return "air.conditioner.horizontal.fill"
         case .tray: return "tray.fill"
         case .prompter: return "text.viewfinder"
         case .clipboard: return "doc.on.clipboard.fill"
@@ -60,6 +62,8 @@ final class NotchViewModel: ObservableObject {
             height = min(max(settings.prompterHeight, 240), Self.maxOpenHeight)
         } else if tab == .dev {
             height = 230
+        } else if tab == .smarthome {
+            height = 240
         } else {
             height = Self.defaultOpenHeight
         }
@@ -78,6 +82,8 @@ final class NotchViewModel: ObservableObject {
     private var isHovering = false
     private var pending: DispatchWorkItem?
 
+    var onOpen: (() -> Void)?
+
     init(settings: AppSettings) {
         self.settings = settings
     }
@@ -87,7 +93,7 @@ final class NotchViewModel: ObservableObject {
             notchSize = size
             hasPhysicalNotch = true
         } else {
-            notchSize = CGSize(width: 190, height: screen.menuBarHeight)
+            notchSize = CGSize(width: 190, height: 32)
             hasPhysicalNotch = false
         }
     }
@@ -131,6 +137,7 @@ final class NotchViewModel: ObservableObject {
         guard !isOpen else { return }
         isOpen = true
         peek = nil
+        onOpen?()
         if settings.hapticsEnabled {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }

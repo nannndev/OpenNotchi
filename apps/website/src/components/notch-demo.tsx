@@ -3,17 +3,23 @@ import {
   Calendar,
   Check,
   Copy,
+  Fan,
   Gauge,
   Heart,
+  Lightbulb,
   MessageSquareQuote,
+  Minus,
   Pause,
   Pipette,
   Play,
+  Plus,
   Repeat,
   Shuffle,
   SkipBack,
   SkipForward,
   SlidersHorizontal,
+  Snowflake,
+  Sparkles,
   Terminal,
   Video,
   Volume2,
@@ -32,7 +38,7 @@ const LINES = [
   "Turn it up for the long way home",
 ]
 const DURATION = 204
-const TABS = ["Home", "Prompter", "Dev", "Timer"] as const
+const TABS = ["Home", "Smarthome", "Prompter", "Dev", "Timer"] as const
 type Tab = (typeof TABS)[number]
 
 const spring = { type: "spring", stiffness: 260, damping: 28 } as const
@@ -78,7 +84,13 @@ export function NotchDemo() {
   const [prompterSpeed, setPrompterSpeed] = useState<number>(1)
   const [prompterPlaying, setPrompterPlaying] = useState<boolean>(true)
   const [prompterMirrored, setPrompterMirrored] = useState<boolean>(false)
-  const prompterText = "Good morning team. Today I'm excited to showcase OpenNotchi v0.7.0. By positioning this teleprompter right under your Mac camera, you maintain 100% natural eye contact during video calls and keynotes without looking away."
+  const prompterText = "Good morning team. Today I'm excited to showcase OpenNotchi v0.8.0. By positioning this teleprompter right under your Mac camera, you maintain 100% natural eye contact during video calls and keynotes without looking away."
+
+  // Smarthome State
+  const [acTemp, setAcTemp] = useState(24)
+  const [acMode, setAcMode] = useState<"cool" | "eco" | "off">("cool")
+  const [lightOn, setLightOn] = useState(true)
+  const [lightBrightness, setLightBrightness] = useState(85)
 
 
   const closeTimer = useRef<number | undefined>(undefined)
@@ -128,6 +140,20 @@ export function NotchDemo() {
     window.setTimeout(() => setPeekToast(null), 2500)
   }
 
+  const adjustTemp = (delta: number) => {
+    const next = Math.max(16, Math.min(30, acTemp + delta))
+    setAcTemp(next)
+    triggerPeek(`AC: ${next}°C · ${acMode.toUpperCase()}`)
+  }
+
+  const toggleLight = () => {
+    setLightOn((prev) => {
+      const next = !prev
+      triggerPeek(next ? `Lamps ON (${lightBrightness}%)` : "Lamps OFF")
+      return next
+    })
+  }
+
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center" aria-hidden>
       <motion.div
@@ -153,6 +179,24 @@ export function NotchDemo() {
           <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden opacity-40">
             <div className="absolute -left-12 -top-6 size-48 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 blur-3xl animate-pulse" />
             <div className="absolute -right-10 bottom-0 size-48 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-600 blur-3xl" />
+          </div>
+        )}
+
+        {/* Ambient Smarthome Aura Glow */}
+        {open && tab === "Smarthome" && (
+          <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden opacity-35">
+            <div
+              className={cn(
+                "absolute -left-10 -top-10 size-48 rounded-full blur-3xl transition-colors duration-500",
+                acMode === "cool" ? "bg-cyan-500" : acMode === "eco" ? "bg-emerald-500" : "bg-neutral-600",
+              )}
+            />
+            <div
+              className={cn(
+                "absolute -right-10 bottom-0 size-48 rounded-full blur-3xl transition-colors duration-500",
+                lightOn ? "bg-amber-400 opacity-60" : "bg-neutral-800 opacity-20",
+              )}
+            />
           </div>
         )}
 
@@ -576,8 +620,8 @@ export function NotchDemo() {
                                   OCTOBER
                                 </div>
                                 <div className="py-1 flex flex-col items-center">
-                                  <span className="font-display text-2xl font-black leading-none text-white tracking-tight">13</span>
-                                  <span className="text-[7px] font-semibold text-neutral-400 uppercase tracking-wider">Tuesday</span>
+                                  <span className="font-display text-2xl font-black leading-none text-white tracking-tight">14</span>
+                                  <span className="text-[7px] font-semibold text-neutral-400 uppercase tracking-wider">Wednesday</span>
                                 </div>
                               </div>
                             </div>
@@ -586,6 +630,145 @@ export function NotchDemo() {
                       </>
                     )}
                   </>
+                )}
+
+                {/* Smarthome Showcase Tab */}
+                {tab === "Smarthome" && (
+                  <div className="flex w-full items-center justify-between gap-3 text-xs h-full py-0.5">
+                    {/* AC Thermostat Card */}
+                    <div className="flex flex-1 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-2.5 h-[98px]">
+                      <div className="flex flex-col items-center justify-center shrink-0">
+                        <div className="flex items-center gap-1 text-neutral-400 text-[9px] uppercase font-bold tracking-wider mb-0.5">
+                          <Snowflake className={cn("size-3", acMode === "cool" ? "text-cyan-400" : "text-neutral-500")} />
+                          AC Climate
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => adjustTemp(-1)}
+                            className="size-6 rounded-md bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center font-bold text-white transition"
+                          >
+                            <Minus className="size-3" />
+                          </button>
+                          <div className="flex flex-col items-center px-0.5">
+                            <span className="font-display text-2xl font-black text-white leading-none">
+                              {acTemp}°C
+                            </span>
+                            <span className="text-[9px] text-cyan-300 font-medium">Target</span>
+                          </div>
+                          <button
+                            onClick={() => adjustTemp(1)}
+                            className="size-6 rounded-md bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center font-bold text-white transition"
+                          >
+                            <Plus className="size-3" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="h-12 w-px bg-white/10 shrink-0" />
+
+                      {/* Modes & Fan */}
+                      <div className="flex flex-col justify-between h-full flex-1 py-0.5">
+                        <div className="flex items-center gap-1">
+                          {(["cool", "eco", "off"] as const).map((m) => (
+                            <button
+                              key={m}
+                              onClick={() => {
+                                setAcMode(m)
+                                triggerPeek(`AC mode: ${m.toUpperCase()}`)
+                              }}
+                              className={cn(
+                                "flex-1 py-1 rounded text-[9px] font-bold uppercase transition",
+                                acMode === m
+                                  ? m === "cool"
+                                    ? "bg-cyan-500/30 text-cyan-300 border border-cyan-400/30"
+                                    : m === "eco"
+                                    ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/30"
+                                    : "bg-white/20 text-white"
+                                  : "bg-white/5 text-neutral-400 hover:text-white"
+                              )}
+                            >
+                              {m}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between text-[9px] text-neutral-400 px-0.5">
+                          <span className="flex items-center gap-1"><Fan className="size-2.5 text-cyan-300" /> Auto High</span>
+                          <span className="text-neutral-500">22.8°C Room</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lighting & Scenes Card */}
+                    <div className="flex flex-1 items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-2.5 h-[98px]">
+                      {/* Smart Bulb Toggle & Slider */}
+                      <div className="flex flex-col justify-between h-full flex-1 py-0.5">
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={toggleLight}
+                            className={cn(
+                              "flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition font-semibold text-[10px]",
+                              lightOn
+                                ? "bg-amber-400/25 text-amber-200 border border-amber-400/40 shadow-[0_0_10px_rgba(251,191,36,0.2)]"
+                                : "bg-white/10 text-neutral-400 hover:text-white"
+                            )}
+                          >
+                            <Lightbulb className={cn("size-3", lightOn && "fill-amber-300 text-amber-300")} />
+                            <span>Desk Lamp</span>
+                          </button>
+                          <span className="font-mono text-[10px] text-neutral-300 font-bold">{lightOn ? `${lightBrightness}%` : "OFF"}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="10"
+                          max="100"
+                          disabled={!lightOn}
+                          value={lightBrightness}
+                          onChange={(e) => {
+                            const val = Number(e.target.value)
+                            setLightBrightness(val)
+                          }}
+                          onMouseUp={() => triggerPeek(`Lamp: ${lightBrightness}%`)}
+                          className={cn(
+                            "h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/20 accent-amber-400 transition-opacity",
+                            !lightOn && "opacity-30 cursor-not-allowed"
+                          )}
+                        />
+                      </div>
+
+                      <div className="h-12 w-px bg-white/10 shrink-0" />
+
+                      {/* Quick Scenes */}
+                      <div className="flex flex-col justify-between h-full shrink-0">
+                        <span className="text-[8px] uppercase font-bold text-neutral-500 tracking-wider">Scene</span>
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => {
+                              setAcTemp(22)
+                              setAcMode("cool")
+                              setLightOn(true)
+                              setLightBrightness(100)
+                              triggerPeek("Scene: Focus Work (22°C, 100%)")
+                            }}
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[9px] text-neutral-200 hover:text-white transition font-medium"
+                          >
+                            <Sparkles className="size-2 text-cyan-300" /> Focus
+                          </button>
+                          <button
+                            onClick={() => {
+                              setAcTemp(25)
+                              setAcMode("eco")
+                              setLightOn(true)
+                              setLightBrightness(30)
+                              triggerPeek("Scene: Movie Night (25°C, 30%)")
+                            }}
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[9px] text-neutral-200 hover:text-white transition font-medium"
+                          >
+                            <Sparkles className="size-2 text-amber-300" /> Movie
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* Teleprompter Showcase Tab */}

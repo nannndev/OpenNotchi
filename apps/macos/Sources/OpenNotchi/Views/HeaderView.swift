@@ -58,6 +58,7 @@ struct HeaderView: View {
                     Divider()
                 }
                 Menu("Visible Tabs") {
+                    Toggle("Smarthome", isOn: $settings.smarthomeEnabled)
                     Toggle("Prompter", isOn: $settings.prompterTabEnabled)
                     Toggle("Clipboard", isOn: $settings.clipboardEnabled)
                     Toggle("Timer", isOn: $settings.timerTabEnabled)

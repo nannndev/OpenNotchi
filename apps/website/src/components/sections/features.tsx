@@ -1,11 +1,15 @@
 import { motion } from "motion/react"
 import {
-  CalendarClock, Camera, CandlestickChart, Clipboard, CloudSun, Disc3, Headphones, Inbox, MessageSquareQuote, MoonStar,
-  Palette, ScrollText, ShieldCheck, Smartphone, Terminal, Timer, type LucideIcon,
+  Boxes, CalendarClock, Camera, CandlestickChart, Clipboard, CloudSun, Disc3, Headphones, Home, Inbox,
+  MessageSquareQuote, Monitor, MoonStar, Palette, ScrollText, ShieldCheck, Sliders, Smartphone, Terminal,
+  Timer, type LucideIcon,
 } from "lucide-react"
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   { icon: Disc3, title: "Now playing", body: "Spotify, Apple Music and YouTube on a vinyl you can scratch, with VU meters and a spectrum." },
+  { icon: Home, title: "Smart home & AC", body: "Control AC temperature, lighting dimmers, and smart plugs via Home Assistant and Shortcuts." },
+  { icon: Boxes, title: "3D spatial animations", body: "3D Trapdoor Flip, Holographic Depth, and Cube Roll swinging down with top-hinged physics." },
+  { icon: Monitor, title: "Multi-display island", body: "Follows your active screen or floats as an island pill on external monitors." },
   { icon: MessageSquareQuote, title: "Synced lyrics", body: "Lines light up as they're sung. Click one to jump there." },
   { icon: ScrollText, title: "Teleprompter", body: "Your notes scroll right under the camera, so you keep eye contact on calls." },
   { icon: Camera, title: "Photobox", body: "Strips in 18 frames, sized for a story or post, decorated with stickers and stamps." },
@@ -18,8 +22,9 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   { icon: Headphones, title: "Live activities", body: "AirPods battery, charging, and a volume and brightness HUD beside the notch." },
   { icon: CloudSun, title: "Weather and calendar", body: "Today's weather and your next events, one hover away." },
   { icon: Timer, title: "Focus timer", body: "Pomodoro countdowns that stay beside the notch while you work." },
+  { icon: Sliders, title: "Hi-Fi audio decks", body: "Dual ballistic analog VU needle meters and a 9-band digital graphic equalizer." },
   { icon: Smartphone, title: "Spotify on any device", body: "Playing on your phone or a speaker? See it and control it from your Mac." },
-  { icon: Palette, title: "Make it yours", body: "Themes that follow your music, six ways to open, your own shortcut." },
+  { icon: Palette, title: "Make it yours", body: "Themes that follow your music, nine open animations, your own shortcut." },
   { icon: ShieldCheck, title: "Private by design", body: "No account, no tracking. Gestures and prayer times run on your Mac." },
 ]
 

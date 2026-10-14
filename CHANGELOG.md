@@ -4,7 +4,26 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.8.0] - 2026-10-14
+
+### Added
+- **3D Spatial Show/Hide Animations**: Authentic 3D perspective animations for opening and closing OpenNotchi, anchoring directly to the top camera bezel with physical spring physics and top edge specular highlight sheen:
+  - **📦 3D Trapdoor Flip (`flip3D`)**: The entire notch swings downward from the top camera bezel on a 3D hinge axis (`-88°` to `0°` rotation) with wide-angle perspective (`0.55`), realistic mechanical momentum, top specular bevel highlight, and flipping contents.
+  - **🔮 3D Holographic Depth (`depth3D`)**: Spatial z-space projection combining `-55°` tilt, deep z-depth scale (`0.38` to `1.0`), and floating spring dampening, materializing like a floating glass HUD.
+  - **🎲 3D Cube Roll (`cube3D`)**: High-angle geometric cube roll (`-95°` to `0°`) rotating down like a facet of a 3D spatial cube on compound diagonal axes.
+  - Selectable directly in **Settings > Appearance > Open Animation** with live preview buttons, and in the Notch Header quick menu (three-dot button).
+- **Smarthome & Climate/Lighting Hub**: Advanced smart device control center directly within the notch with three dedicated operational decks:
+  - **❄️ AC & Climate Control Deck**: Interactive thermostat dial with +/- steppers, current vs target room temperature indicator, 1-tap mode switcher (Cool, Eco, Dry, Fan, Off), fan speed presets, and mode-adaptive ambient aura lighting.
+  - **💡 Smart Lighting Studio**: Glowing bulb toggles with warm ambient bloom, custom fluid brightness sliders (0–100%), and warmth presets.
+  - **🔌 Smart Switches & Plugs**: 1-click toggles for fans, coffee makers, and monitors with live wattage power monitor.
+  - **🎬 Instant Quick Scenes**: 1-tap presets for "Focus Work", "Movie Night", "Sleep", and "All Off".
+  - **Dynamic Island Heads-Up Peek**: Instant drop-down pill feedback whenever AC temperature or lamps are adjusted.
+  - **Home Assistant REST API & Apple Shortcuts**: Connect to local Home Assistant servers via Bearer token with auto-discovery, Apple Shortcuts execution, and built-in interactive offline simulation mode.
+- **Multi-Display & External Monitor Support**: Seamlessly displays OpenNotchi across multi-monitor setups with 3 selectable display targets in Settings:
+  - **Built-in Screen Only**: Pinned strictly to the physical MacBook camera notch (or primary display).
+  - **Follow Active Screen**: Automatically moves to whichever display your mouse cursor is on.
+  - **All Connected Screens**: Spawns on every monitor simultaneously, showing full live activities on all screens with single-notch expand coordination.
+- **Floating Dynamic Island Pill**: On external monitors or Macs without a physical notch, OpenNotchi renders as an elegant floating Dynamic Island capsule pill with smooth 360° rounded corners, subtle dark glass border, ambient drop shadow, and a top-edge bumper hover trigger.
 
 ## [0.7.0] - 2026-10-13
 
@@ -136,7 +155,12 @@ First public release.
 - Global shortcut ⌥⌘N, launch at login, sidebar Settings window
 - Monochrome brand: app icon, logo, wordmark and menu bar icon
 
-[Unreleased]: https://github.com/nannndev/OpenNotchi/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/nannndev/OpenNotchi/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/nannndev/OpenNotchi/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/nannndev/OpenNotchi/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/nannndev/OpenNotchi/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/nannndev/OpenNotchi/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/nannndev/OpenNotchi/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/nannndev/OpenNotchi/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/nannndev/OpenNotchi/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nannndev/OpenNotchi/releases/tag/v0.1.0

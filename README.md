@@ -12,7 +12,10 @@ alternative to paid apps like NotchNook and Alcove.
 ## Features
 
 - **Notch that expands on hover**, matching the physical camera housing (falls
-  back to a pill on displays without a notch)
+  back to an elegant floating Dynamic Island pill on external displays without a notch)
+- **Multi-Display & Multi-Monitor**: 3 selectable display targets in Settings: Built-in notch only, Follow active cursor screen, or All connected screens simultaneously
+- **3D Spatial Animations**: Authentic 3D perspective show/hide open animations (3D Trapdoor Flip, 3D Holographic Depth, and 3D Cube Roll) with top-hinge anchor physics and bevel specular highlights
+- **Smarthome & AC / Lamp Hub**: 1-click climate control (thermostat dial, 16–30°C, Cool/Eco/Dry/Fan/Off modes, fan speed), ambient lighting studio with dimming sliders, smart plug power meters, and 1-tap scenes (Focus, Movie, Sleep, All Off) via Home Assistant API or Apple Shortcuts
 - **Now Playing with Spinning Vinyl Deck**: Interactive album jacket where a grooved vinyl record slides out and rotates continuously during playback, with an ambient color aura backdrop matching the album art palette
 - **Complete Transport & Audio Controls**: Integrated system volume slider with 1-click mute/unmute, shuffle, repeat, and favorite heart buttons
 - **Interactive Karaoke Lyrics**: Synced lyrics with depth blur, hover play cues, and 1-click seeking by tapping any lyric line
@@ -122,7 +125,7 @@ and add it to `MediaManager.providers`.
 
 ## Roadmap
 
-- [ ] Multi-display support
+- [x] Multi-display support (Built-in only, Active screen cursor follow, All screens with floating Dynamic Island)
 - [ ] Signed & notarized releases, Homebrew cask
 
 ## Releases & versioning

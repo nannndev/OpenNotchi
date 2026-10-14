@@ -30,13 +30,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKey: HotKey?
     private var cancellables: Set<AnyCancellable> = []
 
-    private var notchController: NotchWindowController?
+    private(set) var screenManager: NotchScreenManager!
     private var statusItem: NSStatusItem?
     private var toggleMenuItem: NSMenuItem?
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        notchController = NotchWindowController(
+        screenManager = NotchScreenManager(
             media: media,
             tray: tray,
             battery: battery,
@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func screensChanged() {
-        notchController?.reposition()
+        screenManager.reposition()
     }
 
     // MARK: - Shortcut
@@ -72,7 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Registers the user's toggle shortcut (⌥⌘N by default).
     func updateHotKey() {
         hotKey = settings.hotKeyEnabled
-            ? HotKey(keyCode: settings.hotKeyCode, modifiers: settings.hotKeyModifiers) { [weak self] in self?.notchController?.toggle() }
+            ? HotKey(keyCode: settings.hotKeyCode, modifiers: settings.hotKeyModifiers) { [weak self] in self?.screenManager.toggle() }
             : nil
         toggleMenuItem?.title = settings.hotKeyEnabled ? "Toggle Notch  \(settings.hotKeyDisplay)" : "Toggle Notch"
     }
@@ -92,20 +92,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .filter { $0 }
             .sink { [weak self] _ in
                 guard let self, self.settings.chargingPeekEnabled else { return }
-                self.notchController?.showPeek(.charging(level: self.battery.level))
+                self.screenManager.showPeek(.charging(level: self.battery.level))
             }
             .store(in: &cancellables)
 
         bluetooth.onConnect = { [weak self] name, symbol, battery, info in
-            self?.notchController?.showPeek(.device(name: name, symbol: symbol, battery: battery, info: info))
+            self?.screenManager.showPeek(.device(name: name, symbol: symbol, battery: battery, info: info))
         }
 
         reminders.onBanner = { [weak self] banner in
-            self?.notchController?.showPeek(.banner(banner))
+            self?.screenManager.showPeek(.banner(banner))
         }
 
         updater.onUpdateBanner = { [weak self] banner in
-            self?.notchController?.showPeek(.banner(banner))
+            self?.screenManager.showPeek(.banner(banner))
         }
 
         mediaKeys.handler = { [weak self] key in
@@ -141,15 +141,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             volume = (volume + (key == .volumeUp ? step : -step)).clamped(to: 0...1)
             SystemAudio.volume = volume
             if SystemAudio.isMuted && key == .volumeUp { SystemAudio.isMuted = false }
-            notchController?.showPeek(.volume(level: volume, muted: SystemAudio.isMuted))
+            screenManager.showPeek(.volume(level: volume, muted: SystemAudio.isMuted))
         case .mute:
             SystemAudio.isMuted.toggle()
-            notchController?.showPeek(.volume(level: SystemAudio.volume ?? 0, muted: SystemAudio.isMuted))
+            screenManager.showPeek(.volume(level: SystemAudio.volume ?? 0, muted: SystemAudio.isMuted))
         case .brightnessUp, .brightnessDown:
             guard var level = DisplayBrightness.level else { return false }
             level = (level + (key == .brightnessUp ? step : -step)).clamped(to: 0...1)
             DisplayBrightness.level = level
-            notchController?.showPeek(.brightness(level: level))
+            screenManager.showPeek(.brightness(level: level))
         }
         return true
     }
@@ -207,11 +207,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Opens the notch so theme and animation changes in Settings are visible right away.
     func previewNotch() {
-        notchController?.previewAnimation()
+        screenManager.previewAnimation()
     }
 
     @objc private func toggleNotch() {
-        notchController?.toggle()
+        screenManager.toggle()
     }
 
     @objc private func checkForUpdates() {

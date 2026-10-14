@@ -48,4 +48,18 @@ extension NSScreen {
     static var preferredNotchScreen: NSScreen? {
         screens.first(where: { $0.notchSize != nil }) ?? main
     }
+
+    /// The display currently containing the mouse cursor.
+    static var screenWithCursor: NSScreen? {
+        let mouseLoc = NSEvent.mouseLocation
+        return screens.first { NSMouseInRect(mouseLoc, $0.frame, false) } ?? main
+    }
+
+    /// Hardware display ID (CGDirectDisplayID) to uniquely identify this monitor.
+    var displayID: CGDirectDisplayID? {
+        guard let id = deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+            return nil
+        }
+        return CGDirectDisplayID(id.uint32Value)
+    }
 }
