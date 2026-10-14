@@ -6,6 +6,10 @@ export const LATEST_ZIP_URL = `${REPO_URL}/releases/latest/download/OpenNotchi.z
 export const CHANGELOG_URL = `${REPO_URL}/blob/main/CHANGELOG.md`
 export const SITE_URL = "https://opennotchi.vercel.app"
 
+/** The person behind OpenNotchi. The display name and avatar come live from their GitHub profile. */
+export const DEVELOPER_LOGIN = "nannndev"
+export const DEVELOPER_URL = `https://github.com/${DEVELOPER_LOGIN}`
+
 export type SupportLink = {
   name: string
   url: string

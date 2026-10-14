@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react"
-import { REPO } from "@/lib/site"
+import { DEVELOPER_LOGIN, REPO } from "@/lib/site"
 
-const API = `https://api.github.com/repos/${REPO}`
+const API = "https://api.github.com"
 
 export type ReleaseAsset = { name: string; size: number; download_count: number; browser_download_url: string }
 export type Release = { tag_name: string; published_at: string; html_url: string; assets: ReleaseAsset[] }
 export type Repo = { stargazers_count: number; forks_count: number }
+export type User = { login: string; name: string | null; avatar_url: string; html_url: string; bio: string | null; followers: number }
 export type Contributor = { login: string; avatar_url: string; html_url: string; contributions: number; type: string }
 
-/** Fetches a GitHub API path, cached in sessionStorage to stay under the rate limit. */
+/** Fetches a GitHub API path (relative to api.github.com), cached in sessionStorage to stay under the rate limit. */
 function useGitHub<T>(path: string, maxAgeMinutes: number) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState(false)
@@ -46,9 +47,10 @@ function useGitHub<T>(path: string, maxAgeMinutes: number) {
   return { data, error, loading: !data && !error }
 }
 
-export const useLatestRelease = () => useGitHub<Release>("/releases/latest", 10)
-export const useRepo = () => useGitHub<Repo>("", 10)
-export const useReleases = () => useGitHub<Release[]>("/releases?per_page=100", 10)
+export const useLatestRelease = () => useGitHub<Release>(`/repos/${REPO}/releases/latest`, 10)
+export const useRepo = () => useGitHub<Repo>(`/repos/${REPO}`, 10)
+export const useReleases = () => useGitHub<Release[]>(`/repos/${REPO}/releases?per_page=100`, 10)
+export const useDeveloper = () => useGitHub<User>(`/users/${DEVELOPER_LOGIN}`, 60)
 
 /** Total .dmg and .zip downloads across every release (null while loading). */
 export function useDownloadCount() {
@@ -64,7 +66,7 @@ export function formatCount(n: number) {
   return new Intl.NumberFormat("en", { notation: n >= 10_000 ? "compact" : "standard" }).format(n)
 }
 
-export const useContributors = () => useGitHub<Contributor[]>("/contributors?per_page=100", 30)
+export const useContributors = () => useGitHub<Contributor[]>(`/repos/${REPO}/contributors?per_page=100`, 30)
 
 export function formatSize(bytes: number) {
   return bytes > 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.round(bytes / 1e3)} KB`

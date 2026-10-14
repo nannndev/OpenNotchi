@@ -1,3 +1,4 @@
+import { DeveloperBadge } from "@/components/developer-badge"
 import { AppleIcon, GitHubIcon } from "@/components/icons"
 import { MacBookPreview } from "@/components/macbook-preview"
 import { formatCount, useDownloadCount, useLatestRelease } from "@/hooks/use-github"
@@ -66,6 +67,9 @@ export function Hero() {
         <HeroCopy />
       </div>
       <MacBookPreview wallpaper={<HeroCopy onScreen />} />
+      <div className="mt-8 flex justify-center">
+        <DeveloperBadge label="Crafted by" />
+      </div>
     </section>
   )
 }
