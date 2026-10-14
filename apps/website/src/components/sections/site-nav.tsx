@@ -39,24 +39,10 @@ export function SiteNav() {
       )}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-8">
-        <div className="flex min-w-0 items-center gap-3">
-          <a href="#top" className="flex shrink-0 items-center gap-2.5" onClick={() => setOpen(false)}>
-            <img src="/favicon.svg" alt="" className="size-7 invert" />
-            <Wordmark className="font-display text-lg font-extrabold" />
-          </a>
-          <a
-            href={DEVELOPER_URL}
-            target="_blank"
-            rel="noopener"
-            title={`Built by ${devName} (@${DEVELOPER_LOGIN})`}
-            className="hidden min-w-0 items-center gap-1.5 rounded-full border border-white/10 py-0.5 pr-2.5 pl-0.5 text-xs text-neutral-400 transition hover:border-white/25 hover:text-white sm:inline-flex"
-          >
-            <img src={`https://github.com/${DEVELOPER_LOGIN}.png?size=48`} alt="" className="size-5 rounded-full bg-white/10" />
-            <span className="truncate">
-              by <span className="font-medium text-neutral-200">{devName}</span>
-            </span>
-          </a>
-        </div>
+        <a href="#top" className="flex shrink-0 items-center gap-2.5" onClick={() => setOpen(false)}>
+          <img src="/favicon.svg" alt="" className="size-7 invert" />
+          <Wordmark className="font-display text-lg font-extrabold" />
+        </a>
 
         <nav className="flex items-center gap-1 sm:gap-2">
           {LINKS.map(([label, href]) => (
