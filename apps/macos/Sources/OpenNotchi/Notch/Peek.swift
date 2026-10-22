@@ -23,6 +23,8 @@ enum Peek: Equatable {
     case volume(level: Float, muted: Bool)
     case brightness(level: Float)
     case micMute(muted: Bool)
+    /// Some app just started using the camera and/or microphone.
+    case privacy(camera: Bool, mic: Bool)
     /// A reminder that grows below the notch, with an optional action button.
     case banner(Banner)
 
@@ -32,6 +34,7 @@ enum Peek: Equatable {
         case .charging: return 3.2
         case .device: return 3.8
         case .volume, .brightness, .micMute: return 1.8
+        case .privacy: return 3
         case .banner: return 12
         }
     }
@@ -39,7 +42,7 @@ enum Peek: Equatable {
     /// HUD peeks show a fluid level bar and need a wider pill.
     var isHUD: Bool {
         switch self {
-        case .volume, .brightness, .micMute, .charging: return true
+        case .volume, .brightness, .micMute, .charging, .privacy: return true
         default: return false
         }
     }

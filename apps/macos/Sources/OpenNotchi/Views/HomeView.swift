@@ -192,17 +192,17 @@ private struct PlayerView: View {
             }
 
             HStack(spacing: 8) {
-                Button {
+                PlayerChip(icon: "heart", isOn: info.isLoved ?? false, onColor: .pink,
+                           help: (info.isLoved ?? false) ? "Favorited" : "Favorite") {
                     media.toggleLove()
-                } label: {
-                    Image(systemName: (info.isLoved ?? false) ? "heart.fill" : "heart")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle((info.isLoved ?? false) ? .pink : .secondary)
-                        .frame(width: 22, height: 22)
-                        .background(Circle().fill(.white.opacity(0.06)))
                 }
-                .buttonStyle(.plain)
-                .help((info.isLoved ?? false) ? "Favorited" : "Favorite")
+
+                if settings.lyricsEnabled && info.videoID == nil {
+                    PlayerChip(icon: "pip", isOn: settings.lyricsOverlayEnabled,
+                               help: settings.lyricsOverlayEnabled ? "Hide desktop lyrics" : "Show desktop lyrics") {
+                        settings.lyricsOverlayEnabled.toggle()
+                    }
+                }
 
                 Spacer()
 

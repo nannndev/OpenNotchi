@@ -1,5 +1,7 @@
 import Combine
 import Foundation
+import NaturalLanguage
+import Translation
 
 struct LyricLine: Identifiable, Equatable {
     let id: Int
@@ -17,6 +19,11 @@ final class LyricsManager: ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var lines: [LyricLine] = []
     @Published private(set) var plainText: String?
+    /// Translated lyrics keyed by the original line text.
+    @Published private(set) var translations: [String: String] = [:]
+    /// Why lyrics aren't translated (missing language pack, old macOS), shown in Settings.
+    @Published private(set) var translationIssue: String?
+    private var translateTask: Task<Void, Never>?
 
     private let settings: AppSettings
     private var trackKey: String?
@@ -84,8 +91,14 @@ final class LyricsManager: ObservableObject {
 
     /// Retries a lookup that failed because of the network (not a real "no lyrics").
     func retryIfNeeded() {
+        retryTranslationIfNeeded()
         guard state == .notFound, cache[trackKey ?? ""] == nil, let lastInfo, lastInfo.trackKey == trackKey else { return }
         load(lastInfo)
+    }
+
+    /// Tries again after a failed translation, e.g. once the user has downloaded the language pack.
+    func retryTranslationIfNeeded() {
+        if translationIssue != nil { translateIfNeeded() }
     }
 
     private func apply(_ state: State, _ lines: [LyricLine], _ plain: String?, key: String?) {
@@ -94,6 +107,84 @@ final class LyricsManager: ObservableObject {
         self.plainText = plain
         let transientFailure = state == .notFound && lastRequestFailed
         if let key, state != .loading, !transientFailure { cache[key] = (state, lines, plain) }
+        translateIfNeeded()
+    }
+
+    // MARK: - Translation
+
+    /// Translates the current lyrics on-device into the language chosen in Settings.
+    func translateIfNeeded() {
+        translateTask?.cancel()
+        translations = [:]
+        translationIssue = nil
+        guard settings.lyricsTranslate else { return }
+
+        let source = state == .synced ? lines.map(\.text) : (plainText ?? "").components(separatedBy: .newlines)
+        let texts = Array(Set(source.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }))
+        guard !texts.isEmpty else { return }
+        guard #available(macOS 26, *) else {
+            translationIssue = "Translating lyrics needs macOS 26 or later."
+            return
+        }
+
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(texts.joined(separator: "\n"))
+        guard let detected = recognizer.dominantLanguage else { return }
+        let from = Locale.Language(identifier: detected.rawValue)
+        let to = Locale.Language(identifier: settings.lyricsTranslateTarget)
+        guard from.languageCode != to.languageCode else {
+            let name = Locale.current.localizedString(forLanguageCode: detected.rawValue) ?? detected.rawValue
+            translationIssue = "This song is already in \(name). Pick another language to translate into."
+            return
+        }
+
+        let key = trackKey
+        translateTask = Task { @MainActor [weak self] in
+            // Language packs can finish downloading while a song plays: keep checking until they're ready.
+            defer {
+                if !Task.isCancelled, self?.translationIssue != nil, self?.trackKey == key {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+                        if self?.trackKey == key { self?.retryTranslationIfNeeded() }
+                    }
+                }
+            }
+            do {
+                let result = try await Self.translate(texts, from: from, to: to)
+                guard !Task.isCancelled, self?.trackKey == key else { return }
+                self?.translations = result
+            } catch let issue as TranslationIssue {
+                self?.translationIssue = issue.message
+            } catch {
+                if !Task.isCancelled { self?.translationIssue = "Couldn't translate these lyrics." }
+            }
+        }
+    }
+
+    private struct TranslationIssue: Error { let message: String }
+
+    @available(macOS 26, *)
+    private static func translate(_ texts: [String], from: Locale.Language, to: Locale.Language) async throws -> [String: String] {
+        // Translate first; the availability status can lag behind packs that are already usable.
+        do {
+            let session = TranslationSession(installedSource: from, target: to)
+            // Responses can come back reordered and with normalized text, so match them by index.
+            let requests = texts.enumerated().map { TranslationSession.Request(sourceText: $0.element, clientIdentifier: String($0.offset)) }
+            let responses = try await session.translations(from: requests)
+            return Dictionary(responses.compactMap { response in
+                response.clientIdentifier.flatMap(Int.init).map { (texts[$0], response.targetText) }
+            }, uniquingKeysWith: { first, _ in first })
+        } catch {
+            NSLog("OpenNotchi lyrics translation %@ → %@ failed: %@", from.maximalIdentifier, to.maximalIdentifier, String(describing: error))
+            let name = Locale.current.localizedString(forLanguageCode: from.languageCode?.identifier ?? "") ?? "this language"
+            switch await LanguageAvailability().status(from: from, to: to) {
+            case .supported:
+                throw TranslationIssue(message: "Download \(name) in System Settings › General › Language & Region › Translation Languages.")
+            case .unsupported:
+                throw TranslationIssue(message: "Translating from \(name) isn't supported.")
+            default:
+                throw error
+            }
+        }
     }
 
     // MARK: - Networking

@@ -381,6 +381,7 @@ private struct FeaturesPane: View {
                 Toggle("Timer", isOn: $settings.timerTabEnabled)
                 Toggle("Mirror (camera)", isOn: $settings.mirrorTabEnabled)
                 Toggle("Developer tools (ports, eyedropper, mic)", isOn: $settings.devToolsEnabled)
+                Toggle("Notes, keep awake & Shortcuts", isOn: $settings.notesTabEnabled)
             }
             Section("Home") {
                 Toggle("Lyrics (button on the artwork)", isOn: $settings.lyricsEnabled)
@@ -390,10 +391,30 @@ private struct FeaturesPane: View {
                 }
                 Toggle("Show the current lyric line under the title", isOn: $settings.lyricsOnHome)
                     .disabled(!settings.lyricsEnabled)
+                Toggle("Translate lyrics", isOn: $settings.lyricsTranslate)
+                    .disabled(!settings.lyricsEnabled)
+                if settings.lyricsTranslate {
+                    Picker("Translate into", selection: $settings.lyricsTranslateTarget) {
+                        ForEach(["id", "en", "ja", "ko", "zh-Hans", "es", "fr", "de", "ar", "pt", "it", "th", "vi"], id: \.self) { code in
+                            Text(Locale.current.localizedString(forIdentifier: code) ?? code).tag(code)
+                        }
+                    }
+                    TranslationIssueRow()
+                }
+                Toggle("Floating lyrics widget on the desktop", isOn: $settings.lyricsOverlayEnabled)
+                    .disabled(!settings.lyricsEnabled)
+                if settings.lyricsOverlayEnabled {
+                    Slider(value: $settings.lyricsOverlayOpacity, in: 0...1) { Text("Widget background") }
+                    Toggle("Show the next line", isOn: $settings.lyricsOverlayNextLine)
+                    Toggle("Lock widget (clicks pass through)", isOn: $settings.lyricsOverlayLocked)
+                    Button("Reset widget size and position") { AppDelegate.shared?.resetLyricsOverlay() }
+                }
             }
             Section("Live activities") {
                 Toggle("Charger connected", isOn: $settings.chargingPeekEnabled)
                 Toggle("AirPods and Bluetooth devices", isOn: $settings.devicePeekEnabled)
+                Toggle("Camera or microphone starts being used", isOn: $settings.privacyPeekEnabled)
+                Toggle("Download finished in ~/Downloads", isOn: $settings.downloadPeekEnabled)
                 Toggle("Network speed beside notch when active", isOn: $settings.networkLiveActivity)
                 Toggle("Show network traffic in header ticker", isOn: $settings.showStatsInHeader)
                 Toggle("Volume & brightness HUD in the notch", isOn: $settings.hudEnabled)
@@ -692,6 +713,26 @@ private struct SmarthomePane: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             isTesting = false
             testResult = smarthome.connectionStatus
+        }
+    }
+}
+
+/// Explains why lyrics aren't being translated, with a shortcut to the language downloads.
+private struct TranslationIssueRow: View {
+    @EnvironmentObject private var lyrics: LyricsManager
+
+    var body: some View {
+        if let issue = lyrics.translationIssue {
+            HStack {
+                Label(issue, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                Spacer()
+                Button("Open Settings") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!)
+                }
+                .controlSize(.small)
+            }
         }
     }
 }

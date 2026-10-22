@@ -455,6 +455,43 @@ final class AppSettings: ObservableObject {
     @Published var mirrorTabEnabled: Bool { didSet { defaults.set(mirrorTabEnabled, forKey: "mirrorTabEnabled") } }
     @Published var devToolsEnabled: Bool { didSet { defaults.set(devToolsEnabled, forKey: "devToolsEnabled") } }
     @Published var smarthomeEnabled: Bool { didSet { defaults.set(smarthomeEnabled, forKey: "smarthomeEnabled") } }
+    @Published var notesTabEnabled: Bool { didSet { defaults.set(notesTabEnabled, forKey: "notesTabEnabled") } }
+    @Published var notesText: String { didSet { defaults.set(notesText, forKey: "notesText") } }
+    @Published var lyricsOverlayEnabled: Bool {
+        didSet {
+            defaults.set(lyricsOverlayEnabled, forKey: "lyricsOverlayEnabled")
+            AppDelegate.shared?.updateLyricsOverlay()
+        }
+    }
+    /// Desktop lyrics widget: background opacity (0 = text only) and click-through lock.
+    @Published var lyricsOverlayOpacity: Double { didSet { defaults.set(lyricsOverlayOpacity, forKey: "lyricsOverlayOpacity") } }
+    @Published var lyricsOverlayLocked: Bool { didSet { defaults.set(lyricsOverlayLocked, forKey: "lyricsOverlayLocked") } }
+    @Published var lyricsOverlayNextLine: Bool { didSet { defaults.set(lyricsOverlayNextLine, forKey: "lyricsOverlayNextLine") } }
+    @Published var lyricsTranslate: Bool {
+        didSet {
+            defaults.set(lyricsTranslate, forKey: "lyricsTranslate")
+            AppDelegate.shared?.lyrics.translateIfNeeded()
+        }
+    }
+    /// Language code lyrics are translated into, e.g. "id".
+    @Published var lyricsTranslateTarget: String {
+        didSet {
+            defaults.set(lyricsTranslateTarget, forKey: "lyricsTranslateTarget")
+            AppDelegate.shared?.lyrics.translateIfNeeded()
+        }
+    }
+    @Published var privacyPeekEnabled: Bool {
+        didSet {
+            defaults.set(privacyPeekEnabled, forKey: "privacyPeekEnabled")
+            AppDelegate.shared?.updateSystemMonitors()
+        }
+    }
+    @Published var downloadPeekEnabled: Bool {
+        didSet {
+            defaults.set(downloadPeekEnabled, forKey: "downloadPeekEnabled")
+            AppDelegate.shared?.updateSystemMonitors()
+        }
+    }
     @Published var smarthomeProvider: SmarthomeProviderType { didSet { defaults.set(smarthomeProvider.rawValue, forKey: "smarthomeProvider") } }
     @Published var homeAssistantURL: String { didSet { defaults.set(homeAssistantURL, forKey: "homeAssistantURL") } }
     @Published var homeAssistantToken: String { didSet { defaults.set(homeAssistantToken, forKey: "homeAssistantToken") } }
@@ -554,6 +591,16 @@ final class AppSettings: ObservableObject {
             "timerTabEnabled": false,
             "mirrorTabEnabled": false,
             "devToolsEnabled": true,
+            "notesTabEnabled": true,
+            "notesText": "",
+            "lyricsOverlayEnabled": false,
+            "lyricsOverlayOpacity": 0.45,
+            "lyricsOverlayLocked": false,
+            "lyricsOverlayNextLine": true,
+            "lyricsTranslate": false,
+            "lyricsTranslateTarget": "id",
+            "privacyPeekEnabled": true,
+            "downloadPeekEnabled": true,
             "smarthomeEnabled": true,
             "smarthomeProvider": SmarthomeProviderType.demo.rawValue,
             "homeAssistantURL": "http://homeassistant.local:8123",
@@ -649,6 +696,16 @@ final class AppSettings: ObservableObject {
         timerTabEnabled = defaults.bool(forKey: "timerTabEnabled")
         mirrorTabEnabled = defaults.bool(forKey: "mirrorTabEnabled")
         devToolsEnabled = defaults.bool(forKey: "devToolsEnabled")
+        notesTabEnabled = defaults.bool(forKey: "notesTabEnabled")
+        notesText = defaults.string(forKey: "notesText") ?? ""
+        lyricsOverlayEnabled = defaults.bool(forKey: "lyricsOverlayEnabled")
+        lyricsOverlayOpacity = defaults.double(forKey: "lyricsOverlayOpacity")
+        lyricsOverlayLocked = defaults.bool(forKey: "lyricsOverlayLocked")
+        lyricsOverlayNextLine = defaults.bool(forKey: "lyricsOverlayNextLine")
+        lyricsTranslate = defaults.bool(forKey: "lyricsTranslate")
+        lyricsTranslateTarget = defaults.string(forKey: "lyricsTranslateTarget") ?? "id"
+        privacyPeekEnabled = defaults.bool(forKey: "privacyPeekEnabled")
+        downloadPeekEnabled = defaults.bool(forKey: "downloadPeekEnabled")
         smarthomeEnabled = defaults.object(forKey: "smarthomeEnabled") != nil ? defaults.bool(forKey: "smarthomeEnabled") : true
         smarthomeProvider = SmarthomeProviderType(rawValue: defaults.string(forKey: "smarthomeProvider") ?? "") ?? .demo
         homeAssistantURL = defaults.string(forKey: "homeAssistantURL") ?? "http://homeassistant.local:8123"
@@ -717,6 +774,7 @@ final class AppSettings: ObservableObject {
             case .mirror: return mirrorTabEnabled
             case .markets: return marketsEnabled
             case .dev: return devToolsEnabled
+            case .notes: return notesTabEnabled
             case .smarthome: return smarthomeEnabled
             }
         }

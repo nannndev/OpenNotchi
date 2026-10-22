@@ -3,6 +3,7 @@ import SwiftUI
 /// Lyrics for the current song, shown in the center of Home in lyrics mode.
 struct LyricsContent: View {
     @EnvironmentObject private var lyrics: LyricsManager
+    @EnvironmentObject private var settings: AppSettings
     let info: NowPlayingInfo
 
     var body: some View {
@@ -26,6 +27,28 @@ struct LyricsContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Own column beside the lyrics: never covers a line and stays clear of the notch's rounded corners.
+        .safeAreaInset(edge: .trailing, spacing: 6) {
+            if lyrics.state == .synced || lyrics.state == .plain {
+                VStack(spacing: 6) {
+                    PlayerChip(icon: "translate", isOn: settings.lyricsTranslate,
+                               help: lyrics.translationIssue ?? (settings.lyricsTranslate ? "Stop translating" : "Translate lyrics")) {
+                        settings.lyricsTranslate.toggle()
+                    }
+                    PlayerChip(icon: "pip", isOn: settings.lyricsOverlayEnabled,
+                               help: settings.lyricsOverlayEnabled ? "Hide desktop lyrics" : "Show desktop lyrics") {
+                        settings.lyricsOverlayEnabled.toggle()
+                    }
+                    PlayerChip(icon: "square.and.arrow.up", help: "Share lyrics as an image") {
+                        LyricsShare.open()
+                    }
+                }
+                .padding(3)
+                .background(Capsule().fill(.black.opacity(0.25)))
+                .overlay(Capsule().stroke(.white.opacity(0.08), lineWidth: 0.5))
+                .frame(maxHeight: .infinity)
+            }
+        }
         .onAppear { lyrics.retryIfNeeded() }
     }
 
@@ -105,8 +128,11 @@ private struct SyncedLyricsView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 12) {
                         ForEach(lyrics.lines) { line in
-                            LyricLineView(line: line, distance: current.map { abs(line.id - $0) } ?? 3, accent: accent)
+                            LyricLineView(line: line, translation: lyrics.translations[line.text], distance: current.map { abs(line.id - $0) } ?? 3, accent: accent)
                                 .onTapGesture { media.seek(to: line.time) }
+                                .contextMenu {
+                                    Button { LyricsShare.open(startAt: line.text) } label: { Label("Share This Line…", systemImage: "square.and.arrow.up") }
+                                }
                                 .id(line.id)
                         }
                     }
@@ -127,6 +153,7 @@ private struct SyncedLyricsView: View {
 
 private struct LyricLineView: View {
     let line: LyricLine
+    let translation: String?
     /// How many lines away from the one being sung.
     let distance: Int
     let accent: ResolvedAccent
@@ -152,11 +179,16 @@ private struct LyricLineView: View {
                     .foregroundStyle(accent.color)
                     .transition(.opacity)
             }
-            Text(line.text.isEmpty ? "♪" : line.text)
-                .font(.system(size: isCurrent ? 16 : 14.5, weight: isCurrent ? .bold : .medium, design: .rounded))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(isCurrent && !accent.isNeutral ? accent.color : (hovering ? .white : .white))
-                .shadow(color: isCurrent ? (accent.isNeutral ? Color.white.opacity(0.3) : accent.color.opacity(0.45)) : .clear, radius: 8)
+            VStack(spacing: 2) {
+                Text(line.text.isEmpty ? "♪" : line.text)
+                    .font(.system(size: isCurrent ? 16 : 14.5, weight: isCurrent ? .bold : .medium, design: .rounded))
+                    .foregroundStyle(isCurrent && !accent.isNeutral ? accent.color : (hovering ? .white : .white))
+                    .shadow(color: isCurrent ? (accent.isNeutral ? Color.white.opacity(0.3) : accent.color.opacity(0.45)) : .clear, radius: 8)
+                if let translation {
+                    TranslatedLine(text: translation, size: isCurrent ? 12 : 11)
+                }
+            }
+            .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 4)
@@ -175,8 +207,52 @@ private struct LyricLineView: View {
     }
 }
 
+/// Translations are amber, italic and marked with a small icon so they never pass for the original lyrics.
+struct TranslatedLine: View {
+    static let color = Color(red: 1.0, green: 0.78, blue: 0.38)
+    let text: String
+    let size: CGFloat
+
+    var body: some View {
+        (Text(Image(systemName: "translate")).font(.system(size: size * 0.8)) + Text(" " + text))
+            .font(.system(size: size, weight: .medium, design: .rounded))
+            .italic()
+            .foregroundStyle(Self.color.opacity(0.9))
+    }
+}
+
+/// The small round button used for every secondary player action, so they all line up and match.
+struct PlayerChip: View {
+    let icon: String
+    var isOn = false
+    /// Color of the icon while on; the accent by default.
+    var onColor: Color?
+    let help: String
+    let action: () -> Void
+    @Environment(\.notchAccent) private var accent
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .symbolVariant(isOn ? .fill : .none)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(isOn ? (onColor ?? (accent.isNeutral ? .white : accent.color)) : .white.opacity(hovering ? 0.9 : 0.55))
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(.white.opacity(isOn ? 0.16 : (hovering ? 0.12 : 0.06))))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: hovering)
+        .animation(.easeOut(duration: 0.15), value: isOn)
+    }
+}
+
 /// Unsynced lyrics: scrolls along with song progress as a best guess.
 private struct PlainLyricsView: View {
+    @EnvironmentObject private var lyrics: LyricsManager
     let info: NowPlayingInfo
     let text: String
 
@@ -194,12 +270,17 @@ private struct PlainLyricsView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 8) {
                         ForEach(lines.indices, id: \.self) { index in
-                            Text(lines[index].isEmpty ? " " : lines[index])
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .multilineTextAlignment(.center)
-                                .foregroundStyle(.white.opacity(0.75))
-                                .frame(maxWidth: .infinity)
-                                .id(index)
+                            VStack(spacing: 2) {
+                                Text(lines[index].isEmpty ? " " : lines[index])
+                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.75))
+                                if let translation = lyrics.translations[lines[index]] {
+                                    TranslatedLine(text: translation, size: 11)
+                                }
+                            }
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .id(index)
                         }
                     }
                     .padding(.vertical, 60)

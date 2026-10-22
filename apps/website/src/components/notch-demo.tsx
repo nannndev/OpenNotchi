@@ -84,7 +84,7 @@ export function NotchDemo() {
   const [prompterSpeed, setPrompterSpeed] = useState<number>(1)
   const [prompterPlaying, setPrompterPlaying] = useState<boolean>(true)
   const [prompterMirrored, setPrompterMirrored] = useState<boolean>(false)
-  const prompterText = "Good morning team. Today I'm excited to showcase OpenNotchi v0.8.0. By positioning this teleprompter right under your Mac camera, you maintain 100% natural eye contact during video calls and keynotes without looking away."
+  const prompterText = "Good morning team. Today I'm excited to showcase OpenNotchi v0.9.0. By positioning this teleprompter right under your Mac camera, you maintain 100% natural eye contact during video calls and keynotes without looking away."
 
   // Smarthome State
   const [acTemp, setAcTemp] = useState(24)

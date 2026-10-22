@@ -4,6 +4,19 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-10-22
+
+### Added
+- **Desktop Lyrics Widget**: A floating karaoke widget on every Space, showing the line being sung and the next one. Drag it anywhere, resize it from the corner grip (the text scales with it), set the background from fully clear to solid, or lock it so clicks pass through. Toggle it from the player, lyrics mode, the `⋯` menu or Settings; a reset brings it back if it gets lost.
+- **Translated Lyrics**: Lyrics translated on-device with Apple's Translation framework (free, offline, no API key). Translations appear in amber italics under each line in the notch and the desktop widget. The source language is detected automatically, and translation retries on its own once a language pack finishes downloading.
+- **Shareable Lyric Cards**: Pick a run of consecutive lines and export a 1080×1350 card in five styles: Aura (blurred artwork), Player (Now Playing screen with a progress bar set to the chosen line), Polaroid, Solid and Paper. Optional translations; copy, save to Pictures › OpenNotchi, or share through AirDrop and Messages.
+- **Notes Tab**: A scratchpad that saves as you type, with **Keep Awake** (15 min, 1 h, 2 h or until turned off) and an **Apple Shortcuts** runner.
+- **Camera & Microphone Peek**: A pill beside the notch whenever any app starts using the camera or microphone.
+- **Download Finished Banner**: Files that finish downloading into ~/Downloads drop out of the notch with an Open button.
+
+### Changed
+- Secondary player buttons (favorite, desktop lyrics, translate, share) share one consistent chip style; the lyrics-mode actions sit in their own column beside the lyrics.
+
 ## [0.8.0] - 2026-10-14
 
 ### Added

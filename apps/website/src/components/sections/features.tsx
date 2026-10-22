@@ -1,8 +1,8 @@
 import { motion } from "motion/react"
 import {
-  Boxes, CalendarClock, Camera, CandlestickChart, Clipboard, CloudSun, Disc3, Headphones, Home, Inbox,
-  MessageSquareQuote, Monitor, MoonStar, Palette, ScrollText, ShieldCheck, Sliders, Smartphone, Terminal,
-  Timer, type LucideIcon,
+  Boxes, CalendarClock, Camera, CandlestickChart, Clipboard, CloudSun, Coffee, Disc3, Download, Headphones, Home, Inbox,
+  Languages, MessageSquareQuote, Monitor, MoonStar, Palette, PictureInPicture2, ScrollText, Share2, ShieldCheck, Sliders,
+  Smartphone, StickyNote, Terminal, Timer, Webcam, type LucideIcon,
 } from "lucide-react"
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
@@ -11,6 +11,9 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   { icon: Boxes, title: "3D spatial animations", body: "3D Trapdoor Flip, Holographic Depth, and Cube Roll swinging down with top-hinged physics." },
   { icon: Monitor, title: "Multi-display island", body: "Follows your active screen or floats as an island pill on external monitors." },
   { icon: MessageSquareQuote, title: "Synced lyrics", body: "Lines light up as they're sung. Click one to jump there." },
+  { icon: PictureInPicture2, title: "Desktop lyrics", body: "A floating karaoke widget you can drag, resize and fade to just the words." },
+  { icon: Languages, title: "Translated lyrics", body: "Each line translated on your Mac, offline and free, right under the original." },
+  { icon: Share2, title: "Lyric cards", body: "Pick a few lines and share them as a card: Aura, Player, Polaroid, Solid or Paper." },
   { icon: ScrollText, title: "Teleprompter", body: "Your notes scroll right under the camera, so you keep eye contact on calls." },
   { icon: Camera, title: "Photobox", body: "Strips in 18 frames, sized for a story or post, decorated with stickers and stamps." },
   { icon: CalendarClock, title: "Meeting reminders", body: "A heads-up drops out of the notch before each event, with one-click Join." },
@@ -22,6 +25,10 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   { icon: Headphones, title: "Live activities", body: "AirPods battery, charging, and a volume and brightness HUD beside the notch." },
   { icon: CloudSun, title: "Weather and calendar", body: "Today's weather and your next events, one hover away." },
   { icon: Timer, title: "Focus timer", body: "Pomodoro countdowns that stay beside the notch while you work." },
+  { icon: StickyNote, title: "Quick notes", body: "A scratchpad in the notch that saves as you type, plus your Apple Shortcuts." },
+  { icon: Coffee, title: "Keep awake", body: "Stop your Mac sleeping for 15 minutes, an hour, or until you say so." },
+  { icon: Webcam, title: "Camera & mic alerts", body: "A pill lights up the moment any app starts using your camera or microphone." },
+  { icon: Download, title: "Download done", body: "Finished downloads drop out of the notch with a button to open them." },
   { icon: Sliders, title: "Hi-Fi audio decks", body: "Dual ballistic analog VU needle meters and a 9-band digital graphic equalizer." },
   { icon: Smartphone, title: "Spotify on any device", body: "Playing on your phone or a speaker? See it and control it from your Mac." },
   { icon: Palette, title: "Make it yours", body: "Themes that follow your music, nine open animations, your own shortcut." },

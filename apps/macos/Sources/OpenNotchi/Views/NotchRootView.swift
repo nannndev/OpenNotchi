@@ -536,7 +536,7 @@ struct BannerView: View {
                         }
                         vm.dismissPeek()
                     } label: {
-                        Label(title, systemImage: banner.actionType == .triggerUpdate ? "arrow.triangle.2.circlepath" : "video.fill")
+                        Label(title, systemImage: banner.actionType == .triggerUpdate ? "arrow.triangle.2.circlepath" : banner.actionURL?.isFileURL == true ? "arrow.up.forward.app" : "video.fill")
                             .font(.system(size: 12, weight: .semibold))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
@@ -791,6 +791,20 @@ private struct PeekView: View {
                     .font(.system(size: 10, weight: .heavy, design: .monospaced))
                     .foregroundStyle(muted ? .red : Color(red: 1.0, green: 0.6, blue: 0.2))
 
+            case .privacy(let camera, let mic):
+                HStack(spacing: 4) {
+                    if camera { Image(systemName: "video.fill").foregroundStyle(.green) }
+                    if mic { Image(systemName: "mic.fill").foregroundStyle(.orange) }
+                }
+                .font(.system(size: height * 0.4, weight: .bold))
+                .frame(width: height + 4, alignment: .leading)
+
+                Spacer()
+
+                Text("IN USE")
+                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(camera ? .green : .orange)
+
             case .banner:
                 EmptyView()
             }
@@ -867,6 +881,7 @@ struct ExpandedView: View {
                 case .mirror: MirrorView()
                 case .markets: MarketsView()
                 case .dev: DevToolsView()
+                case .notes: NotesView()
                 case .smarthome: SmarthomeView()
                 }
             }

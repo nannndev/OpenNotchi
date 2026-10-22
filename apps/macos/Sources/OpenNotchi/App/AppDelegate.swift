@@ -26,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let bluetooth = BluetoothMonitor()
     private let mediaKeys = MediaKeyInterceptor()
+    private let privacy = PrivacyMonitor()
+    private let downloads = DownloadsMonitor()
+    private var lyricsOverlay: LyricsOverlayWindow?
     private var hudRetryTimer: Timer?
     private var hotKey: HotKey?
     private var cancellables: Set<AnyCancellable> = []
@@ -54,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateHotKey()
         setupPeeks()
         updateSystemMonitors()
+        updateLyricsOverlay()
 
         NotificationCenter.default.addObserver(
             self,
@@ -108,6 +112,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.screenManager.showPeek(.banner(banner))
         }
 
+        privacy.onStart = { [weak self] camera, mic in
+            self?.screenManager.showPeek(.privacy(camera: camera, mic: mic))
+        }
+
+        downloads.onFinish = { [weak self] url in
+            self?.screenManager.showPeek(.banner(Banner(
+                icon: "arrow.down.circle.fill",
+                tint: .blue,
+                badge: "Done",
+                title: url.lastPathComponent,
+                subtitle: "Downloaded",
+                actionTitle: "Open",
+                actionURL: url
+            )))
+        }
+
         mediaKeys.handler = { [weak self] key in
             self?.handleMediaKey(key) ?? false
         }
@@ -116,6 +136,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Starts or stops the Bluetooth and media key monitors to match Settings.
     func updateSystemMonitors() {
         settings.devicePeekEnabled ? bluetooth.start() : bluetooth.stop()
+        settings.privacyPeekEnabled ? privacy.start() : privacy.stop()
+        settings.downloadPeekEnabled ? downloads.start() : downloads.stop()
 
         hudRetryTimer?.invalidate()
         hudRetryTimer = nil
@@ -130,6 +152,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if self?.mediaKeys.start() == true { timer.invalidate() }
             }
         }
+    }
+
+    /// Shows or hides the floating desktop lyrics widget to match Settings.
+    func updateLyricsOverlay() {
+        if settings.lyricsOverlayEnabled {
+            if lyricsOverlay == nil { lyricsOverlay = LyricsOverlayWindow(media: media, lyrics: lyrics, settings: settings) }
+            lyricsOverlay?.orderFrontRegardless()
+        } else {
+            lyricsOverlay?.orderOut(nil)
+        }
+    }
+
+    /// Brings a lost or tiny widget back to its default size and spot.
+    func resetLyricsOverlay() {
+        settings.lyricsOverlayLocked = false
+        settings.lyricsOverlayEnabled = true
+        lyricsOverlay?.resetPosition()
     }
 
     /// Adjusts volume or brightness and shows the HUD. Returns false to let macOS handle the key.
@@ -191,6 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .environmentObject(prayers)
                     .environmentObject(calendar)
                     .environmentObject(updater)
+                    .environmentObject(lyrics)
             )
             let window = NSWindow(contentViewController: hosting)
             window.title = "OpenNotchi Settings"

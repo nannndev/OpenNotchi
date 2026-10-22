@@ -65,6 +65,13 @@ struct HeaderView: View {
                     Toggle("Mirror", isOn: $settings.mirrorTabEnabled)
                     Toggle("Markets", isOn: $settings.marketsEnabled)
                     Toggle("Dev Tools", isOn: $settings.devToolsEnabled)
+                    Toggle("Notes", isOn: $settings.notesTabEnabled)
+                }
+                Toggle("Desktop Lyrics", isOn: $settings.lyricsOverlayEnabled)
+                    .disabled(!settings.lyricsEnabled)
+                if settings.lyricsOverlayEnabled {
+                    Toggle("Lock Desktop Lyrics", isOn: $settings.lyricsOverlayLocked)
+                    Button("Reset Desktop Lyrics Position") { AppDelegate.shared?.resetLyricsOverlay() }
                 }
                 Menu("Open Animation") {
                     ForEach(NotchAnimationStyle.allCases) { style in

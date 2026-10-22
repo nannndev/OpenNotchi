@@ -11,6 +11,7 @@ enum NotchTab: String, CaseIterable {
     case mirror = "Mirror"
     case markets = "Markets"
     case dev = "Dev"
+    case notes = "Notes"
 
     var icon: String {
         switch self {
@@ -23,6 +24,7 @@ enum NotchTab: String, CaseIterable {
         case .mirror: return "camera.fill"
         case .markets: return "chart.line.uptrend.xyaxis"
         case .dev: return "terminal.fill"
+        case .notes: return "note.text"
         }
     }
 }
