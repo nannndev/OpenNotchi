@@ -1,3 +1,4 @@
+import { emit, listen } from "@tauri-apps/api/event"
 import { useEffect, useState } from "react"
 
 export type NotchTheme =
@@ -135,6 +136,8 @@ export function saveSettings(settings: AppSettings): void {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
     // Dispatch local custom event for current window
     window.dispatchEvent(new CustomEvent("opennotchi-settings-updated", { detail: settings }))
+    // Broadcast to all Tauri windows (pill, settings, lyrics, share)
+    emit("opennotchi-settings-changed", settings).catch(() => {})
   } catch (e) {
     console.error("Failed to save settings", e)
   }
@@ -167,9 +170,16 @@ export function useSettings(): [AppSettings, (partial: Partial<AppSettings>) => 
 
     window.addEventListener("opennotchi-settings-updated", onCustomUpdate)
     window.addEventListener("storage", onStorage)
+
+    // Listen for settings broadcast from other windows via Tauri event bus
+    const unlisten = listen<AppSettings>("opennotchi-settings-changed", ({ payload }) => {
+      setSettings(payload)
+    })
+
     return () => {
       window.removeEventListener("opennotchi-settings-updated", onCustomUpdate)
       window.removeEventListener("storage", onStorage)
+      unlisten.then((f) => f()).catch(() => {})
     }
   }, [])
 

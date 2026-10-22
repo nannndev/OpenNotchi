@@ -4,6 +4,8 @@ import {
   ChevronRight,
   ClipboardList,
   Coffee,
+  Download,
+  ExternalLink,
   HelpCircle,
   Info,
   Monitor,
@@ -11,12 +13,14 @@ import {
   Palette,
   Play,
   RotateCcw,
+  RotateCw,
   Sliders,
   Sparkles,
   Timer,
   Wand2,
 } from "lucide-react"
 import { useEffect, useState } from "react"
+import { CURRENT_VERSION, openExternalUrl, useUpdateChecker } from "./updater"
 import {
   ACCENT_PRESETS,
   ANIMATION_OPTIONS,
@@ -46,6 +50,7 @@ export function SettingsWindow() {
   const [monitors, setMonitors] = useState<MonitorInfo[]>([])
   const [autostartEnabled, setAutostartEnabled] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const { updateInfo, isChecking, error, checkNow } = useUpdateChecker()
 
   // Query monitors and autostart on mount
   useEffect(() => {
@@ -124,6 +129,7 @@ export function SettingsWindow() {
           >
             <Info size={16} />
             <span>About OpenNotchi</span>
+            {updateInfo?.available && <span className="nav-update-badge">NEW</span>}
           </button>
         </nav>
       </aside>
@@ -155,7 +161,7 @@ export function SettingsWindow() {
                 />
               )}
 
-              <div className="preview-closed-content">
+              <div className="preview-closed-content" aria-hidden={previewOpen}>
                 <div className="preview-vinyl" />
                 <span className="preview-text">Blinding Lights · The Weeknd</span>
                 <span className="preview-bars">
@@ -165,22 +171,20 @@ export function SettingsWindow() {
                 </span>
               </div>
 
-              {previewOpen && (
-                <div className="preview-open-content">
-                  <div className="preview-open-top">
-                    <span className="preview-tab active">🎵 Music</span>
-                    <span className="preview-tab">📋 Clipboard</span>
-                    <span className="preview-tab">⏱️ Timer</span>
-                  </div>
-                  <div className="preview-open-body">
-                    <div className="preview-open-vinyl" />
-                    <div className="preview-open-info">
-                      <strong>Blinding Lights</strong>
-                      <small>I'm blinded by the lights ♪</small>
-                    </div>
+              <div className="preview-open-content" aria-hidden={!previewOpen}>
+                <div className="preview-open-top">
+                  <span className="preview-tab active">🎵 Music</span>
+                  <span className="preview-tab">📋 Clipboard</span>
+                  <span className="preview-tab">⏱️ Timer</span>
+                </div>
+                <div className="preview-open-body">
+                  <div className="preview-open-vinyl" />
+                  <div className="preview-open-info">
+                    <strong>Blinding Lights</strong>
+                    <small>I'm blinded by the lights ♪</small>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </section>
@@ -468,7 +472,64 @@ export function SettingsWindow() {
               <p className="about-tagline">
                 Now playing, synced lyrics, clipboard, focus timer and live activities in a smooth notch pill.
               </p>
-              <span className="about-chip">Version 0.1.0 • Built with Tauri & React</span>
+              <span className="about-chip">Version {CURRENT_VERSION} • Built with Tauri & React</span>
+            </div>
+
+            {/* Software Update Card */}
+            <div className="update-card">
+              <div className="update-card-header">
+                <div className="update-card-title">
+                  <Sparkles size={16} color="var(--accent)" />
+                  <strong>Software Updates</strong>
+                </div>
+                <button
+                  className="check-update-btn"
+                  onClick={() => checkNow()}
+                  disabled={isChecking}
+                >
+                  <RotateCw size={12} className={isChecking ? "spin-icon" : ""} />
+                  <span>{isChecking ? "Checking…" : "Check for Updates"}</span>
+                </button>
+              </div>
+
+              {updateInfo?.available ? (
+                <div className="update-banner">
+                  <div className="update-meta">
+                    <span className="update-tag">v{updateInfo.latestVersion} Available</span>
+                    <h4 className="update-headline">{updateInfo.releaseName || `OpenNotchi v${updateInfo.latestVersion}`}</h4>
+                    {updateInfo.releaseNotes && (
+                      <p className="update-notes">
+                        {updateInfo.releaseNotes.slice(0, 180)}...
+                      </p>
+                    )}
+                  </div>
+                  <div className="update-actions">
+                    <button
+                      className="update-action-btn primary"
+                      onClick={() => openExternalUrl(updateInfo.downloadUrl)}
+                    >
+                      <Download size={13} />
+                      <span>Download Installer (.exe)</span>
+                    </button>
+                    <button
+                      className="update-action-btn secondary"
+                      onClick={() => openExternalUrl(updateInfo.releaseUrl)}
+                    >
+                      <ExternalLink size={13} />
+                      <span>Release Notes</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="update-status-row">
+                  <Check size={14} color="var(--green)" />
+                  <span>
+                    OpenNotchi is up to date (version {CURRENT_VERSION}).
+                  </span>
+                </div>
+              )}
+
+              {error && <div className="update-error-text">⚠️ {error}</div>}
             </div>
 
             <div className="about-details">

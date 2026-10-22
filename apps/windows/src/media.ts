@@ -33,7 +33,7 @@ export function useNowPlaying(): NowPlaying | null {
     const poll = async () => {
       const next = await invoke<NowPlaying | null>("now_playing", { withArtwork: false }).catch(() => null)
       if (!alive) return
-      const nextKey = next ? `${next.title}\u0000${next.artist}` : ""
+      const nextKey = next ? `${next.title}\u0000${next.artist}\u0000${next.source}` : ""
       if (next && nextKey !== key) {
         key = nextKey
         artwork = (await invoke<NowPlaying | null>("now_playing", { withArtwork: true }).catch(() => null))?.artwork ?? null

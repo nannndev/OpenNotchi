@@ -181,132 +181,192 @@ button:focus-visible {
 }
 
 /* ==========================================================================
-   The 9 Signature Open Animations (macOS Parity)
+   The 9 Signature Open Animations (macOS Parity & Full Differentiation)
    ========================================================================== */
 
-/* 1. Fluid Classic (Default) */
+/* 1. Fluid Classic (Canonical Apple Notch spring) */
 .anim-fluid {
   transition:
-    width 0.42s cubic-bezier(0.32, 1.35, 0.5, 1),
-    height 0.42s cubic-bezier(0.32, 1.35, 0.5, 1),
-    border-radius 0.35s ease,
-    box-shadow 0.35s ease,
-    transform 0.42s cubic-bezier(0.32, 1.35, 0.5, 1);
+    width 0.38s cubic-bezier(0.32, 1.25, 0.45, 1),
+    height 0.38s cubic-bezier(0.32, 1.25, 0.45, 1),
+    border-radius 0.3s ease,
+    box-shadow 0.3s ease;
 }
-.anim-fluid.open {
-  border-radius: 0 0 32px 32px;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5);
-  transition-timing-function: cubic-bezier(0.34, 1.45, 0.55, 1);
+.anim-fluid .pill-open,
+.anim-fluid .preview-open-content {
+  transform: scale(0.92) translateY(-6px);
+  filter: blur(4px);
+  transition: opacity 0.26s ease, transform 0.38s cubic-bezier(0.32, 1.25, 0.45, 1), filter 0.28s ease;
+}
+.anim-fluid.open .pill-open,
+.anim-fluid.open .preview-open-content {
+  transform: scale(1) translateY(0);
+  filter: none;
+  transition-delay: 0.04s;
 }
 
-/* 2. Bouncy Island (Playful Spring with Overshoot) */
+/* 2. Bouncy Island (Playful Spring with Big Overshoot) */
 .anim-bouncy {
   transition:
-    width 0.48s cubic-bezier(0.34, 1.65, 0.55, 1),
-    height 0.48s cubic-bezier(0.34, 1.65, 0.55, 1),
-    border-radius 0.4s ease,
-    transform 0.48s cubic-bezier(0.34, 1.65, 0.55, 1);
+    width 0.48s cubic-bezier(0.34, 1.85, 0.55, 1),
+    height 0.48s cubic-bezier(0.34, 1.85, 0.55, 1),
+    border-radius 0.35s ease;
 }
-.anim-bouncy.open {
-  border-radius: 0 0 34px 34px;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+.anim-bouncy .pill-open,
+.anim-bouncy .preview-open-content {
+  transform: scale(0.72) translateY(-20px);
+  filter: blur(6px);
+  transition: opacity 0.22s ease, transform 0.48s cubic-bezier(0.34, 1.9, 0.5, 1), filter 0.25s ease;
+}
+.anim-bouncy.open .pill-open,
+.anim-bouncy.open .preview-open-content {
+  transform: scale(1) translateY(0);
+  filter: none;
+  transition-delay: 0.03s;
 }
 
-/* 3. Waterfall Drop (Slides down with momentum) */
+/* 3. Waterfall Drop (Cascading slide down from behind notch) */
 .anim-waterfall {
   transition:
-    width 0.4s cubic-bezier(0.25, 1.25, 0.4, 1),
-    height 0.4s cubic-bezier(0.25, 1.25, 0.4, 1),
-    transform 0.4s cubic-bezier(0.25, 1.25, 0.4, 1);
+    width 0.42s cubic-bezier(0.22, 1.2, 0.36, 1),
+    height 0.46s cubic-bezier(0.22, 1.28, 0.36, 1),
+    border-radius 0.35s ease;
 }
-.anim-waterfall:not(.open) {
-  transform: translateY(-4px);
+.anim-waterfall .pill-open,
+.anim-waterfall .preview-open-content {
+  transform: translateY(-68px) scaleY(0.75);
+  filter: blur(6px);
+  transition: opacity 0.3s ease, transform 0.46s cubic-bezier(0.22, 1.28, 0.36, 1), filter 0.3s ease;
 }
-.anim-waterfall.open {
-  transform: translateY(0);
-  border-radius: 0 0 30px 30px;
+.anim-waterfall.open .pill-open,
+.anim-waterfall.open .preview-open-content {
+  transform: translateY(0) scaleY(1);
+  filter: none;
+  transition-delay: 0.03s;
 }
 
-/* 4. Snappy Pro (Ultra-fast, zero latency) */
+/* 4. Snappy Pro (Ultra-fast 140ms, zero lag, no spring overshoot) */
 .anim-snappy {
   transition:
-    width 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-    height 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    width 0.14s cubic-bezier(0.16, 1, 0.3, 1),
+    height 0.14s cubic-bezier(0.16, 1, 0.3, 1),
+    border-radius 0.14s ease;
 }
-.anim-snappy.open {
-  border-radius: 0 0 28px 28px;
+.anim-snappy .pill-open,
+.anim-snappy .preview-open-content {
+  transform: none;
+  filter: none;
+  transition: opacity 0.12s ease;
+}
+.anim-snappy.open .pill-open,
+.anim-snappy.open .preview-open-content {
+  opacity: 1;
 }
 
-/* 5. Elastic Pop (Magnetic scale punch) */
+/* 5. Elastic Pop (Magnetic center pop out) */
 .anim-pop {
   transition:
-    width 0.52s cubic-bezier(0.4, 1.8, 0.5, 0.95),
-    height 0.52s cubic-bezier(0.4, 1.8, 0.5, 0.95),
-    transform 0.52s cubic-bezier(0.4, 1.8, 0.5, 0.95);
+    width 0.46s cubic-bezier(0.4, 1.95, 0.5, 0.95),
+    height 0.46s cubic-bezier(0.4, 1.95, 0.5, 0.95),
+    border-radius 0.35s ease;
 }
-.anim-pop:not(.open) {
-  transform: scale(0.96);
+.anim-pop .pill-open,
+.anim-pop .preview-open-content {
+  transform: scale(0.5);
+  filter: blur(8px);
+  transition: opacity 0.2s ease, transform 0.46s cubic-bezier(0.4, 2.0, 0.5, 0.95), filter 0.25s ease;
 }
-.anim-pop.open {
+.anim-pop.open .pill-open,
+.anim-pop.open .preview-open-content {
   transform: scale(1);
-  border-radius: 0 0 32px 32px;
+  filter: none;
+  transition-delay: 0.03s;
 }
 
-/* 6. Gentle Float (Cinematic slow ease) */
+/* 6. Gentle Float (Cinematic slow velvet glide, 0.72s) */
 .anim-gentle {
   transition:
-    width 0.65s cubic-bezier(0.2, 0.9, 0.3, 1),
-    height 0.65s cubic-bezier(0.2, 0.9, 0.3, 1),
-    transform 0.65s cubic-bezier(0.2, 0.9, 0.3, 1);
+    width 0.72s cubic-bezier(0.16, 1, 0.3, 1),
+    height 0.72s cubic-bezier(0.16, 1, 0.3, 1),
+    border-radius 0.45s ease;
 }
-.anim-gentle.open {
-  border-radius: 0 0 32px 32px;
+.anim-gentle .pill-open,
+.anim-gentle .preview-open-content {
+  transform: scale(0.96) translateY(-8px);
+  filter: blur(8px);
+  transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.72s cubic-bezier(0.16, 1, 0.3, 1), filter 0.5s ease;
+}
+.anim-gentle.open .pill-open,
+.anim-gentle.open .preview-open-content {
+  transform: scale(1) translateY(0);
+  filter: none;
+  transition-delay: 0.06s;
 }
 
-/* 7. 3D Trapdoor Flip (Visor hinge tilt from top) */
+/* 7. 3D Trapdoor Flip (Visor hinge rotation from top edge) */
 .anim-flip3D {
+  transform-origin: top center;
   transition:
-    width 0.45s cubic-bezier(0.34, 1.35, 0.55, 1),
-    height 0.45s cubic-bezier(0.34, 1.35, 0.55, 1),
-    transform 0.45s cubic-bezier(0.34, 1.35, 0.55, 1);
+    width 0.46s cubic-bezier(0.34, 1.35, 0.55, 1),
+    height 0.46s cubic-bezier(0.34, 1.35, 0.55, 1),
+    border-radius 0.35s ease;
 }
-.anim-flip3D:not(.open) {
-  transform: rotateX(-32deg) scale(0.95);
+.anim-flip3D .pill-open,
+.anim-flip3D .preview-open-content {
+  transform-origin: top center;
+  transform: perspective(900px) rotateX(-50deg) scale(0.85);
+  filter: blur(6px);
+  transition: opacity 0.26s ease, transform 0.46s cubic-bezier(0.34, 1.35, 0.55, 1), filter 0.28s ease;
 }
-.anim-flip3D.open {
-  transform: rotateX(0deg) scale(1);
-  border-radius: 0 0 32px 32px;
+.anim-flip3D.open .pill-open,
+.anim-flip3D.open .preview-open-content {
+  transform: perspective(900px) rotateX(0deg) scale(1);
+  filter: none;
+  transition-delay: 0.04s;
 }
 
-/* 8. 3D Holographic Depth (Spatial z-axis float) */
+/* 8. 3D Holographic Depth (Spatial z-axis zoom from deep background) */
 .anim-depth3D {
+  transform-origin: top center;
   transition:
     width 0.48s cubic-bezier(0.3, 1.3, 0.5, 1),
     height 0.48s cubic-bezier(0.3, 1.3, 0.5, 1),
-    transform 0.48s cubic-bezier(0.3, 1.3, 0.5, 1);
+    border-radius 0.35s ease;
 }
-.anim-depth3D:not(.open) {
-  transform: translateZ(-75px) rotateX(-16deg) scale(0.9);
+.anim-depth3D .pill-open,
+.anim-depth3D .preview-open-content {
+  transform-origin: top center;
+  transform: perspective(1000px) translateZ(-130px) rotateX(-20deg) scale(0.8);
+  filter: blur(8px);
+  transition: opacity 0.3s ease, transform 0.48s cubic-bezier(0.3, 1.3, 0.5, 1), filter 0.3s ease;
 }
-.anim-depth3D.open {
-  transform: translateZ(0) rotateX(0deg) scale(1);
-  border-radius: 0 0 32px 32px;
+.anim-depth3D.open .pill-open,
+.anim-depth3D.open .preview-open-content {
+  transform: perspective(1000px) translateZ(0) rotateX(0deg) scale(1);
+  filter: none;
+  transition-delay: 0.04s;
 }
 
-/* 9. 3D Cube Roll (Isometric top roll) */
+/* 9. 3D Cube Roll (Steep isometric forward cube face roll) */
 .anim-cube3D {
+  transform-origin: top center;
   transition:
     width 0.46s cubic-bezier(0.32, 1.4, 0.52, 1),
     height 0.46s cubic-bezier(0.32, 1.4, 0.52, 1),
-    transform 0.46s cubic-bezier(0.32, 1.4, 0.52, 1);
+    border-radius 0.35s ease;
 }
-.anim-cube3D:not(.open) {
-  transform: rotateX(-50deg) scale(0.88);
+.anim-cube3D .pill-open,
+.anim-cube3D .preview-open-content {
+  transform-origin: top center;
+  transform: perspective(800px) rotateX(-65deg) scale(0.74);
+  filter: blur(8px);
+  transition: opacity 0.28s ease, transform 0.46s cubic-bezier(0.32, 1.4, 0.52, 1), filter 0.28s ease;
 }
-.anim-cube3D.open {
-  transform: rotateX(0deg) scale(1);
-  border-radius: 0 0 32px 32px;
+.anim-cube3D.open .pill-open,
+.anim-cube3D.open .preview-open-content {
+  transform: perspective(800px) rotateX(0deg) scale(1);
+  filter: none;
+  transition-delay: 0.04s;
 }
 
 /* ==========================================================================
@@ -337,43 +397,38 @@ button:focus-visible {
    Closed & Open Views inside Pill
    ========================================================================== */
 
-.pill-closed,
-.pill-open {
+.pill-closed {
   position: absolute;
   inset: 0;
   z-index: 1;
-  transition: opacity 0.22s ease, transform 0.35s cubic-bezier(0.34, 1.3, 0.55, 1), filter 0.25s ease;
-}
-
-.pill-closed {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 14px;
+  transition: opacity 0.2s ease, transform 0.28s cubic-bezier(0.34, 1.3, 0.55, 1), filter 0.2s ease;
 }
 .pill.open .pill-closed {
   opacity: 0;
-  transform: scale(0.9);
+  transform: scale(0.88);
   filter: blur(4px);
   pointer-events: none;
 }
 
 .pill-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   padding: 10px 16px 14px;
   box-sizing: border-box;
   opacity: 0;
-  transform: translateY(-8px) scale(0.96);
-  filter: blur(6px);
   pointer-events: none;
+  transform-origin: top center;
 }
 .pill.open .pill-open {
   opacity: 1;
-  transform: none;
-  filter: none;
   pointer-events: auto;
-  transition-delay: 0.06s;
 }
 
 /* Top bar inside Open Pill */
@@ -1381,13 +1436,20 @@ button:focus-visible {
 }
 
 .preview-closed-content {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
+  padding: 0 14px;
+  box-sizing: border-box;
+  transition: opacity 0.2s ease, transform 0.28s cubic-bezier(0.34, 1.3, 0.55, 1), filter 0.2s ease;
 }
 .pill-preview-item.open .preview-closed-content {
-  display: none;
+  opacity: 0;
+  transform: scale(0.88);
+  filter: blur(4px);
+  pointer-events: none;
 }
 .preview-vinyl {
   width: 22px;
@@ -1418,12 +1480,19 @@ button:focus-visible {
 }
 
 .preview-open-content {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  height: 100%;
-  padding: 8px 0;
+  padding: 10px 16px;
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: top center;
+}
+.pill-preview-item.open .preview-open-content {
+  opacity: 1;
+  pointer-events: auto;
 }
 .preview-open-top {
   display: flex;
@@ -2086,6 +2155,8 @@ button:focus-visible {
   font-size: 12.5px;
   color: rgba(255, 255, 255, 0.7);
   transition: all 0.15s;
+  cursor: pointer;
+  user-select: none;
 }
 
 .share-line-item:hover {
@@ -2097,6 +2168,7 @@ button:focus-visible {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   font-weight: 600;
+  border-radius: 0;
 }
 
 .share-line-item.selected.first {
@@ -2107,6 +2179,10 @@ button:focus-visible {
 .share-line-item.selected.last {
   border-bottom-left-radius: 8px;
   border-bottom-right-radius: 8px;
+}
+
+.share-line-item.selected.first.last {
+  border-radius: 8px;
 }
 
 .line-check {
@@ -2250,6 +2326,13 @@ button:focus-visible {
 
 .share-btn.secondary:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.14);
+}
+
+.share-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* ==========================================================================
@@ -2578,11 +2661,202 @@ button:focus-visible {
   color: #262220;
 }
 
-.live-polaroid-artist {
+/* ==========================================================================
+   Software Update & Notification Styling
+   ========================================================================== */
+
+/* Update indicator in open pill header */
+.update-badge-btn {
+  position: relative;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+.update-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px rgba(56, 189, 248, 0.5);
+  }
+}
+
+/* Sidebar nav update badge */
+.nav-update-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  color: #000;
+  padding: 1.5px 6px;
+  border-radius: 999px;
+  margin-left: auto;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+}
+
+/* Software Update Card in About */
+.update-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.update-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.update-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #fff;
+}
+
+.check-update-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  transition: all 0.15s;
+  cursor: pointer;
+}
+
+.check-update-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.check-update-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.update-banner {
+  background: radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.15), transparent 70%), rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.update-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.update-tag {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.update-headline {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.update-notes {
+  margin: 0;
   font-size: 12px;
-  font-style: italic;
-  opacity: 0.65;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: pre-line;
+}
+
+.update-actions {
+  display: flex;
+  gap: 10px;
   margin-top: 4px;
+}
+
+.update-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.update-action-btn.primary {
+  background: #38bdf8;
+  color: #000;
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.3);
+}
+
+.update-action-btn.primary:hover {
+  background: #7dd3fc;
+  transform: translateY(-1px);
+}
+
+.update-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.update-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.update-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.update-error-text {
+  font-size: 11.5px;
+  color: #f87171;
 }
 
 @media (prefers-reduced-motion: reduce) {

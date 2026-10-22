@@ -201,6 +201,26 @@ fn watch_hover(window: WebviewWindow) {
     });
 }
 
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        std::process::Command::new("rundll32")
+            .args(["url.dll,FileProtocolHandler", &url])
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -231,6 +251,7 @@ pub fn run() {
             is_lyrics_visible,
             open_settings,
             open_share_lyrics,
+            open_external_url,
             get_monitors,
             set_pill_monitor,
             media::now_playing,

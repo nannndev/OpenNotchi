@@ -106,6 +106,122 @@ mod imp {
         op.and_then(|op| op.join()).map(|_| ()).map_err(|e| e.to_string())
     }
 
+    fn is_dedicated_music_app(app_id: &str) -> bool {
+        let lower = app_id.to_lowercase();
+        lower.contains("spotify")
+            || lower.contains("applemusic")
+            || lower.contains("apple music")
+            || lower.contains("tidal")
+            || lower.contains("deezer")
+            || lower.contains("qobuz")
+            || lower.contains("amazonmusic")
+            || lower.contains("musicbee")
+            || lower.contains("foobar2000")
+            || lower.contains("itunes")
+            || lower.contains("winamp")
+            || lower.contains("aimp")
+            || lower.contains("pandora")
+            || lower.contains("wmp")
+    }
+
+    fn is_browser_app(app_id: &str) -> bool {
+        let lower = app_id.to_lowercase();
+        lower.contains("chrome")
+            || lower.contains("msedge")
+            || lower.contains("edge")
+            || lower.contains("firefox")
+            || lower.contains("brave")
+            || lower.contains("opera")
+            || lower.contains("vivaldi")
+    }
+
+    fn get_all_sessions(mgr: &Manager) -> Vec<Session> {
+        let mut sessions = Vec::new();
+        if let Ok(vec_view) = mgr.GetSessions() {
+            if let Ok(size) = vec_view.Size() {
+                for i in 0..size {
+                    if let Ok(session) = vec_view.GetAt(i) {
+                        sessions.push(session);
+                    }
+                }
+            }
+        }
+        sessions
+    }
+
+    fn find_best_session(mgr: &Manager, last_source: &str) -> Option<Session> {
+        let sessions = get_all_sessions(mgr);
+        if sessions.is_empty() {
+            return mgr.GetCurrentSession().ok();
+        }
+
+        let has_music_app = sessions.iter().any(|s| {
+            let app_id = s.SourceAppUserModelId().map(|x| x.to_string()).unwrap_or_default();
+            is_dedicated_music_app(&app_id)
+        });
+
+        struct Candidate {
+            session: Session,
+            score: i32,
+        }
+
+        let mut candidates: Vec<Candidate> = Vec::new();
+
+        for session in sessions {
+            let app_id = session.SourceAppUserModelId().map(|s| s.to_string()).unwrap_or_default();
+            let status = session.GetPlaybackInfo().ok().and_then(|p| p.PlaybackStatus().ok());
+            let is_playing = status == Some(Status::Playing);
+            let is_music = is_dedicated_music_app(&app_id);
+            let is_browser = is_browser_app(&app_id);
+            let is_prev = !last_source.is_empty() && app_id == last_source;
+
+            // If a dedicated music app session exists on the system, NEVER select a paused browser tab
+            if has_music_app && is_browser && !is_playing {
+                continue;
+            }
+
+            let score = if is_playing {
+                if is_music {
+                    10_000 + if is_prev { 1_000 } else { 0 }
+                } else if is_browser {
+                    5_000 + if is_prev { 500 } else { 0 }
+                } else {
+                    6_000 + if is_prev { 500 } else { 0 }
+                }
+            } else {
+                // Not playing (paused, buffering, track changing)
+                if is_prev && is_music {
+                    4_000
+                } else if is_music {
+                    2_000
+                } else if is_prev {
+                    1_500
+                } else if is_browser {
+                    10
+                } else {
+                    100
+                }
+            };
+
+            candidates.push(Candidate { session, score });
+        }
+
+        candidates.sort_by(|a, b| b.score.cmp(&a.score));
+
+        for c in candidates {
+            if let Ok(props_op) = c.session.TryGetMediaPropertiesAsync() {
+                if let Ok(props) = props_op.join() {
+                    let title = props.Title().map(|s| s.to_string()).unwrap_or_default();
+                    if !title.is_empty() {
+                        return Some(c.session);
+                    }
+                }
+            }
+        }
+
+        mgr.GetCurrentSession().ok()
+    }
+
     fn run_media_poller(cache: Arc<RwLock<Option<NowPlaying>>>, rx: mpsc::Receiver<MediaCmd>) {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
@@ -114,16 +230,19 @@ mod imp {
         let mut manager_opt: Option<Manager> = None;
         let mut last_track_id = String::new();
         let mut last_artwork: Option<String> = None;
+        let mut last_source = String::new();
+        let mut active_session: Option<Session> = None;
+        let mut missed_ticks = 0;
 
         loop {
             // Handle any commands queued up
             while let Ok(cmd) = rx.try_recv() {
                 match cmd {
                     MediaCmd::Control { action, seek_to } => {
-                        if let Some(ref mgr) = manager_opt {
-                            if let Ok(session) = mgr.GetCurrentSession() {
-                                let _ = execute_control(&session, &action, seek_to);
-                            }
+                        let target = active_session.as_ref()
+                            .or_else(|| manager_opt.as_ref().and_then(|m| m.GetCurrentSession().ok()));
+                        if let Some(session) = target {
+                            let _ = execute_control(session, &action, seek_to);
                         }
                     }
                 }
@@ -140,19 +259,24 @@ mod imp {
 
             let mut updated = false;
             if let Some(ref mgr) = manager_opt {
-                if let Ok(session) = mgr.GetCurrentSession() {
+                if let Some(session) = find_best_session(mgr, &last_source) {
                     if let Ok(props_op) = session.TryGetMediaPropertiesAsync() {
                         if let Ok(props) = props_op.join() {
                             let title = props.Title().map(|s| s.to_string()).unwrap_or_default();
                             if !title.is_empty() {
                                 let artist = props.Artist().map(|s| s.to_string()).unwrap_or_default();
                                 let album = props.AlbumTitle().map(|s| s.to_string()).unwrap_or_default();
-                                let track_id = format!("{}\u{0000}{}", title, artist);
+                                let source = session.SourceAppUserModelId().map(|s| s.to_string()).unwrap_or_default();
+                                let track_id = format!("{}\u{0000}{}\u{0000}{}", title, artist, source);
 
                                 if track_id != last_track_id {
                                     last_track_id = track_id;
                                     last_artwork = props.Thumbnail().ok().and_then(read_artwork);
                                 }
+
+                                last_source = source.clone();
+                                active_session = Some(session.clone());
+                                missed_ticks = 0;
 
                                 let timeline = session.GetTimelineProperties().ok();
                                 let playback = session.GetPlaybackInfo().ok();
@@ -166,7 +290,7 @@ mod imp {
                                     duration: seconds(timeline.as_ref().and_then(|t| t.EndTime().ok()).map(|d| d.Duration).unwrap_or(0)),
                                     updated_at: unix_ms(timeline.as_ref().and_then(|t| t.LastUpdatedTime().ok()).map(|u| u.UniversalTime).unwrap_or(0)),
                                     artwork: last_artwork.clone(),
-                                    source: session.SourceAppUserModelId().map(|s| s.to_string()).unwrap_or_default(),
+                                    source,
                                 };
 
                                 if let Ok(mut lock) = cache.write() {
@@ -180,11 +304,17 @@ mod imp {
             }
 
             if !updated {
-                last_track_id.clear();
-                last_artwork = None;
-                if let Ok(mut lock) = cache.write() {
-                    if lock.is_some() {
-                        *lock = None;
+                missed_ticks += 1;
+                // Give a 2-tick (1s) grace period during song transitions before completely clearing
+                if missed_ticks >= 2 {
+                    last_track_id.clear();
+                    last_artwork = None;
+                    last_source.clear();
+                    active_session = None;
+                    if let Ok(mut lock) = cache.write() {
+                        if lock.is_some() {
+                            *lock = None;
+                        }
                     }
                 }
             }
@@ -192,10 +322,10 @@ mod imp {
             // Sleep 500ms or wake up on incoming control command
             match rx.recv_timeout(Duration::from_millis(500)) {
                 Ok(MediaCmd::Control { action, seek_to }) => {
-                    if let Some(ref mgr) = manager_opt {
-                        if let Ok(session) = mgr.GetCurrentSession() {
-                            let _ = execute_control(&session, &action, seek_to);
-                        }
+                    let target = active_session.as_ref()
+                        .or_else(|| manager_opt.as_ref().and_then(|m| m.GetCurrentSession().ok()));
+                    if let Some(session) = target {
+                        let _ = execute_control(session, &action, seek_to);
                     }
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {}

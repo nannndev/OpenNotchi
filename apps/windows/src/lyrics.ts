@@ -65,3 +65,68 @@ export async function fetchLyrics(title: string, artist: string, album: string, 
   cache.set(key, lyrics)
   return lyrics
 }
+
+/** Helper to create an inclusive range array [start ... end] */
+export function makeRange(start: number, end: number): number[] {
+  if (start > end) return []
+  const res: number[] = []
+  for (let i = start; i <= end; i++) {
+    res.push(i)
+  }
+  return res
+}
+
+/**
+ * Calculates next selection when user taps a line in Lyric Share.
+ * Follows the macOS OpenNotchi / Spotify algorithm:
+ * - Tapping top boundary unselects / drops it
+ * - Tapping bottom boundary unselects / drops it
+ * - Tapping inside trims the selection to that line
+ * - Tapping the only selected line unselects it (empty selection)
+ * - Tapping within reach (<= maxLines) stretches the selection
+ * - Tapping beyond reach (> maxLines) starts a new selection at the tapped line
+ */
+export function getNextLyricSelection(
+  current: number[],
+  idx: number,
+  maxLines = 5,
+): number[] {
+  if (current.length === 0) {
+    return [idx]
+  }
+
+  // If only one line is selected and tapped again, unselect it
+  if (current.length === 1 && current[0] === idx) {
+    return []
+  }
+
+  const lower = Math.min(...current)
+  const upper = Math.max(...current)
+
+  // 1. Tapping the top boundary drops it (unselect top)
+  if (idx === lower) {
+    return makeRange(lower + 1, upper)
+  }
+
+  // 2. Tapping the bottom boundary drops it (unselect bottom)
+  if (idx === upper) {
+    return makeRange(lower, upper - 1)
+  }
+
+  // 3. Tapping inside trims to that line
+  if (idx > lower && idx < upper) {
+    return makeRange(lower, idx)
+  }
+
+  // 4. Tapping outside: within reach stretches, beyond reach starts fresh
+  const min = Math.min(idx, lower)
+  const max = Math.max(idx, upper)
+  const span = max - min + 1
+
+  if (span <= maxLines) {
+    return makeRange(min, max)
+  }
+
+  // Too far away from current selection, start fresh at tapped index
+  return [idx]
+}

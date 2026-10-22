@@ -1,6 +1,6 @@
 [package]
 name = "opennotchi"
-version = "0.1.0"
+version = "0.9.0"
 description = "OpenNotchi for Windows: now playing, synced lyrics and live activities in a pill at the top of the screen"
 authors = ["OpenNotchi contributors"]
 license = "MIT"
@@ -30,6 +30,7 @@ winreg = "0.56.0"
 base64 = "0.23.1"
 windows = { version = "0.62.2", features = [
   "Foundation",
+  "Foundation_Collections",
   "Media_Control",
   "Storage_Streams",
   "Win32_System_Power",

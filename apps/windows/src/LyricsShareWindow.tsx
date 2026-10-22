@@ -8,8 +8,9 @@ import {
   Sparkles,
   X,
 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
-import { useLyrics, useNowPlaying } from "./media"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { currentIndex, getNextLyricSelection, makeRange } from "./lyrics"
+import { positionAt, useLyrics, useNowPlaying } from "./media"
 import { useAccent } from "./palette"
 import { resolveAccentColor, useSettings } from "./settings"
 import {
@@ -43,6 +44,7 @@ export function LyricsShareWindow() {
   const [selectedIndices, setSelectedIndices] = useState<number[]>([0, 1])
   const [toast, setToast] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
+  const listRef = useRef<HTMLDivElement | null>(null)
 
   // Extract clean lines
   const lines = useMemo(() => {
@@ -70,32 +72,38 @@ export function LyricsShareWindow() {
     return [0, 4, 8, 12, 16, 20]
   }, [lyrics])
 
-  // Select a line or expand selection (max 5 lines)
-  const handleLineClick = (idx: number) => {
-    if (selectedIndices.length === 0) {
-      setSelectedIndices([idx])
-      return
-    }
-
-    const first = selectedIndices[0]
-    const last = selectedIndices[selectedIndices.length - 1]
-
-    if (idx < first) {
-      // New starting point
-      setSelectedIndices([idx])
-    } else if (idx === first && selectedIndices.length === 1) {
-      // Toggle off or keep 1
-      return
-    } else {
-      // Expand range from `first` to `idx`, up to 5 lines
-      const end = Math.min(idx, first + 4)
-      const range: number[] = []
-      for (let i = first; i <= end; i++) {
-        range.push(i)
+  // When synced lyrics first load for the active track, pre-select current playing lyric
+  const [hasInitializedLyrics, setHasInitializedLyrics] = useState(false)
+  useEffect(() => {
+    if (lyrics && lyrics !== "loading" && np && !hasInitializedLyrics) {
+      if (lyrics.synced.length > 0) {
+        const idx = currentIndex(lyrics.synced, positionAt(np))
+        if (idx !== null && idx >= 0 && idx < lyrics.synced.length) {
+          const end = Math.min(lyrics.synced.length - 1, idx + 1)
+          setSelectedIndices(makeRange(idx, end))
+          setHasInitializedLyrics(true)
+          return
+        }
       }
-      setSelectedIndices(range)
+      setHasInitializedLyrics(true)
     }
+  }, [lyrics, np, hasInitializedLyrics])
+
+  // Select a line or expand selection (max 5 lines) with drop/unselect & jump support
+  const handleLineClick = (idx: number) => {
+    setSelectedIndices((prev) => getNextLyricSelection(prev, idx, 5))
   }
+
+  // Auto-scroll list when jumping or selecting
+  useEffect(() => {
+    if (selectedIndices.length > 0 && listRef.current) {
+      const firstIdx = selectedIndices[0]
+      const el = listRef.current.querySelector<HTMLElement>(`[data-line-idx="${firstIdx}"]`)
+      if (el) {
+        el.scrollIntoView({ block: "nearest", behavior: "smooth" })
+      }
+    }
+  }, [selectedIndices[0]])
 
   const selectedLines = useMemo(() => {
     return selectedIndices.map((i) => lines[i]).filter(Boolean)
@@ -217,7 +225,7 @@ export function LyricsShareWindow() {
             </span>
           </div>
 
-          <div className="share-lines-list">
+          <div className="share-lines-list" ref={listRef}>
             {lines.map((text, idx) => {
               const isSelected = selectedIndices.includes(idx)
               const isFirst = selectedIndices[0] === idx
@@ -226,6 +234,7 @@ export function LyricsShareWindow() {
               return (
                 <button
                   key={idx}
+                  data-line-idx={idx}
                   className={`share-line-item ${isSelected ? "selected" : ""} ${
                     isFirst ? "first" : ""
                   } ${isLast ? "last" : ""}`}
@@ -356,9 +365,15 @@ function LiveCardPreview({
           <div className="live-player-artist">{artist}</div>
 
           <div className="live-player-lyrics">
-            {lines.map((l, i) => (
-              <div key={i} className="live-player-line">{l}</div>
-            ))}
+            {lines.length === 0 ? (
+              <div className="live-player-line" style={{ opacity: 0.4, fontStyle: "italic" }}>
+                Select lines on the left…
+              </div>
+            ) : (
+              lines.map((l, i) => (
+                <div key={i} className="live-player-line">{l}</div>
+              ))
+            )}
           </div>
 
           <div className="live-player-controls">
@@ -378,9 +393,15 @@ function LiveCardPreview({
             <span className="live-photo-tag">{title.toUpperCase()}</span>
           </div>
           <div className="live-polaroid-lyrics">
-            {lines.slice(0, 4).map((l, i) => (
-              <div key={i} className="live-polaroid-line">{l}</div>
-            ))}
+            {lines.length === 0 ? (
+              <div className="live-polaroid-line" style={{ opacity: 0.4, fontStyle: "italic" }}>
+                Select lines on the left…
+              </div>
+            ) : (
+              lines.slice(0, 4).map((l, i) => (
+                <div key={i} className="live-polaroid-line">{l}</div>
+              ))
+            )}
             <div className="live-polaroid-artist">— {artist}</div>
           </div>
         </div>
@@ -402,9 +423,15 @@ function LiveCardPreview({
 
           {/* Lyrics Block */}
           <div className="live-card-lyrics">
-            {lines.map((l, i) => (
-              <div key={i} className="live-card-line">{l}</div>
-            ))}
+            {lines.length === 0 ? (
+              <div className="live-card-line" style={{ opacity: 0.4, fontStyle: "italic" }}>
+                Select lines on the left…
+              </div>
+            ) : (
+              lines.map((l, i) => (
+                <div key={i} className="live-card-line">{l}</div>
+              ))
+            )}
           </div>
 
           {/* Footer Branding */}

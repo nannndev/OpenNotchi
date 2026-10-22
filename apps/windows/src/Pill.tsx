@@ -14,6 +14,7 @@ import {
   Share2,
   SkipBack,
   SkipForward,
+  Sparkles,
   Timer,
 } from "lucide-react"
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
@@ -24,6 +25,7 @@ import { resolveAccentColor, useSettings } from "./settings"
 import { ClipboardTab } from "./tabs/ClipboardTab"
 import { NotesTab } from "./tabs/NotesTab"
 import { TimerTab } from "./tabs/TimerTab"
+import { useUpdateChecker } from "./updater"
 
 // Pill sizes in logical pixels. The window is a fixed 640×280 transparent canvas; the pill animates inside it.
 const CLOSED = { width: 340, height: 38 }
@@ -48,6 +50,7 @@ export function Pill() {
   const [awake, setAwake] = useState(false)
   const [widgetOn, setWidgetOn] = useState(false)
   const [peek, setPeek] = useState<Privacy | null>(null)
+  const { updateInfo } = useUpdateChecker()
   useTick(250)
 
   const size = open ? OPEN : peek ? PEEKING : CLOSED
@@ -175,7 +178,13 @@ export function Pill() {
               <Bars playing={np.isPlaying} />
             </>
           ) : (
-            <span className="closed-text muted">{awake ? "☕ Keeping awake" : "OpenNotchi"}</span>
+            <span className="closed-text muted">
+              {awake
+                ? "☕ Keeping awake"
+                : updateInfo?.available
+                ? `✨ v${updateInfo.latestVersion} update available`
+                : "OpenNotchi"}
+            </span>
           )}
         </div>
 
@@ -251,6 +260,16 @@ export function Pill() {
               >
                 <SettingsIcon size={12} />
               </button>
+              {updateInfo?.available && (
+                <button
+                  className="header-action-btn update-badge-btn"
+                  onClick={openSettings}
+                  title={`OpenNotchi v${updateInfo.latestVersion} available! Click to open Settings`}
+                >
+                  <Sparkles size={12} color="#38bdf8" />
+                  <span className="update-dot" />
+                </button>
+              )}
             </div>
           </div>
 
