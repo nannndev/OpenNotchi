@@ -3,7 +3,7 @@
 
 use serde::Serialize;
 
-#[derive(Serialize, Clone, Default)]
+#[derive(Serialize, Clone, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct NowPlaying {
     pub title: String,
@@ -25,20 +25,49 @@ pub struct NowPlaying {
 mod imp {
     use super::NowPlaying;
     use base64::Engine;
+    use std::sync::{mpsc, Arc, OnceLock, RwLock};
+    use std::time::Duration;
     use windows::Media::Control::{
         GlobalSystemMediaTransportControlsSession as Session,
         GlobalSystemMediaTransportControlsSessionManager as Manager,
         GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
     };
     use windows::Storage::Streams::{DataReader, IRandomAccessStreamReference};
+    use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
 
-    fn manager() -> windows::core::Result<Manager> {
-        Manager::RequestAsync()?.join()
+    enum MediaCmd {
+        Control {
+            action: String,
+            seek_to: Option<f64>,
+        },
     }
 
-    /// The session Windows considers current (the last one the user touched).
-    fn session() -> Option<Session> {
-        manager().ok()?.GetCurrentSession().ok()
+    struct MediaState {
+        cache: Arc<RwLock<Option<NowPlaying>>>,
+        sender: mpsc::Sender<MediaCmd>,
+    }
+
+    static MEDIA_STATE: OnceLock<MediaState> = OnceLock::new();
+
+    fn get_state() -> &'static MediaState {
+        MEDIA_STATE.get_or_init(|| {
+            let cache = Arc::new(RwLock::new(None));
+            let (tx, rx) = mpsc::channel();
+            let cache_clone = Arc::clone(&cache);
+
+            std::thread::Builder::new()
+                .name("smtc-media-poller".into())
+                .spawn(move || {
+                    run_media_poller(cache_clone, rx);
+                })
+                .expect("Failed to spawn media worker thread");
+
+            MediaState { cache, sender: tx }
+        })
+    }
+
+    pub fn init() {
+        let _ = get_state();
     }
 
     /// 100-nanosecond ticks to seconds.
@@ -54,7 +83,6 @@ mod imp {
     fn read_artwork(thumbnail: IRandomAccessStreamReference) -> Option<String> {
         let stream = thumbnail.OpenReadAsync().ok()?.join().ok()?;
         let size = stream.Size().ok()? as u32;
-        // shortcut: a 4 MB cap guards against odd players, raise it if real artwork gets dropped.
         if size == 0 || size > 4_000_000 {
             return None;
         }
@@ -67,32 +95,7 @@ mod imp {
         Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
     }
 
-    pub fn now_playing(with_artwork: bool) -> Option<NowPlaying> {
-        let session = session()?;
-        let props = session.TryGetMediaPropertiesAsync().ok()?.join().ok()?;
-        let title = props.Title().ok()?.to_string();
-        if title.is_empty() {
-            return None;
-        }
-        let timeline = session.GetTimelineProperties().ok()?;
-        let playback = session.GetPlaybackInfo().ok()?;
-        let artwork = if with_artwork { props.Thumbnail().ok().and_then(read_artwork) } else { None };
-
-        Some(NowPlaying {
-            title,
-            artist: props.Artist().map(|s| s.to_string()).unwrap_or_default(),
-            album: props.AlbumTitle().map(|s| s.to_string()).unwrap_or_default(),
-            is_playing: playback.PlaybackStatus().ok() == Some(Status::Playing),
-            position: seconds(timeline.Position().map(|t| t.Duration).unwrap_or(0)),
-            duration: seconds(timeline.EndTime().map(|t| t.Duration).unwrap_or(0)),
-            updated_at: unix_ms(timeline.LastUpdatedTime().map(|t| t.UniversalTime).unwrap_or(0)),
-            artwork,
-            source: session.SourceAppUserModelId().map(|s| s.to_string()).unwrap_or_default(),
-        })
-    }
-
-    pub fn control(action: &str, seek_to: Option<f64>) -> Result<(), String> {
-        let session = session().ok_or("Nothing is playing")?;
+    fn execute_control(session: &Session, action: &str, seek_to: Option<f64>) -> Result<(), String> {
         let op = match action {
             "toggle" => session.TryTogglePlayPauseAsync(),
             "next" => session.TrySkipNextAsync(),
@@ -100,7 +103,131 @@ mod imp {
             "seek" => session.TryChangePlaybackPositionAsync((seek_to.unwrap_or(0.0) * 10_000_000.0) as i64),
             _ => return Err(format!("Unknown action {action}")),
         };
-        op.and_then(|op| op.join()).map(|_| ()).map_err(|e| e.message())
+        op.and_then(|op| op.join()).map(|_| ()).map_err(|e| e.to_string())
+    }
+
+    fn run_media_poller(cache: Arc<RwLock<Option<NowPlaying>>>, rx: mpsc::Receiver<MediaCmd>) {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        }
+
+        let mut manager_opt: Option<Manager> = None;
+        let mut last_track_id = String::new();
+        let mut last_artwork: Option<String> = None;
+
+        loop {
+            // Handle any commands queued up
+            while let Ok(cmd) = rx.try_recv() {
+                match cmd {
+                    MediaCmd::Control { action, seek_to } => {
+                        if let Some(ref mgr) = manager_opt {
+                            if let Ok(session) = mgr.GetCurrentSession() {
+                                let _ = execute_control(&session, &action, seek_to);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Ensure we have a Manager instance
+            if manager_opt.is_none() {
+                if let Ok(op) = Manager::RequestAsync() {
+                    if let Ok(mgr) = op.join() {
+                        manager_opt = Some(mgr);
+                    }
+                }
+            }
+
+            let mut updated = false;
+            if let Some(ref mgr) = manager_opt {
+                if let Ok(session) = mgr.GetCurrentSession() {
+                    if let Ok(props_op) = session.TryGetMediaPropertiesAsync() {
+                        if let Ok(props) = props_op.join() {
+                            let title = props.Title().map(|s| s.to_string()).unwrap_or_default();
+                            if !title.is_empty() {
+                                let artist = props.Artist().map(|s| s.to_string()).unwrap_or_default();
+                                let album = props.AlbumTitle().map(|s| s.to_string()).unwrap_or_default();
+                                let track_id = format!("{}\u{0000}{}", title, artist);
+
+                                if track_id != last_track_id {
+                                    last_track_id = track_id;
+                                    last_artwork = props.Thumbnail().ok().and_then(read_artwork);
+                                }
+
+                                let timeline = session.GetTimelineProperties().ok();
+                                let playback = session.GetPlaybackInfo().ok();
+
+                                let np = NowPlaying {
+                                    title,
+                                    artist,
+                                    album,
+                                    is_playing: playback.and_then(|p| p.PlaybackStatus().ok()) == Some(Status::Playing),
+                                    position: seconds(timeline.as_ref().and_then(|t| t.Position().ok()).map(|d| d.Duration).unwrap_or(0)),
+                                    duration: seconds(timeline.as_ref().and_then(|t| t.EndTime().ok()).map(|d| d.Duration).unwrap_or(0)),
+                                    updated_at: unix_ms(timeline.as_ref().and_then(|t| t.LastUpdatedTime().ok()).map(|u| u.UniversalTime).unwrap_or(0)),
+                                    artwork: last_artwork.clone(),
+                                    source: session.SourceAppUserModelId().map(|s| s.to_string()).unwrap_or_default(),
+                                };
+
+                                if let Ok(mut lock) = cache.write() {
+                                    *lock = Some(np);
+                                }
+                                updated = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !updated {
+                last_track_id.clear();
+                last_artwork = None;
+                if let Ok(mut lock) = cache.write() {
+                    if lock.is_some() {
+                        *lock = None;
+                    }
+                }
+            }
+
+            // Sleep 500ms or wake up on incoming control command
+            match rx.recv_timeout(Duration::from_millis(500)) {
+                Ok(MediaCmd::Control { action, seek_to }) => {
+                    if let Some(ref mgr) = manager_opt {
+                        if let Ok(session) = mgr.GetCurrentSession() {
+                            let _ = execute_control(&session, &action, seek_to);
+                        }
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+
+        unsafe {
+            CoUninitialize();
+        }
+    }
+
+    pub fn now_playing(with_artwork: bool) -> Option<NowPlaying> {
+        let state = get_state();
+        let mut np = state.cache.read().ok()?.clone();
+        if !with_artwork {
+            if let Some(ref mut item) = np {
+                item.artwork = None;
+            }
+        }
+        np
+    }
+
+    pub fn control(action: &str, seek_to: Option<f64>) -> Result<(), String> {
+        let state = get_state();
+        state
+            .sender
+            .send(MediaCmd::Control {
+                action: action.to_string(),
+                seek_to,
+            })
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -109,6 +236,8 @@ mod imp {
     //! Lets the UI be developed on macOS: a fake song that plays from the moment the app starts.
     use super::NowPlaying;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    pub fn init() {}
 
     pub fn now_playing(_with_artwork: bool) -> Option<NowPlaying> {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_millis() as f64;
@@ -128,6 +257,10 @@ mod imp {
     pub fn control(_action: &str, _seek_to: Option<f64>) -> Result<(), String> {
         Ok(())
     }
+}
+
+pub fn init() {
+    imp::init();
 }
 
 #[tauri::command]

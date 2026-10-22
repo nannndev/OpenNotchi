@@ -148,16 +148,39 @@ fn cursor_in_pill(cursor: (f64, f64), window_pos: (f64, f64), window_width: f64,
 /// and lets clicks through everywhere outside the pill.
 fn watch_hover(window: WebviewWindow) {
     std::thread::spawn(move || {
-        let mut inside = None;
+        // Allow WebView2 and native window 500ms to mount and stabilize before polling
+        std::thread::sleep(Duration::from_millis(500));
+
+        let mut inside: Option<bool> = None;
+        let mut cached_geom: Option<((f64, f64), f64, f64)> = None; // (pos, width, scale)
+        let mut last_geom_refresh = std::time::Instant::now();
+
         loop {
-            std::thread::sleep(Duration::from_millis(30));
-            let (Ok(cursor), Ok(pos), Ok(size), Ok(scale)) =
-                (window.cursor_position(), window.outer_position(), window.outer_size(), window.scale_factor())
-            else {
+            std::thread::sleep(Duration::from_millis(40));
+
+            // Refresh window geometry once per second or on the very first cycle
+            if cached_geom.is_none() || last_geom_refresh.elapsed() >= Duration::from_secs(1) {
+                if let (Ok(pos), Ok(size), Ok(scale)) = (
+                    window.outer_position(),
+                    window.outer_size(),
+                    window.scale_factor(),
+                ) {
+                    cached_geom = Some(((pos.x as f64, pos.y as f64), size.width as f64, scale));
+                    last_geom_refresh = std::time::Instant::now();
+                }
+            }
+
+            let Some((win_pos, win_width, scale)) = cached_geom else {
                 continue;
             };
+
+            let Ok(cursor) = window.cursor_position() else {
+                continue;
+            };
+
             let pill = *window.state::<PillSize>().0.lock().unwrap();
-            let now = cursor_in_pill((cursor.x, cursor.y), (pos.x as f64, pos.y as f64), size.width as f64, pill, scale);
+            let now = cursor_in_pill((cursor.x, cursor.y), win_pos, win_width, pill, scale);
+
             if inside != Some(now) {
                 inside = Some(now);
                 let _ = window.set_ignore_cursor_events(!now);
@@ -171,10 +194,15 @@ fn watch_hover(window: WebviewWindow) {
 pub fn run() {
     tauri::Builder::default()
         .manage(PillSize(Mutex::new((360.0, 44.0))))
-        // Remembers where the desktop lyrics widget was dragged; the pill is always re-centered.
+        // Only remember the position and size where the desktop lyrics widget was dragged;
+        // Never restore window visibility so the lyrics widget does not open at launch.
         .plugin(
             tauri_plugin_window_state::Builder::default()
-                .with_denylist(&["pill"])
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::SIZE,
+                )
+                .with_denylist(&["pill", "settings"])
                 .build(),
         )
         .on_window_event(|window, event| {
@@ -204,9 +232,21 @@ pub fn run() {
             if cfg!(debug_assertions) {
                 app.handle().plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())?;
             }
+
+            // Start dedicated SMTC background thread
+            media::init();
+
             if let Some(pill) = app.get_webview_window("pill") {
                 place_pill(&pill)?;
                 watch_hover(pill);
+            }
+
+            // Explicitly ensure lyrics and settings windows are hidden on startup
+            if let Some(lyrics) = app.get_webview_window("lyrics") {
+                let _ = lyrics.hide();
+            }
+            if let Some(settings) = app.get_webview_window("settings") {
+                let _ = settings.hide();
             }
 
             let lyrics = MenuItem::with_id(app, "lyrics", "Toggle Desktop Lyrics", true, None::<&str>)?;
