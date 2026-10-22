@@ -3,6 +3,7 @@ export const REPO_URL = `https://github.com/${REPO}`
 export const RELEASES_URL = `${REPO_URL}/releases`
 export const LATEST_DMG_URL = `${REPO_URL}/releases/latest/download/OpenNotchi.dmg`
 export const LATEST_ZIP_URL = `${REPO_URL}/releases/latest/download/OpenNotchi.zip`
+export const LATEST_WINDOWS_EXE_URL = `${REPO_URL}/releases/latest/download/OpenNotchi-Windows-setup.exe`
 export const CHANGELOG_URL = `${REPO_URL}/blob/main/CHANGELOG.md`
 export const SITE_URL = "https://opennotchi.vercel.app"
 

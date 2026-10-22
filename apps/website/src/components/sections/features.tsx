@@ -9,7 +9,7 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   { icon: Disc3, title: "Now playing", body: "Spotify, Apple Music and YouTube on a vinyl you can scratch, with VU meters and a spectrum." },
   { icon: Home, title: "Smart home & AC", body: "Control AC temperature, lighting dimmers, and smart plugs via Home Assistant and Shortcuts." },
   { icon: Boxes, title: "3D spatial animations", body: "3D Trapdoor Flip, Holographic Depth, and Cube Roll swinging down with top-hinged physics." },
-  { icon: Monitor, title: "Multi-display island", body: "Follows your active screen or floats as an island pill on external monitors." },
+  { icon: Monitor, title: "macOS & Windows parity", body: "Swift for macOS and Rust + Tauri for Windows, sharing all 8 themes, 9 animations, and synced lyrics." },
   { icon: MessageSquareQuote, title: "Synced lyrics", body: "Lines light up as they're sung. Click one to jump there." },
   { icon: PictureInPicture2, title: "Desktop lyrics", body: "A floating karaoke widget you can drag, resize and fade to just the words." },
   { icon: Languages, title: "Translated lyrics", body: "Each line translated on your Mac, offline and free, right under the original." },

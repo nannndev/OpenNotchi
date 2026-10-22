@@ -5,8 +5,9 @@
 
 MACOS := apps/macos
 WEB := apps/website
+WINDOWS := apps/windows
 
-.PHONY: help app run install dist clean web web-install web-build brand release
+.PHONY: help app run install dist clean web web-install web-build brand release windows-dev windows-build windows-test
 
 help:
 	@echo "make run                  build and launch the macOS app (debug)"
@@ -42,6 +43,15 @@ web: web-install
 
 web-build: web-install
 	npm --prefix $(WEB) run build
+
+windows-dev:
+	npm --prefix $(WINDOWS) run dev
+
+windows-build:
+	npm --prefix $(WINDOWS) run build
+
+windows-test:
+	npm --prefix $(WINDOWS) run test
 
 brand:
 	swift brand/generate.swift

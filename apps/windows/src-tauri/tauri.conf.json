@@ -1,0 +1,87 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "OpenNotchi",
+  "version": "0.1.0",
+  "identifier": "io.github.opennotchi",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "pill",
+        "url": "index.html",
+        "title": "OpenNotchi",
+        "width": 640,
+        "height": 280,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false,
+        "visibleOnAllWorkspaces": true
+      },
+      {
+        "label": "lyrics",
+        "url": "index.html#lyrics",
+        "title": "OpenNotchi Lyrics",
+        "width": 560,
+        "height": 130,
+        "minWidth": 280,
+        "minHeight": 70,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "focus": false,
+        "visible": false,
+        "center": false,
+        "x": 400,
+        "y": 700
+      },
+      {
+        "label": "settings",
+        "url": "index.html#settings",
+        "title": "OpenNotchi Settings",
+        "width": 780,
+        "height": 560,
+        "minWidth": 680,
+        "minHeight": 480,
+        "decorations": true,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "resizable": true,
+        "shadow": true,
+        "focus": true,
+        "visible": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost https://lrclib.net; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+    },
+    "macOSPrivateApi": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Now playing, synced lyrics and live activities in a pill at the top of your screen."
+  }
+}

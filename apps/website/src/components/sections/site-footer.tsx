@@ -19,7 +19,7 @@ export function SiteFooter() {
             <a href={DEVELOPER_URL} target="_blank" rel="noopener" className="font-medium text-foreground underline-offset-4 hover:underline">
               {devName}
             </a>
-            {dev?.name ? ` (@${DEVELOPER_LOGIN})` : ""}. Free and open source under the MIT license. Not affiliated with Apple.
+            {dev?.name ? ` (@${DEVELOPER_LOGIN})` : ""}. Free and open source for macOS &amp; Windows under the MIT license.
           </p>
         </div>
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-2">

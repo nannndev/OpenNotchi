@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Spotify-style lyric cards: pick a few lines, pick a look, then copy, save or share a 1080×1350 image.
 enum LyricsShare {
@@ -49,8 +50,9 @@ enum LyricsShare {
 struct SharedSong {
     let title: String
     let artist: String
-    let artwork: NSImage?
-    let palette: ArtworkPalette?
+    /// Vars so the user can swap in their own cover; the palette follows it.
+    var artwork: NSImage?
+    var palette: ArtworkPalette?
     let lines: [String]
     /// Start time of each line in seconds; nil for unsynced lyrics.
     let times: [Double?]
@@ -73,12 +75,28 @@ enum LyricCardStyle: String, CaseIterable, Identifiable {
 }
 
 private struct LyricsShareView: View {
-    let song: SharedSong
+    @State var song: SharedSong
     /// Always a run of consecutive lines, like Spotify.
     @State var selection: ClosedRange<Int>
     @State private var style: LyricCardStyle = .aura
     @State private var showTranslation = false
     @State private var toast: String?
+    @State private var backdrop: NSImage?
+    @State private var backdropBlur: Double = 12
+    /// Which image the camera sheet is taking: the cover or the background.
+    @State private var cameraTarget: PhotoTarget?
+    private let originalArtwork: (NSImage?, ArtworkPalette?)
+
+    init(song: SharedSong, selection: ClosedRange<Int>) {
+        _song = State(initialValue: song)
+        _selection = State(initialValue: selection)
+        originalArtwork = (song.artwork, song.palette)
+    }
+
+    enum PhotoTarget: Identifiable {
+        case cover, backdrop
+        var id: Self { self }
+    }
 
     private static let maxLines = 5
     private var chosen: [String] { selection.map { song.lines[$0] } }
@@ -86,7 +104,8 @@ private struct LyricsShareView: View {
 
     private var card: some View {
         LyricCard(song: song, lines: chosen, time: song.times[selection.lowerBound],
-                  translations: showTranslation ? song.translations : [:], style: style)
+                  translations: showTranslation ? song.translations : [:], style: style,
+                  backdrop: backdrop, backdropBlur: backdropBlur)
     }
 
     var body: some View {
@@ -120,6 +139,17 @@ private struct LyricsShareView: View {
                 .labelsHidden()
                 .frame(width: 380)
 
+                HStack(spacing: 10) {
+                    photoMenu("Cover", icon: "music.note.list", target: .cover, isCustom: song.artwork !== originalArtwork.0)
+                    photoMenu("Background", icon: "photo", target: .backdrop, isCustom: backdrop != nil)
+                    if backdrop != nil {
+                        Image(systemName: "drop.halffull").foregroundStyle(.secondary)
+                        Slider(value: $backdropBlur, in: 0...40)
+                            .frame(width: 110)
+                            .help("Background blur")
+                    }
+                }
+
                 Toggle("Include translation", isOn: $showTranslation)
                     .disabled(!hasTranslations)
 
@@ -134,12 +164,15 @@ private struct LyricsShareView: View {
             .padding(24)
             .frame(maxWidth: .infinity)
         }
-        .frame(width: 760, height: 640)
+        .frame(width: 760, height: 690)
+        .sheet(item: $cameraTarget) { target in
+            CameraCaptureSheet { image in setPhoto(image, for: target) }
+        }
     }
 
     private var linePicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Tap a line, then the lines next to it (up to \(Self.maxLines))")
+            Text("Tap the first and last line you want (up to \(Self.maxLines))")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 16)
@@ -182,21 +215,17 @@ private struct LyricsShareView: View {
     }
 
     private func toggle(_ index: Int) {
-        selection = Self.nextSelection(selection, tapping: index, maxLines: Self.maxLines) ?? {
-            flash("Up to \(Self.maxLines) lines")
-            return selection
-        }()
+        selection = Self.nextSelection(selection, tapping: index, maxLines: Self.maxLines)
     }
 
-    /// Next to the run grows it, an end of the run shrinks it, anywhere else starts a new run.
-    /// Nil when the run is already at its maximum length.
-    static func nextSelection(_ range: ClosedRange<Int>, tapping index: Int, maxLines: Int) -> ClosedRange<Int>? {
-        if index == range.lowerBound - 1 || index == range.upperBound + 1 {
-            return range.count < maxLines ? min(index, range.lowerBound)...max(index, range.upperBound) : nil
-        }
+    /// Tapping an end drops it, inside trims to it, within reach stretches to it (filling the gap),
+    /// and anything further away starts over there.
+    static func nextSelection(_ range: ClosedRange<Int>, tapping index: Int, maxLines: Int) -> ClosedRange<Int> {
         if range.count > 1, index == range.lowerBound { return (index + 1)...range.upperBound }
         if range.count > 1, index == range.upperBound { return range.lowerBound...(index - 1) }
-        return index...index
+        if range.contains(index) { return range.lowerBound...index }
+        let stretched = min(index, range.lowerBound)...max(index, range.upperBound)
+        return stretched.count <= maxLines ? stretched : index...index
     }
 
     // MARK: - Export
@@ -232,6 +261,42 @@ private struct LyricsShareView: View {
         return MirrorPhotos.save(cg, name: "Lyrics – \(song.title)")
     }
 
+    // MARK: - Custom photos
+
+    private func photoMenu(_ title: String, icon: String, target: PhotoTarget, isCustom: Bool) -> some View {
+        Menu {
+            Button { choosePhoto(for: target) } label: { Label("Choose Photo…", systemImage: "photo.on.rectangle") }
+            Button { cameraTarget = target } label: { Label("Take Photo…", systemImage: "camera") }
+            if isCustom {
+                Divider()
+                Button(target == .cover ? "Use Song Artwork" : "Remove Photo") { setPhoto(nil, for: target) }
+            }
+        } label: {
+            Label(title, systemImage: isCustom ? "checkmark.circle.fill" : icon)
+        }
+        .fixedSize()
+    }
+
+    private func choosePhoto(for target: PhotoTarget) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let image = NSImage(contentsOf: url) else { return flash("Couldn't open that image") }
+        setPhoto(image, for: target)
+    }
+
+    /// Nil restores the song artwork (cover) or the default background.
+    private func setPhoto(_ image: NSImage?, for target: PhotoTarget) {
+        switch target {
+        case .backdrop:
+            backdrop = image
+        case .cover:
+            song.artwork = image ?? originalArtwork.0
+            song.palette = image.flatMap(ArtworkPalette.extract) ?? originalArtwork.1
+        }
+    }
+
     private func flash(_ text: String) {
         withAnimation { toast = text }
         Task { @MainActor in
@@ -251,6 +316,9 @@ struct LyricCard: View {
     var time: Double?
     let translations: [String: String]
     let style: LyricCardStyle
+    /// The user's own photo behind the card, and how much to blur it.
+    var backdrop: NSImage?
+    var backdropBlur: CGFloat = 0
 
     private var top: Color { song.palette?.backgroundTop ?? Color(red: 0.16, green: 0.12, blue: 0.24) }
     private var bottom: Color { song.palette?.backgroundBottom ?? Color(red: 0.05, green: 0.05, blue: 0.09) }
@@ -262,6 +330,8 @@ struct LyricCard: View {
     }
 
     private var ink: Color {
+        // Text sits on the user's photo (darkened below), except on the Polaroid's white frame.
+        if backdrop != nil, style != .polaroid { return .white }
         switch style {
         case .aura, .player: return .white
         case .polaroid: return Color(red: 0.15, green: 0.13, blue: 0.12)
@@ -303,6 +373,22 @@ struct LyricCard: View {
     }
 
     @ViewBuilder private var background: some View {
+        if let backdrop {
+            ZStack {
+                Image(nsImage: backdrop)
+                    .resizable()
+                    .scaledToFill()
+                    // Oversized so the blur doesn't fade the edges to transparent.
+                    .frame(width: Self.size.width + backdropBlur * 4, height: Self.size.height + backdropBlur * 4)
+                    .blur(radius: backdropBlur)
+                LinearGradient(colors: [.black.opacity(0.25), .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
+            }
+        } else {
+            styleBackground
+        }
+    }
+
+    @ViewBuilder private var styleBackground: some View {
         switch style {
         case .aura, .player:
             ZStack {
@@ -534,7 +620,8 @@ struct LyricCard: View {
             Text("OpenNotchi")
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
         }
-        .foregroundStyle(ink.opacity(0.55))
+        // The Polaroid's footer sits on the photo, not on the white frame.
+        .foregroundStyle((backdrop != nil ? Color.white : ink).opacity(0.6))
     }
 }
 
@@ -556,5 +643,32 @@ private struct Grain: View {
             }
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Live camera with a shutter, for taking a cover or background photo for a lyric card.
+private struct CameraCaptureSheet: View {
+    let onCapture: (NSImage) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var request = 0
+
+    var body: some View {
+        VStack(spacing: 14) {
+            CameraPreview(cameraID: AppSettings.shared.mirrorCameraID, captureRequest: request) { photo in
+                onCapture(NSImage(cgImage: photo, size: NSSize(width: photo.width, height: photo.height)))
+                dismiss()
+            }
+            .frame(width: 480, height: 360)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            HStack {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button { request += 1 } label: { Label("Take Photo", systemImage: "camera.fill") }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(18)
     }
 }
