@@ -105,6 +105,17 @@ fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Shows the lyric share card generator window.
+#[tauri::command]
+fn open_share_lyrics(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("share") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+    Ok(())
+}
+
 /// Returns whether the desktop lyrics widget is currently visible.
 #[tauri::command]
 fn is_lyrics_visible(app: tauri::AppHandle) -> bool {
@@ -202,11 +213,11 @@ pub fn run() {
                     tauri_plugin_window_state::StateFlags::POSITION
                         | tauri_plugin_window_state::StateFlags::SIZE,
                 )
-                .with_denylist(&["pill", "settings"])
+                .with_denylist(&["pill", "settings", "share"])
                 .build(),
         )
         .on_window_event(|window, event| {
-            if window.label() == "settings" {
+            if window.label() == "settings" || window.label() == "share" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
@@ -219,6 +230,7 @@ pub fn run() {
             hide_lyrics,
             is_lyrics_visible,
             open_settings,
+            open_share_lyrics,
             get_monitors,
             set_pill_monitor,
             media::now_playing,
@@ -241,24 +253,31 @@ pub fn run() {
                 watch_hover(pill);
             }
 
-            // Explicitly ensure lyrics and settings windows are hidden on startup
+            // Explicitly ensure auxiliary windows are hidden on startup
             if let Some(lyrics) = app.get_webview_window("lyrics") {
                 let _ = lyrics.hide();
             }
             if let Some(settings) = app.get_webview_window("settings") {
                 let _ = settings.hide();
             }
+            if let Some(share) = app.get_webview_window("share") {
+                let _ = share.hide();
+            }
 
             let lyrics = MenuItem::with_id(app, "lyrics", "Toggle Desktop Lyrics", true, None::<&str>)?;
+            let share = MenuItem::with_id(app, "share", "Share Lyric Card…", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit OpenNotchi", true, None::<&str>)?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().cloned().expect("bundle icon"))
                 .tooltip("OpenNotchi")
-                .menu(&Menu::with_items(app, &[&lyrics, &settings, &quit])?)
+                .menu(&Menu::with_items(app, &[&lyrics, &share, &settings, &quit])?)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "lyrics" => {
                         let _ = toggle_lyrics(app.clone());
+                    }
+                    "share" => {
+                        let _ = open_share_lyrics(app.clone());
                     }
                     "settings" => {
                         let _ = open_settings(app.clone());

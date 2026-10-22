@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWindow } from "@tauri-apps/api/window"
-import { Lock, Maximize2, X } from "lucide-react"
+import { Lock, Maximize2, Share2, X } from "lucide-react"
 import { useState } from "react"
 import { currentLine, useLyrics, useNowPlaying, useTick } from "./media"
 
@@ -47,6 +47,7 @@ export function LyricsWidget() {
       {hover && (
         <>
           <div className="widget-controls">
+            <button onClick={() => invoke("open_share_lyrics").catch(() => {})} title="Share lyrics card" aria-label="Share lyrics card"><Share2 size={12} /></button>
             <button onClick={cycleBackground} title={`Background ${Math.round(background * 100)}%`} aria-label="Background opacity">◐</button>
             <button onClick={lock} title="Lock (clicks pass through)" aria-label="Lock"><Lock size={12} /></button>
             <button onClick={() => invoke("hide_lyrics").catch(() => win.hide())} title="Hide" aria-label="Hide"><X size={12} /></button>

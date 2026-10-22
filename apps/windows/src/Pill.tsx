@@ -11,6 +11,7 @@ import {
   Play,
   Quote,
   Settings as SettingsIcon,
+  Share2,
   SkipBack,
   SkipForward,
   Timer,
@@ -106,6 +107,7 @@ export function Pill() {
       .catch(() => {})
 
   const openSettings = () => invoke("open_settings").catch(() => {})
+  const openShare = () => invoke("open_share_lyrics").catch(() => {})
 
   const line = currentLine(np, lyrics)
   const synced = lyrics && lyrics !== "loading" ? lyrics.synced : []
@@ -237,6 +239,13 @@ export function Pill() {
               </button>
               <button
                 className="header-action-btn"
+                onClick={openShare}
+                title="Share lyric card"
+              >
+                <Share2 size={12} />
+              </button>
+              <button
+                className="header-action-btn"
                 onClick={openSettings}
                 title="Open Settings"
               >
@@ -252,15 +261,25 @@ export function Pill() {
                 <div className="deck">
                   <Vinyl src={np?.artwork ?? null} size={118} playing={!!np?.isPlaying} tonearm />
                   {hasSynced && (
-                    <button
-                      className={`lyrics-toggle ${lyricsMode ? "on" : ""}`}
-                      onClick={() => setLyricsMode(!lyricsMode)}
-                      aria-label={lyricsMode ? "Show player" : "Show lyrics"}
-                      aria-pressed={lyricsMode}
-                      title={lyricsMode ? "Show player" : "Show lyrics"}
-                    >
-                      <Quote size={11} fill="currentColor" />
-                    </button>
+                    <div className="deck-controls-stack">
+                      <button
+                        className={`lyrics-toggle ${lyricsMode ? "on" : ""}`}
+                        onClick={() => setLyricsMode(!lyricsMode)}
+                        aria-label={lyricsMode ? "Show player" : "Show lyrics"}
+                        aria-pressed={lyricsMode}
+                        title={lyricsMode ? "Show player" : "Show lyrics"}
+                      >
+                        <Quote size={11} fill="currentColor" />
+                      </button>
+                      <button
+                        className="lyrics-share-toggle"
+                        onClick={openShare}
+                        aria-label="Share lyric card"
+                        title="Share lyric card"
+                      >
+                        <Share2 size={11} />
+                      </button>
+                    </div>
                   )}
                 </div>
 

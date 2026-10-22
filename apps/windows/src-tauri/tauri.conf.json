@@ -62,10 +62,28 @@
         "focus": true,
         "visible": false,
         "center": true
+      },
+      {
+        "label": "share",
+        "url": "index.html#share",
+        "title": "OpenNotchi — Share Lyric Card",
+        "width": 880,
+        "height": 650,
+        "minWidth": 780,
+        "minHeight": 580,
+        "decorations": true,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "resizable": true,
+        "shadow": true,
+        "focus": true,
+        "visible": false,
+        "center": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost https://lrclib.net; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost https://lrclib.net; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"
     },
     "macOSPrivateApi": true
   },
