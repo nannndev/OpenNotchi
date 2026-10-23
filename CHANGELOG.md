@@ -4,6 +4,19 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-10-23
+
+### Added
+- **Lyric Videos in Every Frame**: Video mode now works with all ten card styles, not just VHS. Set a background video (uploaded or recorded from the webcam) or a photo, with blur and zoom; short clips loop for the whole video.
+- **Music in Lyric Videos**: Attach the song's audio file and the part matching the chosen lines is added to the exported video. Without one, the background clip's own sound is kept.
+- **Lyric Text Styling**: Pick the font (Sans, Rounded, Serif, Mono, Handwritten), size and alignment (left, center, right) for lyric cards and videos.
+- **Pomodoro Timer**: Turn on Pomodoro in the Timer tab for 25-minute focus sessions and 5-minute breaks that start on their own, with a 15-minute break after every fourth focus. Skip moves to the next phase, and dots show your progress through the round.
+- **Windows**: Lyric videos with background video/photo, music, blur, zoom and text styling, plus the Pomodoro timer.
+
+### Changed
+- The cover in Player, Vinyl and Polaroid cards always shows the song artwork (or your custom cover) instead of the background.
+- The website's feature list is grouped into tabs.
+
 ## [0.9.0] - 2026-10-22
 
 ### Added
