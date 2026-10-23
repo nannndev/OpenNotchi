@@ -89,7 +89,7 @@ export function makeRange(start: number, end: number): number[] {
 export function getNextLyricSelection(
   current: number[],
   idx: number,
-  maxLines = 5,
+  maxLines = 8,
 ): number[] {
   if (current.length === 0) {
     return [idx]
