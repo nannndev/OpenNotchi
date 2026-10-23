@@ -239,9 +239,9 @@ mod imp {
             while let Ok(cmd) = rx.try_recv() {
                 match cmd {
                     MediaCmd::Control { action, seek_to } => {
-                        let target = active_session.as_ref()
+                        let target = active_session.clone()
                             .or_else(|| manager_opt.as_ref().and_then(|m| m.GetCurrentSession().ok()));
-                        if let Some(session) = target {
+                        if let Some(session) = &target {
                             let _ = execute_control(session, &action, seek_to);
                         }
                     }
@@ -322,9 +322,9 @@ mod imp {
             // Sleep 500ms or wake up on incoming control command
             match rx.recv_timeout(Duration::from_millis(500)) {
                 Ok(MediaCmd::Control { action, seek_to }) => {
-                    let target = active_session.as_ref()
+                    let target = active_session.clone()
                         .or_else(|| manager_opt.as_ref().and_then(|m| m.GetCurrentSession().ok()));
-                    if let Some(session) = target {
+                    if let Some(session) = &target {
                         let _ = execute_control(session, &action, seek_to);
                     }
                 }
