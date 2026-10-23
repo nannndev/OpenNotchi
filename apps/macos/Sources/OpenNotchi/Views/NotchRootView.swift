@@ -287,7 +287,7 @@ struct ClosedActivityView: View {
                 }
                 .frame(width: height - 14, height: height - 14)
             } else if timer.isActive {
-                Image(systemName: timer.isRunning ? "timer" : "pause.fill")
+                Image(systemName: !timer.isRunning ? "pause.fill" : timer.pomodoro && timer.phase != .focus ? "cup.and.saucer.fill" : "timer")
                     .font(.system(size: height * 0.45, weight: .semibold))
                     .foregroundStyle(accent.highlight)
                     .frame(width: height - 10)
