@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { Analytics } from "@vercel/analytics/react"
 import { Contributors } from "@/components/sections/contributors"
 import { Download } from "@/components/sections/download"
 import { Features } from "@/components/sections/features"
@@ -31,6 +32,7 @@ export default function App() {
         <Support />
       </main>
       <SiteFooter />
+      <Analytics />
     </TooltipProvider>
   )
 }
