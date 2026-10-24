@@ -1,6 +1,6 @@
 [package]
 name = "opennotchi"
-version = "0.12.0"
+version = "0.13.0"
 description = "OpenNotchi for Windows: now playing, synced lyrics and live activities in a pill at the top of the screen"
 authors = ["OpenNotchi contributors"]
 license = "MIT"

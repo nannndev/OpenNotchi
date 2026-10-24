@@ -3,6 +3,22 @@
 All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
+
+## [0.13.0] - 2026-10-25
+
+### Added
+- **Cyber-Bot Mascot Companion (macOS & Windows)**:
+  - Replaced the 5-bar mascot with a futuristic Cyber-Bot living in your notch/pill.
+  - Animated OLED visor screen featuring reactive mood expressions: natural blinking, pointer gaze tracking, heart eyes (♥ ♥) on click/pet, joyful arcs (^ ^) when tasks complete, chill waves (~ ~) with music headphones when vibing, scanning slits on agent work, and alert eyes (O O).
+  - Squash-and-bounce spring physics on click and interactive pet tracking.
+- **Enhanced Liquid Glass (macOS)**:
+  - Redesigned Liquid Glass and Liquid Glass Clear with native silky blur, high-index tinted substrate for crystal-clear readability, specular gloss light refraction, and polished beveled glass rim borders.
+
+### Fixed
+- **Windows Theme Overlay Bug**:
+  - Removed the milky white aura overlay that was washing out themes in the expanded pill.
+  - Re-positioned ambient aura glow behind the pill into the desktop stage, restoring deep, vibrant colors for Aurora, Midnight, Classic Black, and Frosted themes.
+
 ## [0.12.0] - 2026-10-24
 
 ### Added

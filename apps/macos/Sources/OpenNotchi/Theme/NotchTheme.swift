@@ -243,11 +243,11 @@ struct NotchBackground<S: Shape>: View {
             // 1. Native macOS Blur
             VisualEffectBlur(material: .popover)
 
-            // 2. High-index dark tinted glass substrate (ensures contrast & legibility)
+            // 2. Control Center dark smoke glass tint (matches macOS Control Center cards)
             LinearGradient(
                 colors: clear
-                    ? [Color(white: 0.14, opacity: 0.68), Color(white: 0.08, opacity: 0.80)]
-                    : [Color(white: 0.10, opacity: 0.84), Color(white: 0.05, opacity: 0.92)],
+                    ? [Color(red: 0.18, green: 0.19, blue: 0.23).opacity(0.58), Color(red: 0.10, green: 0.11, blue: 0.14).opacity(0.72)]
+                    : [Color(red: 0.16, green: 0.17, blue: 0.21).opacity(0.72), Color(red: 0.08, green: 0.09, blue: 0.12).opacity(0.84)],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -255,7 +255,7 @@ struct NotchBackground<S: Shape>: View {
             // 3. Top Specular Glass Reflection
             LinearGradient(
                 colors: [
-                    Color.white.opacity(clear ? 0.24 : 0.18),
+                    Color.white.opacity(clear ? 0.25 : 0.18),
                     Color.white.opacity(0.04),
                     Color.clear
                 ],

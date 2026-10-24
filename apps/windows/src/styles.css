@@ -81,16 +81,28 @@ button:focus-visible {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
 }
 
-/* 2. Liquid Glass */
+/* 2. Liquid Glass (macOS Control Center Dark Frosted Glass) */
 .theme-liquidGlass {
-  background: linear-gradient(135deg, rgba(24, 26, 36, 0.94) 0%, rgba(13, 14, 20, 0.98) 100%) !important;
-  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7), inset 0 1px 1.5px rgba(255, 255, 255, 0.28) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 35%, transparent 60%),
+    linear-gradient(135deg, rgba(34, 36, 44, 0.78) 0%, rgba(18, 19, 25, 0.88) 100%) !important;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.55),
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14) !important;
 }
 
-/* 3. Liquid Glass (Clear) */
+/* 3. Liquid Glass Clear (Crystal Control Center Glass) */
 .theme-liquidGlassClear {
-  background: linear-gradient(135deg, rgba(32, 35, 48, 0.88) 0%, rgba(18, 20, 28, 0.92) 100%) !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), inset 0 1px 2px rgba(255, 255, 255, 0.38) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.04) 35%, transparent 60%),
+    linear-gradient(135deg, rgba(40, 43, 54, 0.64) 0%, rgba(22, 24, 32, 0.76) 100%) !important;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18) !important;
 }
 
 /* 4. Frosted */
