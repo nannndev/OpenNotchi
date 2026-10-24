@@ -5,7 +5,8 @@
   "windows": [
     "pill",
     "lyrics",
-    "settings"
+    "settings",
+    "share"
   ],
   "permissions": [
     "core:default",
