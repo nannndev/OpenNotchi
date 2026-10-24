@@ -9,7 +9,6 @@ import { Photobox } from "@/components/sections/photobox"
 import { SiteFooter } from "@/components/sections/site-footer"
 import { SiteNav } from "@/components/sections/site-nav"
 import { Support } from "@/components/sections/support"
-import { NotchDemo } from "@/components/notch-demo"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
 export default function App() {
@@ -22,7 +21,6 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      <NotchDemo />
       <SiteNav />
       <main id="top">
         <Hero />
