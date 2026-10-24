@@ -4,6 +4,20 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] - 2026-10-24
+
+### Added
+- **AI tab** (off until you turn on Settings › AI):
+  - **Agents**: Claude Code and Codex sessions with their state (working, needs you, done, idle). The notch drops a banner when one finishes or needs you. Optional Claude Code hooks make it instant.
+  - **Usage**: tokens and estimated cost for today, the current 5-hour block and the last 7 days for each Claude Code account, plus Codex rate limits and reset times. Add more accounts by folder. An optional meter can sit in the closed notch.
+  - **Ask AI**: summarize, fix, translate or explain the clipboard or the current lyric line. Use Apple Intelligence on supported Macs, Ollama, the Anthropic API or any OpenAI-compatible API; keys stay in the Keychain (Credential Manager on Windows).
+  - Agent status and usage are read from files on your computer; Ask AI sends text only to the provider you choose.
+- **Windows: Teleprompter tab** with adjustable speed, text size and mirrored text.
+- **Windows: Mirror & Photobox** like on the Mac: filters, ring light, grid, all 19 strip frames in 5 formats, 1 to 6 photos, your own text, and a Mirror & Photobox page in Settings. Pin the mirror open and drag to resize it.
+
+### Fixed
+- **Windows**: the pill no longer slides up out of view while lyrics scroll, and glass themes no longer leave stacked copies of the pill on screen.
+
 ## [0.10.1] - 2026-10-24
 
 ### Added
