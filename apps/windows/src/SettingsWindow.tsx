@@ -20,9 +20,12 @@ import {
   Timer,
   Video,
   Wand2,
+  Bot,
 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { CURRENT_VERSION, openExternalUrl, useUpdateChecker } from "./updater"
+import { AISettings } from "./AISettings"
+import { MirrorSettings } from "./MirrorSettings"
 import {
   ACCENT_PRESETS,
   ANIMATION_OPTIONS,
@@ -44,7 +47,7 @@ interface MonitorInfo {
   height: number
 }
 
-type TabKey = "appearance" | "animations" | "tabs" | "general" | "about"
+type TabKey = "appearance" | "animations" | "tabs" | "mirror" | "ai" | "general" | "about"
 
 export function SettingsWindow() {
   const [settings, setSettings] = useSettings()
@@ -92,7 +95,7 @@ export function SettingsWindow() {
           </div>
           <div className="brand-meta">
             <span className="brand-title">OpenNotchi</span>
-            <span className="brand-version">v0.1.0 (Windows)</span>
+            <span className="brand-version">v{CURRENT_VERSION} (Windows)</span>
           </div>
         </div>
 
@@ -117,6 +120,20 @@ export function SettingsWindow() {
           >
             <Sliders size={16} />
             <span>Pill Tabs & Features</span>
+          </button>
+          <button
+            className={`nav-item ${activeTab === "mirror" ? "active" : ""}`}
+            onClick={() => setActiveTab("mirror")}
+          >
+            <Video size={16} />
+            <span>Mirror & Photobox</span>
+          </button>
+          <button
+            className={`nav-item ${activeTab === "ai" ? "active" : ""}`}
+            onClick={() => setActiveTab("ai")}
+          >
+            <Bot size={16} />
+            <span>AI</span>
           </button>
           <button
             className={`nav-item ${activeTab === "general" ? "active" : ""}`}
@@ -514,6 +531,10 @@ export function SettingsWindow() {
             </button>
           </div>
         )}
+
+        {activeTab === "mirror" && <MirrorSettings />}
+
+        {activeTab === "ai" && <AISettings />}
 
         {/* Tab 5: About */}
         {activeTab === "about" && (

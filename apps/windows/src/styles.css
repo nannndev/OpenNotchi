@@ -81,6 +81,13 @@ button:focus-visible {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
 }
 
+/* WebView2 can't blur the desktop behind a transparent window, and backdrop-filter there
+   leaves stale copies of the pill on screen while it resizes. Keep the glass look, drop the blur. */
+.pill[class*="theme-"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* 2. Liquid Glass */
 .theme-liquidGlass {
   background: rgba(16, 16, 22, 0.68) !important;
@@ -817,6 +824,7 @@ button:focus-visible {
    ========================================================================== */
 
 .lyrics-scroll {
+  position: relative; /* offsetParent for the centering math in LyricsScroller */
   flex: 1;
   min-width: 0;
   height: 100%;
@@ -3942,23 +3950,30 @@ button:focus-visible {
 }
 
 /* ==========================================================================
-   Mirror & Photobox Tab
+   Mirror & Photobox Tab (matches the macOS mirror)
    ========================================================================== */
 
 .tab-mirror {
+  position: relative;
   width: 100%;
   height: 100%;
-  display: grid;
-  grid-template-columns: 1fr 170px;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
+  padding-bottom: 10px;
+  box-sizing: border-box;
 }
 .mirror-view {
   position: relative;
-  border-radius: 12px;
+  flex: 1;
+  min-height: 0;
+  border-radius: 16px;
   overflow: hidden;
   background: #000;
-  min-height: 0;
+  transition: box-shadow 0.25s;
+}
+.mirror-view.ring {
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.35);
 }
 .mirror-view video {
   width: 100%;
@@ -3966,6 +3981,14 @@ button:focus-visible {
   object-fit: cover;
   /* Mirrored like a real mirror; captureFrame flips the saved photo the same way. */
   transform: scaleX(-1);
+}
+.mirror-view.ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 8px rgba(255, 248, 235, 0.95), inset 0 0 40px 16px rgba(255, 244, 225, 0.5);
 }
 .mirror-error {
   height: 100%;
@@ -3979,25 +4002,39 @@ button:focus-visible {
   text-align: center;
   color: var(--muted);
 }
+.mirror-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --line: rgba(255, 255, 255, 0.3);
+  background:
+    linear-gradient(var(--line), var(--line)) 33.33% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--line), var(--line)) 66.66% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--line), var(--line)) 0 33.33% / 100% 1px no-repeat,
+    linear-gradient(var(--line), var(--line)) 0 66.66% / 100% 1px no-repeat;
+}
 .mirror-countdown {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 56px;
+  font-size: 64px;
   font-weight: 800;
-  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   animation: mirror-pop 0.8s ease-out;
+  pointer-events: none;
 }
 @keyframes mirror-pop {
-  from { transform: scale(1.4); opacity: 0; }
+  from { transform: scale(1.6); opacity: 0; }
   30% { transform: scale(1); opacity: 1; }
 }
 .mirror-flash {
   position: absolute;
   inset: 0;
   background: #fff;
+  opacity: 0.9;
   animation: mirror-flash 0.18s ease-out forwards;
+  pointer-events: none;
 }
 @keyframes mirror-flash {
   to { opacity: 0; }
@@ -4008,61 +4045,744 @@ button:focus-visible {
   left: 50%;
   translate: -50% 0;
   display: flex;
-  gap: 5px;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
 }
 .mirror-shots span {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.3);
 }
 .mirror-shots span.done {
-  background: var(--accent);
+  background: #fff;
 }
-.mirror-toast {
+.mirror-saved {
   position: absolute;
-  bottom: 8px;
-  left: 50%;
-  translate: -50% 0;
-  white-space: nowrap;
-  font-size: 10.5px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.75);
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.6);
+  animation: mirror-slide 0.3s ease-out;
 }
-.mirror-side {
+.mirror-saved img {
+  width: 40px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 5px;
+}
+.mirror-saved div {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+}
+.mirror-saved span {
+  font-size: 9px;
+  color: var(--muted);
+}
+@keyframes mirror-slide {
+  from { translate: 20px 0; opacity: 0; }
+}
+
+/* Shutter and photobox on the right, only while hovering */
+.mirror-right {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  translate: 0 -50%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.mirror-right.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mirror-shutter {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: transparent;
+  position: relative;
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.4));
+}
+.mirror-shutter::after {
+  content: "";
+  position: absolute;
+  inset: 2.5px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.12s;
+}
+.mirror-shutter:active::after {
+  transform: scale(0.86);
+}
+.mirror-booth-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.4));
+}
+
+/* Looks and toggles in one capsule along the bottom, only while hovering */
+.mirror-capsule {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.mirror-capsule.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mirror-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex: none;
+}
+.mirror-swatch.active {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.mirror-effect-name {
+  width: 46px;
+  font-size: 10px;
+  font-weight: 600;
+  padding-left: 2px;
+}
+.mirror-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.25);
+}
+.mirror-cap-btn {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  border-radius: 50%;
+}
+.mirror-cap-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.mirror-cap-btn.on-yellow {
+  color: #ffd60a;
+}
+.mirror-spacer {
+  flex: 1;
+}
+
+/* Strip picker over the mirror */
+.strip-picker {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: none;
+  animation: mirror-fade 0.2s ease-out;
+}
+@keyframes mirror-fade {
+  from { opacity: 0; transform: scale(0.97); }
+}
+.strip-picker-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.strip-shots {
+  display: flex;
+  gap: 3px;
+}
+.strip-format {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  padding: 4px 9px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.strip-thumb-img {
+  height: calc(100% - 18px);
+  min-height: 30px;
+  max-width: 120px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.strip-styles button.active .strip-thumb-img {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.strip-shots button {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.12);
+}
+.strip-shots button.active {
+  background: #fff;
+  color: #000;
+}
+.strip-caption {
+  width: 170px;
+  font: inherit;
+  font-size: 11px;
+  color: #fff;
+  padding: 5px 9px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  outline: none;
+}
+.strip-picker-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.strip-styles {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.strip-styles button {
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  flex: none;
+}
+.strip-styles button.active {
+  color: #fff;
+}
+.strip-thumb {
+  /* Explicit height so aspect-ratio can derive the width; flex:1 alone left the width unbounded. */
+  height: calc(100% - 18px);
+  min-height: 30px;
+  aspect-ratio: 1 / 2.6;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 4px 12px;
+  border-radius: 4px;
+  border: 1px solid;
+  box-sizing: border-box;
+}
+.strip-styles button.active .strip-thumb {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.strip-thumb i {
+  flex: 1;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #8aa, #577);
+}
+.strip-start {
+  height: 34px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #fff;
+  color: #000;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* Grabber under the mirror */
+.mirror-resize {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  translate: -50% 0;
+  width: 80px;
+  height: 10px;
+  display: grid;
+  place-items: center;
+  cursor: ns-resize;
+}
+.mirror-resize span {
+  width: 40px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  transition: width 0.15s, background 0.15s;
+}
+.mirror-resize:hover span {
+  width: 54px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* ==========================================================================
+   Settings › Mirror & Photobox
+   ========================================================================== */
+
+.strip-gallery {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 6px 2px 10px;
+}
+.strip-gallery-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.strip-gallery-item img,
+.strip-gallery-swatch {
+  height: 150px;
+  max-width: 150px;
+  object-fit: contain;
+  border-radius: 4px;
+  padding: 3px;
+  outline: 2.5px solid transparent;
+  outline-offset: 0;
+}
+.strip-gallery-swatch {
+  width: 50px;
+}
+.strip-gallery-item.active {
+  color: #fff;
+  font-weight: 600;
+}
+.strip-gallery-item.active img,
+.strip-gallery-item.active .strip-gallery-swatch {
+  outline-color: #fff;
+}
+.strip-closeup {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+.strip-closeup-full {
+  height: 260px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.strip-closeup-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.strip-closeup-footer {
+  width: 300px;
+  height: 190px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: bottom center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.settings-select,
+.settings-input {
+  font: inherit;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 5px 8px;
+  min-width: 180px;
+}
+.segmented {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.segmented button {
+  min-width: 34px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
+}
+.segmented button + button {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+.segmented button.active {
+  background: #fff;
+  color: #000;
+}
+
+/* ==========================================================================
+   AI tab
+   ========================================================================== */
+
+.tab-ai {
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-height: 0;
 }
-.mirror-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+.ai-segments {
+  align-self: center;
+  flex: none;
 }
-.mirror-chips .deck-chip {
-  font-size: 10px;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-}
-.mirror-chips .deck-chip.active {
-  background: var(--accent);
-  color: #000;
-}
-.mirror-select {
+.ai-segments button {
+  padding: 2px 12px;
   font-size: 10.5px;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 3px 6px;
 }
-.mirror-actions {
+.ai-body {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+}
+.ai-empty {
+  margin: auto;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: center;
+}
+.ai-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.ai-agent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 11.5px;
+}
+.ai-agent-project {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ai-agent-msg {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-agent-time {
+  width: 26px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.ai-chip {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.ai-chip.working {
+  color: #000;
+  background: var(--accent);
+  animation: ai-pulse 1.4s ease-in-out infinite;
+}
+.ai-chip.needs_you {
+  color: #000;
+  background: var(--orange);
+}
+.ai-chip.done {
+  color: #000;
+  background: var(--green);
+}
+.ai-chip.idle {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.1);
+}
+@keyframes ai-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.ai-usage {
+  display: flex;
+  gap: 8px;
+  height: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ai-card {
+  flex: 1 0 170px;
+  max-width: 270px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+  min-height: 0;
+}
+.ai-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+.ai-plan {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ai-card-empty,
+.ai-card-note {
+  color: var(--muted);
+  font-size: 10px;
+}
+.ai-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ai-stat span {
+  color: var(--muted);
+}
+.ai-stat b {
+  font-variant-numeric: tabular-nums;
+}
+.ai-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent) var(--p), rgba(255, 255, 255, 0.1) var(--p));
+}
+.ai-bar.hot {
+  background: linear-gradient(90deg, var(--orange) var(--p), rgba(255, 255, 255, 0.1) var(--p));
+}
+.ai-spark {
+  flex: 1;
+  min-height: 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  margin-top: 2px;
+}
+.ai-spark i {
+  flex: 1;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.ai-spark i.today {
+  background: var(--accent);
+}
+.ai-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  min-height: 0;
+}
+.ai-ask-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ai-ask-input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: inherit;
+  font-size: 11.5px;
+}
+.ai-ask-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.ai-quick {
+  display: flex;
   gap: 5px;
-  margin-top: auto;
+  flex-wrap: wrap;
+}
+.ai-quick .prompter-btn:disabled,
+.ai-ask-row .prompter-btn:disabled {
+  opacity: 0.4;
+}
+.ai-answer {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11.5px;
+  line-height: 1.45;
+  user-select: text;
+}
+.ai-answer p {
+  margin: 0;
+  white-space: pre-wrap;
+  padding-right: 22px;
+}
+.ai-answer .muted {
+  font-size: 10.5px;
+}
+.ai-copy {
+  position: sticky;
+  float: right;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+.ai-error {
+  color: var(--orange);
+}
+.ai-ok {
+  color: var(--green);
+}
+
+/* Closed-notch usage meter */
+.usage-meter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  font: 700 10px ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: var(--muted);
+}
+.usage-meter i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) var(--p), rgba(255, 255, 255, 0.15) 0);
+}
+.usage-meter.hot,
+.usage-meter.hot i {
+  color: var(--orange);
+}
+.usage-meter.hot i {
+  background: conic-gradient(var(--orange) var(--p), rgba(255, 255, 255, 0.15) 0);
+}
+
+/* Settings › AI */
+.ai-settings-body {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.ai-settings-body:disabled {
+  opacity: 0.45;
+}
+.ai-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.ai-settings-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+.ai-settings-btn.primary {
+  background: #fff;
+  color: #000;
+}
+.ai-settings-btn:disabled {
+  opacity: 0.45;
+}
+.ai-icon-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.ai-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.ai-settings-note {
+  padding: 0 14px 10px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.ai-account-row {
+  gap: 8px;
+}
+.ai-account-row .settings-input {
+  min-width: 0;
+  width: 150px;
+}
+.ai-account-row .ai-account-dir {
+  flex: 1;
+}
+.ai-wide {
+  min-width: 260px;
+}
+.ai-settings-body .toggle-row {
+  gap: 12px;
 }

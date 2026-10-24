@@ -1,5 +1,6 @@
 import { emit, listen } from "@tauri-apps/api/event"
-import type { MirrorEffect, StripStyle } from "./photobox"
+import type { AiAccount, AiProvider } from "./ai"
+import type { MirrorEffect, StripFormat, StripStyle } from "./photobox"
 import { useEffect, useState } from "react"
 
 export type NotchTheme =
@@ -36,6 +37,10 @@ export type NotchAnimationStyle =
   | "depth3D"
   | "cube3D"
 
+/** Mirror tab height range; the pill window is 280px tall plus room for the floating gap. */
+export const MIRROR_MIN_HEIGHT = 210
+export const MIRROR_MAX_HEIGHT = 440
+
 export type NotchMode = "pinned" | "floating" | "autoHide"
 
 export interface AppSettings {
@@ -66,8 +71,35 @@ export interface AppSettings {
   // Mirror & photobox
   mirrorEffect: MirrorEffect
   photoboxStyle: StripStyle
+  /** Pill height while the Mirror tab is open; drag the bar under the camera to change it. */
+  mirrorHeight: number
+  /** Keeps the pill open on the Mirror tab even after the cursor leaves. */
+  mirrorPinned: boolean
+  mirrorCameraId: string
+  /** Self-timer seconds before a single photo; 0 shoots right away. */
+  mirrorTimer: number
+  mirrorRingLight: boolean
+  mirrorGrid: boolean
+  /** Photos per photobox strip. */
+  stripShots: number
+  stripCaption: string
+  stripFormat: StripFormat
   // Notes content persistence
   notesText: string
+  // AI (all off until "Enable AI features"; API keys live in Credential Manager, never here)
+  aiEnabled: boolean
+  aiAgents: boolean
+  /** Peek when an agent finishes or needs you. */
+  aiNotify: boolean
+  /** Filled with ~/.claude and ~/.codex (when they exist) the first time AI is enabled. */
+  aiAccounts: AiAccount[]
+  aiClosedMeter: boolean
+  aiProvider: AiProvider
+  aiOllamaUrl: string
+  aiOllamaModel: string
+  aiAnthropicModel: string
+  aiOpenaiUrl: string
+  aiOpenaiModel: string
 }
 
 export const THEME_OPTIONS: { id: NotchTheme; name: string; desc: string; previewClass: string }[] = [
@@ -144,7 +176,27 @@ export const DEFAULT_SETTINGS: AppSettings = {
   prompterMirror: false,
   mirrorEffect: "natural",
   photoboxStyle: "classic",
+  mirrorHeight: 300,
+  mirrorPinned: false,
+  mirrorCameraId: "",
+  mirrorTimer: 3,
+  mirrorRingLight: false,
+  mirrorGrid: false,
+  stripShots: 4,
+  stripCaption: "",
+  stripFormat: "strip",
   notesText: "",
+  aiEnabled: false,
+  aiAgents: true,
+  aiNotify: true,
+  aiAccounts: [],
+  aiClosedMeter: false,
+  aiProvider: "ollama",
+  aiOllamaUrl: "http://127.0.0.1:11434",
+  aiOllamaModel: "llama3.2",
+  aiAnthropicModel: "claude-haiku-5-5",
+  aiOpenaiUrl: "https://api.openai.com/v1",
+  aiOpenaiModel: "gpt-4o-mini",
 }
 
 export function loadSettings(): AppSettings {

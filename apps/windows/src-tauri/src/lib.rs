@@ -1,3 +1,4 @@
+mod ai;
 mod media;
 mod system;
 
@@ -54,6 +55,31 @@ fn place_pill(window: &WebviewWindow) -> tauri::Result<()> {
 #[tauri::command]
 fn set_pill_size(size: State<PillSize>, width: f64, height: f64) {
     *size.0.lock().unwrap() = (width, height);
+}
+
+/// Grows or shrinks the transparent pill window (keeping it top-centered) so a taller pill, like a
+/// resized Mirror, isn't clipped.
+#[tauri::command]
+fn set_pill_window_height(app: tauri::AppHandle, height: f64) -> Result<(), String> {
+    let Some(pill) = app.get_webview_window("pill") else { return Ok(()) };
+    let size = pill.inner_size().map_err(|e| e.to_string())?;
+    let scale = pill.scale_factor().map_err(|e| e.to_string())?;
+    let target = (height.clamp(200.0, 600.0) * scale).round() as u32;
+    if size.height != target {
+        pill.set_size(tauri::PhysicalSize::new(size.width, target)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Whether the cursor is over the visible pill right now; used when a pinned Mirror is unpinned.
+#[tauri::command]
+fn cursor_over_pill(app: tauri::AppHandle) -> bool {
+    let Some(w) = app.get_webview_window("pill") else { return false };
+    let (Ok(pos), Ok(size), Ok(scale), Ok(cursor)) = (w.outer_position(), w.outer_size(), w.scale_factor(), w.cursor_position()) else {
+        return false;
+    };
+    let pill = *w.state::<PillSize>().0.lock().unwrap();
+    cursor_in_pill((cursor.x, cursor.y), (pos.x as f64, pos.y as f64), size.width as f64, pill, scale)
 }
 
 /// Returns all available monitors with their dimensions and primary flag.
@@ -246,6 +272,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             set_pill_size,
+            set_pill_window_height,
+            cursor_over_pill,
             toggle_lyrics,
             hide_lyrics,
             is_lyrics_visible,
@@ -260,6 +288,15 @@ pub fn run() {
             system::privacy_state,
             system::get_autostart,
             system::set_autostart,
+            ai::agent_sessions,
+            ai::ai_usage,
+            ai::ai_default_accounts,
+            ai::set_hook_server,
+            ai::claude_hooks,
+            ai::claude_hooks_installed,
+            ai::ai_key_set,
+            ai::ai_key_exists,
+            ai::ask_ai,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

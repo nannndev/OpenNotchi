@@ -22,8 +22,10 @@ import {
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import { currentIndex } from "./lyrics"
 import { control, currentLine, formatTime, positionAt, useLyrics, useNowPlaying, useTick, type NowPlaying } from "./media"
+import { closedMeter } from "./ai"
 import { useAccent } from "./palette"
 import { resolveAccentColor, useSettings } from "./settings"
+import { AITab, useAgents, useUsage } from "./tabs/AITab"
 import { ClipboardTab } from "./tabs/ClipboardTab"
 import { MirrorTab } from "./tabs/MirrorTab"
 import { NotesTab } from "./tabs/NotesTab"
@@ -42,7 +44,7 @@ const REVEAL_STRIP = 4
 const PEEK_MS = 3000
 
 type Privacy = { camera: boolean; mic: boolean }
-type TabKey = "music" | "clipboard" | "timer" | "notes" | "prompter" | "mirror"
+type TabKey = "music" | "clipboard" | "timer" | "notes" | "prompter" | "mirror" | "ai"
 
 export function Pill() {
   const np = useNowPlaying()
@@ -58,16 +60,30 @@ export function Pill() {
   const [awake, setAwake] = useState(false)
   const [widgetOn, setWidgetOn] = useState(false)
   const [peek, setPeek] = useState<Privacy | null>(null)
+  // "Claude Code finished · project" for a few seconds when an agent finishes or needs you.
+  const [agentPeek, setAgentPeek] = useState<string | null>(null)
+  const agentPeekTimer = useRef<number | undefined>(undefined)
+  const showAgentPeek = (text: string) => {
+    setAgentPeek(text)
+    clearTimeout(agentPeekTimer.current)
+    agentPeekTimer.current = window.setTimeout(() => setAgentPeek(null), 4000)
+  }
+  const agents = useAgents(settings.aiEnabled && settings.aiAgents, showAgentPeek)
+  const usage = useUsage(settings.aiEnabled)
+  const meter = settings.aiEnabled && settings.aiClosedMeter && usage ? closedMeter(usage, Date.now()) : null
   // A countdown or photobox in progress keeps the pill open even if the cursor drifts away.
   const [mirrorBusy, setMirrorBusy] = useState(false)
   const mirrorBusyRef = useRef(false)
-  mirrorBusyRef.current = mirrorBusy
+  // A pinned Mirror stays open until unpinned or another tab is chosen.
+  mirrorBusyRef.current = mirrorBusy || (activeTab === "mirror" && settings.mirrorPinned)
   const { updateInfo } = useUpdateChecker()
   useTick(250)
 
-  const size = open ? OPEN : peek ? PEEKING : CLOSED
+  const onMirror = activeTab === "mirror" && settings.tabMirror
+  const openSize = onMirror ? { width: 620, height: settings.mirrorHeight } : OPEN
+  const size = open ? openSize : peek || agentPeek ? PEEKING : CLOSED
   const mode = settings.notchMode ?? "pinned"
-  const hidden = mode === "autoHide" && !open && !peek
+  const hidden = mode === "autoHide" && !open && !peek && !agentPeek
   // The hover zone Rust checks starts at the window's top edge, so it covers the floating gap too.
   const hover = hidden
     ? { width: size.width, height: REVEAL_STRIP }
@@ -75,6 +91,17 @@ export function Pill() {
   useEffect(() => {
     invoke("set_pill_size", hover).catch(() => {})
   }, [hover.width, hover.height])
+
+  // The pill window is sized for the normal open pill; grow it for a taller Mirror.
+  const windowHeight = Math.max(280, (open ? size.height : 0) + 70)
+  useEffect(() => {
+    invoke("set_pill_window_height", { height: windowHeight }).catch(() => {})
+  }, [windowHeight])
+
+  // Unpinning or leaving the Mirror while the cursor is already outside closes the pill.
+  useEffect(() => {
+    if (open && !mirrorBusyRef.current) invoke<boolean>("cursor_over_pill").then((inside) => !inside && setOpen(false)).catch(() => {})
+  }, [settings.mirrorPinned, mirrorBusy])
 
   // Sync initial lyrics widget visibility and listen for changes (including tray clicks)
   useEffect(() => {
@@ -143,6 +170,7 @@ export function Pill() {
     notes: settings.tabNotes,
     prompter: settings.tabPrompter,
     mirror: settings.tabMirror,
+    ai: settings.aiEnabled,
   }
   const currentTabSafe: TabKey = enabledTabs[activeTab]
     ? activeTab
@@ -185,13 +213,18 @@ export function Pill() {
                 IN USE
               </span>
             </>
+          ) : agentPeek ? (
+            <>
+              <Sparkles size={14} color={agentPeek.includes("needs you") ? "var(--orange)" : "var(--green)"} />
+              <span className="closed-text">{agentPeek}</span>
+            </>
           ) : np ? (
             <>
               <Vinyl src={np.artwork} size={24} playing={np.isPlaying} />
               <span className="closed-text" key={line.text ?? np.title}>
                 {line.text ?? np.title}
               </span>
-              <Bars playing={np.isPlaying} />
+              {meter ? <UsageMeter {...meter} /> : <Bars playing={np.isPlaying} />}
             </>
           ) : (
             <span className="closed-text muted">
@@ -202,6 +235,7 @@ export function Pill() {
                 : "OpenNotchi"}
             </span>
           )}
+          {!peek && !agentPeek && !np && meter && <UsageMeter {...meter} />}
         </div>
 
         {/* Open Pill State with Header & Tabs */}
@@ -267,6 +301,16 @@ export function Pill() {
                 >
                   <Video size={12} />
                   <span>Mirror</span>
+                </button>
+              )}
+              {settings.aiEnabled && (
+                <button
+                  className={`tab-nav-btn ${currentTabSafe === "ai" ? "active" : ""}`}
+                  onClick={() => setActiveTab("ai")}
+                  title="AI agents, usage and Ask AI"
+                >
+                  <Sparkles size={12} />
+                  <span>AI</span>
                 </button>
               )}
             </div>
@@ -363,6 +407,8 @@ export function Pill() {
 
             {/* Mounted only while open so the camera light goes off when the pill closes. */}
             {currentTabSafe === "mirror" && open && <MirrorTab onBusy={setMirrorBusy} />}
+
+            {currentTabSafe === "ai" && <AITab sessions={agents} usage={usage} lyricLine={line.text} np={np} />}
           </div>
         </div>
       </div>
@@ -424,8 +470,11 @@ function LyricsScroller({ np, lines }: { np: NowPlaying; lines: { time: number; 
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const el = box.current?.querySelector<HTMLElement>(`[data-i="${current ?? 0}"]`)
-    el?.scrollIntoView({ block: "center", behavior: "smooth" })
+    const scroller = box.current
+    const el = scroller?.querySelector<HTMLElement>(`[data-i="${current ?? 0}"]`)
+    // Scroll only the lyrics list: scrollIntoView also scrolls every overflow:hidden ancestor,
+    // which shifted the whole pill (tabs and all) up out of the window.
+    if (scroller && el) scroller.scrollTo({ top: el.offsetTop - scroller.clientHeight / 2 + el.offsetHeight / 2, behavior: "smooth" })
   }, [current])
 
   return (
@@ -505,6 +554,16 @@ function Vinyl({
         </div>
       )}
     </div>
+  )
+}
+
+/** Compact usage meter in the closed pill: a ring filled to the share used. */
+function UsageMeter({ label, percent, hot }: { label: string; percent: number; hot: boolean }) {
+  return (
+    <span className={`usage-meter ${hot ? "hot" : ""}`} title="AI usage" style={{ ["--p" as string]: `${Math.min(100, percent)}%` } as CSSProperties}>
+      <i />
+      {label}
+    </span>
   )
 }
 

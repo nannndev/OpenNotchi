@@ -83,7 +83,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost https://lrclib.net https://api.github.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost https://lrclib.net https://api.github.com https://api.anthropic.com https://api.openai.com http://127.0.0.1:11434 http://localhost:11434; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"
     },
     "macOSPrivateApi": true
   },
