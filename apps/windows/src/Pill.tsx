@@ -63,14 +63,16 @@ export function Pill() {
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null
   const defaultOpen = searchParams?.get("open") === "1"
   const defaultTab = (searchParams?.get("tab") as TabKey) || "music"
-  const defaultBanner = searchParams?.get("banner") === "1" ? {
+  const defaultBanner: Banner | null = searchParams?.get("banner") === "1" ? {
     id: "demo",
-    kind: "success" as const,
+    kind: "success",
+    icon: "checkmark",
+    tint: "var(--accent, #10b981)",
+    badge: "Done",
     title: "Claude Code: Task completed",
-    description: "47/47 tests passed · OpenNotchi",
-    actionLabel: "Open Terminal",
-    durationMs: 12000,
-    startedAt: Date.now(),
+    subtitle: "47/47 tests passed · OpenNotchi",
+    actionTitle: "Open Terminal",
+    duration: 12,
   } : null
 
   const [open, setOpen] = useState(defaultOpen)
