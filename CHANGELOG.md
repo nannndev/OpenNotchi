@@ -4,6 +4,15 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] - 2026-10-24
+
+### Added
+- **Windows: Notch Style**: Choose in Settings › General between Pinned to top (as before), a Floating pill below the top edge, or Auto-hide, which tucks the pill away until you hover the top of the screen.
+
+### Fixed
+- **Windows**: The update banner no longer keeps offering an update you've already installed. The app had been reporting itself as 0.9.0.
+- **Windows**: The pill no longer briefly shrinks into the top edge while closing; the bounce now plays only when it opens.
+
 ## [0.10.0] - 2026-10-23
 
 ### Added
