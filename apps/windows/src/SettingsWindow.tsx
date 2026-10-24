@@ -16,7 +16,9 @@ import {
   RotateCw,
   Sliders,
   Sparkles,
+  ScrollText,
   Timer,
+  Video,
   Wand2,
 } from "lucide-react"
 import { useEffect, useState } from "react"
@@ -391,6 +393,36 @@ export function SettingsWindow() {
                   className="switch"
                   checked={settings.tabNotes}
                   onChange={(e) => setSettings({ tabNotes: e.target.checked })}
+                />
+              </div>
+
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">
+                    <ScrollText size={16} /> Teleprompter
+                  </div>
+                  <div className="toggle-desc">Your script scrolls right under the camera, so you keep eye contact on calls.</div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={settings.tabPrompter}
+                  onChange={(e) => setSettings({ tabPrompter: e.target.checked })}
+                />
+              </div>
+
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">
+                    <Video size={16} /> Mirror & Photobox
+                  </div>
+                  <div className="toggle-desc">Camera mirror with filters, single photos and 4-shot photobox strips.</div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={settings.tabMirror}
+                  onChange={(e) => setSettings({ tabMirror: e.target.checked })}
                 />
               </div>
             </div>

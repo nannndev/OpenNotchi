@@ -472,6 +472,13 @@ button:focus-visible {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
 }
+/* Six tabs don't fit with labels; only the active one shows its name. */
+.tab-nav-btn:not(.active) span {
+  display: none;
+}
+.tab-nav-btn:not(.active) {
+  padding: 3px 7px;
+}
 .tab-nav-btn.active {
   background: var(--accent);
   color: #000;
@@ -3838,4 +3845,224 @@ button:focus-visible {
 .mode-autoHide .pill.hidden {
   translate: 0 -110%;
   opacity: 0;
+}
+
+/* ==========================================================================
+   Teleprompter Tab
+   ========================================================================== */
+
+.tab-prompter {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+.prompter-eyeline {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-align: center;
+  color: var(--accent);
+  opacity: 0.8;
+}
+.prompter-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  font-weight: 700;
+  line-height: 1.4;
+  padding: 0 6px;
+  /* Lines fade out above and below the reading line at the top. */
+  mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+}
+.prompter-viewport p {
+  margin: 0 0 0.7em;
+}
+.prompter-end {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  padding-bottom: 40px;
+}
+.prompter-editor {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+.prompter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  flex: none;
+}
+.prompter-bar .muted {
+  color: var(--muted);
+  margin-left: auto;
+}
+.prompter-bar input[type="range"] {
+  width: 60px;
+  accent-color: var(--accent);
+}
+.prompter-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.prompter-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.prompter-btn.primary {
+  background: var(--accent);
+  color: #000;
+}
+.prompter-btn.on {
+  color: var(--accent);
+}
+.prompter-speed {
+  font-variant-numeric: tabular-nums;
+  min-width: 46px;
+  text-align: center;
+}
+
+/* ==========================================================================
+   Mirror & Photobox Tab
+   ========================================================================== */
+
+.tab-mirror {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 170px;
+  gap: 12px;
+  min-height: 0;
+}
+.mirror-view {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  min-height: 0;
+}
+.mirror-view video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Mirrored like a real mirror; captureFrame flips the saved photo the same way. */
+  transform: scaleX(-1);
+}
+.mirror-error {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  font-size: 11px;
+  text-align: center;
+  color: var(--muted);
+}
+.mirror-countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 56px;
+  font-weight: 800;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  animation: mirror-pop 0.8s ease-out;
+}
+@keyframes mirror-pop {
+  from { transform: scale(1.4); opacity: 0; }
+  30% { transform: scale(1); opacity: 1; }
+}
+.mirror-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  animation: mirror-flash 0.18s ease-out forwards;
+}
+@keyframes mirror-flash {
+  to { opacity: 0; }
+}
+.mirror-shots {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  gap: 5px;
+}
+.mirror-shots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+.mirror-shots span.done {
+  background: var(--accent);
+}
+.mirror-toast {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  translate: -50% 0;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.75);
+}
+.mirror-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+.mirror-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.mirror-chips .deck-chip {
+  font-size: 10px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+.mirror-chips .deck-chip.active {
+  background: var(--accent);
+  color: #000;
+}
+.mirror-select {
+  font-size: 10.5px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+.mirror-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: auto;
 }

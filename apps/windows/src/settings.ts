@@ -1,4 +1,5 @@
 import { emit, listen } from "@tauri-apps/api/event"
+import type { MirrorEffect, StripStyle } from "./photobox"
 import { useEffect, useState } from "react"
 
 export type NotchTheme =
@@ -54,6 +55,17 @@ export interface AppSettings {
   tabClipboard: boolean
   tabTimer: boolean
   tabNotes: boolean
+  tabPrompter: boolean
+  tabMirror: boolean
+  // Teleprompter
+  prompterScript: string
+  /** Scroll speed in px/s. */
+  prompterSpeed: number
+  prompterFontSize: number
+  prompterMirror: boolean
+  // Mirror & photobox
+  mirrorEffect: MirrorEffect
+  photoboxStyle: StripStyle
   // Notes content persistence
   notesText: string
 }
@@ -123,6 +135,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tabClipboard: true,
   tabTimer: true,
   tabNotes: true,
+  tabPrompter: true,
+  tabMirror: true,
+  prompterScript:
+    "Hi everyone, thanks for joining today.\n\nKeep your eyes on this line, right under the camera, and your gaze looks natural.\n\nPress Edit to paste your own script. Scroll with the mouse wheel to jump around, and change the speed with the plus and minus buttons.",
+  prompterSpeed: 28,
+  prompterFontSize: 18,
+  prompterMirror: false,
+  mirrorEffect: "natural",
+  photoboxStyle: "classic",
   notesText: "",
 }
 

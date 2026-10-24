@@ -5,6 +5,8 @@ import {
   ClipboardList,
   Coffee,
   Mic,
+  ScrollText,
+  Video,
   Music2,
   Pause,
   PictureInPicture2,
@@ -23,7 +25,9 @@ import { control, currentLine, formatTime, positionAt, useLyrics, useNowPlaying,
 import { useAccent } from "./palette"
 import { resolveAccentColor, useSettings } from "./settings"
 import { ClipboardTab } from "./tabs/ClipboardTab"
+import { MirrorTab } from "./tabs/MirrorTab"
 import { NotesTab } from "./tabs/NotesTab"
+import { PrompterTab } from "./tabs/PrompterTab"
 import { TimerTab } from "./tabs/TimerTab"
 import { useUpdateChecker } from "./updater"
 
@@ -38,7 +42,7 @@ const REVEAL_STRIP = 4
 const PEEK_MS = 3000
 
 type Privacy = { camera: boolean; mic: boolean }
-type TabKey = "music" | "clipboard" | "timer" | "notes"
+type TabKey = "music" | "clipboard" | "timer" | "notes" | "prompter" | "mirror"
 
 export function Pill() {
   const np = useNowPlaying()
@@ -54,6 +58,10 @@ export function Pill() {
   const [awake, setAwake] = useState(false)
   const [widgetOn, setWidgetOn] = useState(false)
   const [peek, setPeek] = useState<Privacy | null>(null)
+  // A countdown or photobox in progress keeps the pill open even if the cursor drifts away.
+  const [mirrorBusy, setMirrorBusy] = useState(false)
+  const mirrorBusyRef = useRef(false)
+  mirrorBusyRef.current = mirrorBusy
   const { updateInfo } = useUpdateChecker()
   useTick(250)
 
@@ -86,7 +94,7 @@ export function Pill() {
     const unlisten = listen<boolean>("pill-hover", ({ payload: inside }) => {
       clearTimeout(closeTimer)
       if (inside) setOpen(true)
-      else closeTimer = window.setTimeout(() => setOpen(false), settings.closeDelayMs ?? 300)
+      else closeTimer = window.setTimeout(() => !mirrorBusyRef.current && setOpen(false), settings.closeDelayMs ?? 300)
     })
     return () => {
       unlisten.then((f) => f())
@@ -128,22 +136,17 @@ export function Pill() {
   const showLyrics = lyricsMode && hasSynced
 
   // Fallback active tab if current tab is disabled in settings
-  const currentTabSafe: TabKey =
-    activeTab === "music" && !settings.tabMusic
-      ? settings.tabClipboard
-        ? "clipboard"
-        : settings.tabTimer
-        ? "timer"
-        : settings.tabNotes
-        ? "notes"
-        : "music"
-      : activeTab === "clipboard" && !settings.tabClipboard
-      ? "music"
-      : activeTab === "timer" && !settings.tabTimer
-      ? "music"
-      : activeTab === "notes" && !settings.tabNotes
-      ? "music"
-      : activeTab
+  const enabledTabs: Record<TabKey, boolean> = {
+    music: settings.tabMusic,
+    clipboard: settings.tabClipboard,
+    timer: settings.tabTimer,
+    notes: settings.tabNotes,
+    prompter: settings.tabPrompter,
+    mirror: settings.tabMirror,
+  }
+  const currentTabSafe: TabKey = enabledTabs[activeTab]
+    ? activeTab
+    : (Object.keys(enabledTabs) as TabKey[]).find((k) => enabledTabs[k]) ?? "music"
 
   return (
     <div
@@ -209,6 +212,7 @@ export function Pill() {
               {settings.tabMusic && (
                 <button
                   className={`tab-nav-btn ${currentTabSafe === "music" ? "active" : ""}`}
+                  title="Music"
                   onClick={() => setActiveTab("music")}
                 >
                   <Music2 size={12} />
@@ -218,6 +222,7 @@ export function Pill() {
               {settings.tabClipboard && (
                 <button
                   className={`tab-nav-btn ${currentTabSafe === "clipboard" ? "active" : ""}`}
+                  title="Clipboard"
                   onClick={() => setActiveTab("clipboard")}
                 >
                   <ClipboardList size={12} />
@@ -227,6 +232,7 @@ export function Pill() {
               {settings.tabTimer && (
                 <button
                   className={`tab-nav-btn ${currentTabSafe === "timer" ? "active" : ""}`}
+                  title="Timer"
                   onClick={() => setActiveTab("timer")}
                 >
                   <Timer size={12} />
@@ -236,10 +242,31 @@ export function Pill() {
               {settings.tabNotes && (
                 <button
                   className={`tab-nav-btn ${currentTabSafe === "notes" ? "active" : ""}`}
+                  title="Notes"
                   onClick={() => setActiveTab("notes")}
                 >
                   <Coffee size={12} />
                   <span>Notes</span>
+                </button>
+              )}
+              {settings.tabPrompter && (
+                <button
+                  className={`tab-nav-btn ${currentTabSafe === "prompter" ? "active" : ""}`}
+                  onClick={() => setActiveTab("prompter")}
+                  title="Teleprompter"
+                >
+                  <ScrollText size={12} />
+                  <span>Prompter</span>
+                </button>
+              )}
+              {settings.tabMirror && (
+                <button
+                  className={`tab-nav-btn ${currentTabSafe === "mirror" ? "active" : ""}`}
+                  onClick={() => setActiveTab("mirror")}
+                  title="Mirror & photobox"
+                >
+                  <Video size={12} />
+                  <span>Mirror</span>
                 </button>
               )}
             </div>
@@ -331,6 +358,11 @@ export function Pill() {
             {currentTabSafe === "timer" && <TimerTab />}
 
             {currentTabSafe === "notes" && <NotesTab awake={awake} onToggleAwake={setAwake} />}
+
+            {currentTabSafe === "prompter" && <PrompterTab />}
+
+            {/* Mounted only while open so the camera light goes off when the pill closes. */}
+            {currentTabSafe === "mirror" && open && <MirrorTab onBusy={setMirrorBusy} />}
           </div>
         </div>
       </div>
