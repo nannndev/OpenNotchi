@@ -15,7 +15,7 @@ permissions:
 jobs:
   release-macos:
     name: Build macOS
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     defaults:

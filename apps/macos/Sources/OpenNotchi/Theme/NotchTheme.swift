@@ -163,18 +163,18 @@ struct NotchBackground<S: Shape>: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(theme == .liquidGlassClear ? 0.45 : 0.35),
-                            Color.white.opacity(0.12),
-                            Color.white.opacity(0.04)
+                            Color.white.opacity(theme == .liquidGlassClear ? 0.22 : 0.16),
+                            Color.white.opacity(0.08),
+                            Color.white.opacity(0.02)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     ),
-                    lineWidth: 1
+                    lineWidth: 0.75
                 )
         } else if isOpen && theme == .frosted {
             shape
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
         }
     }
 
@@ -240,28 +240,32 @@ struct NotchBackground<S: Shape>: View {
 
     private func liquidGlass(clear: Bool) -> some View {
         ZStack {
-            // 1. Native macOS Blur
-            VisualEffectBlur(material: .popover)
+            // 1. Native macOS HUD / Control Center dark smoke frosted blur
+            VisualEffectBlur(material: .hudWindow)
 
-            // 2. Control Center dark smoke glass tint (matches macOS Control Center cards)
+            // 2. Control Center dark smoke substrate (deep translucent charcoal)
             LinearGradient(
                 colors: clear
-                    ? [Color(red: 0.18, green: 0.19, blue: 0.23).opacity(0.58), Color(red: 0.10, green: 0.11, blue: 0.14).opacity(0.72)]
-                    : [Color(red: 0.16, green: 0.17, blue: 0.21).opacity(0.72), Color(red: 0.08, green: 0.09, blue: 0.12).opacity(0.84)],
+                    ? [Color(white: 0.14).opacity(0.60), Color(white: 0.08).opacity(0.72)]
+                    : [Color(white: 0.12).opacity(0.76), Color(white: 0.05).opacity(0.86)],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
-            // 3. Top Specular Glass Reflection
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(clear ? 0.25 : 0.18),
-                    Color.white.opacity(0.04),
-                    Color.clear
-                ],
-                startPoint: .top,
-                endPoint: .center
-            )
+            // 3. Ultra-subtle hairline specular top edge highlight (1px)
+            VStack {
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(clear ? 0.20 : 0.14),
+                        Color.white.opacity(0.04),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 1.5)
+                Spacer()
+            }
         }
     }
 
@@ -283,10 +287,12 @@ struct VisualEffectBlur: NSViewRepresentable {
         view.blendingMode = .behindWindow
         view.state = .active
         view.isEmphasized = true
+        view.appearance = NSAppearance(named: .vibrantDark)
         return view
     }
 
     func updateNSView(_ view: NSVisualEffectView, context: Context) {
         view.material = material
+        view.appearance = NSAppearance(named: .vibrantDark)
     }
 }
