@@ -287,24 +287,26 @@ export function Pill() {
       className={`stage mode-${mode}`}
       style={{ ["--accent" as string]: resolvedAccent, ["--float-gap" as string]: `${FLOAT_GAP}px` } as CSSProperties}
     >
+      {/* Dynamic ambient aura blur behind open pill when music is playing (or non-white accent) */}
+      {open && settings.auraGlow !== "off" && (np?.artwork || (settings.accentChoice !== "artwork" && settings.accentChoice !== "white" && resolvedAccent !== "#ffffff")) && (
+        <div
+          className={`aura-backdrop ${settings.auraGlow}`}
+          style={{
+            width: size.width + 48,
+            height: size.height + 48,
+            backgroundImage: np?.artwork ? `url(${np.artwork})` : undefined,
+            backgroundColor: !np?.artwork ? resolvedAccent : undefined,
+          }}
+        />
+      )}
+
       <div
         className={`pill ${open ? "open" : ""} ${hidden ? "hidden" : ""} theme-${settings.theme} border-${settings.borderStyle} anim-${settings.openAnimation}`}
-        style={{ width: size.width, height: size.height }}
+        style={{ width: size.width, height: size.height, zIndex: 1 }}
       >
         {/* Album Art theme background */}
         {settings.theme === "albumArt" && np?.artwork && (
           <div className="theme-album-bg" style={{ backgroundImage: `url(${np.artwork})` }} />
-        )}
-
-        {/* Dynamic aura blur behind open pill */}
-        {open && settings.auraGlow !== "off" && (
-          <div
-            className={`aura ${settings.auraGlow}`}
-            style={{
-              backgroundImage: np?.artwork ? `url(${np.artwork})` : undefined,
-              backgroundColor: !np?.artwork ? resolvedAccent : undefined,
-            }}
-          />
         )}
 
         {/* Closed Pill State */}

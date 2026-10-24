@@ -295,17 +295,17 @@ export function SettingsWindow() {
             </button>
           </div>
 
-          <div className="preview-canvas">
+          <div className="preview-canvas" style={{ position: "relative" }}>
+            {previewOpen && settings.auraGlow !== "off" && activeAccentColor !== "#ffffff" && (
+              <div
+                className={`preview-aura-backdrop ${settings.auraGlow === "vibrant" ? "vibrant" : "subtle"}`}
+                style={{ background: activeAccentColor }}
+              />
+            )}
             <div
               className={`pill-preview-item theme-${settings.theme} border-${settings.borderStyle} anim-${settings.openAnimation} ${previewOpen ? "open" : ""}`}
-              style={{ ["--accent" as string]: activeAccentColor }}
+              style={{ ["--accent" as string]: activeAccentColor, zIndex: 1 }}
             >
-              {settings.auraGlow !== "off" && (
-                <div
-                  className={`preview-aura ${settings.auraGlow === "vibrant" ? "vibrant" : "subtle"}`}
-                  style={{ background: activeAccentColor }}
-                />
-              )}
 
               <div className="preview-closed-content" aria-hidden={previewOpen}>
                 <div className="preview-vinyl" />

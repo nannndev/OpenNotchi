@@ -77,46 +77,32 @@ button:focus-visible {
 
 /* 1. Classic Black */
 .theme-classic {
-  background: #000000;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
-}
-
-/* WebView2 can't blur the desktop behind a transparent window, and backdrop-filter there
-   leaves stale copies of the pill on screen while it resizes. Keep the glass look, drop the blur. */
-.pill[class*="theme-"] {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+  background: #000000 !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
 }
 
 /* 2. Liquid Glass */
 .theme-liquidGlass {
-  background: rgba(16, 16, 22, 0.68) !important;
-  backdrop-filter: blur(28px) saturate(190%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
-  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.28) !important;
+  background: linear-gradient(135deg, rgba(24, 26, 36, 0.94) 0%, rgba(13, 14, 20, 0.98) 100%) !important;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7), inset 0 1px 1.5px rgba(255, 255, 255, 0.28) !important;
 }
 
 /* 3. Liquid Glass (Clear) */
 .theme-liquidGlassClear {
-  background: rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(24px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), inset 0 1px 1.5px rgba(255, 255, 255, 0.35) !important;
+  background: linear-gradient(135deg, rgba(32, 35, 48, 0.88) 0%, rgba(18, 20, 28, 0.92) 100%) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), inset 0 1px 2px rgba(255, 255, 255, 0.38) !important;
 }
 
 /* 4. Frosted */
 .theme-frosted {
-  background: rgba(22, 22, 28, 0.82) !important;
-  backdrop-filter: blur(36px) !important;
-  -webkit-backdrop-filter: blur(36px) !important;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6) !important;
+  background: #14151e !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7) !important;
 }
 
 /* 5. Music Adaptive */
 .theme-adaptive {
-  background: linear-gradient(145deg, rgba(10, 10, 14, 0.95) 0%, color-mix(in srgb, var(--accent) 30%, #06060a) 100%) !important;
-  backdrop-filter: blur(20px) !important;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.65) !important;
+  background: linear-gradient(145deg, #090a0f 0%, color-mix(in srgb, var(--accent) 35%, #050508) 100%) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7) !important;
 }
 
 /* 6. Album Art */
@@ -137,18 +123,18 @@ button:focus-visible {
 
 /* 7. Midnight */
 .theme-midnight {
-  background: linear-gradient(135deg, #070918 0%, #150e33 50%, #1f1147 100%) !important;
-  box-shadow: 0 16px 40px rgba(6, 7, 24, 0.75) !important;
+  background: linear-gradient(135deg, #070918 0%, #150e33 50%, #20114a 100%) !important;
+  box-shadow: 0 16px 40px rgba(6, 7, 24, 0.8) !important;
 }
 
 /* 8. Aurora */
 .theme-aurora {
   background:
-    radial-gradient(circle at 15% 90%, rgba(0, 242, 254, 0.28), transparent 60%),
-    radial-gradient(circle at 85% 10%, rgba(127, 0, 255, 0.32), transparent 60%),
-    radial-gradient(circle at 50% 50%, rgba(0, 245, 160, 0.16), transparent 70%),
-    #050811 !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7) !important;
+    radial-gradient(circle at 15% 90%, rgba(0, 242, 254, 0.45), transparent 55%),
+    radial-gradient(circle at 85% 15%, rgba(168, 85, 247, 0.45), transparent 55%),
+    radial-gradient(circle at 50% 55%, rgba(16, 185, 129, 0.25), transparent 65%),
+    #060814 !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75) !important;
 }
 
 /* ==========================================================================
@@ -387,24 +373,34 @@ button:focus-visible {
    Aura Glow
    ========================================================================== */
 
-.aura {
+.aura-backdrop {
   position: absolute;
-  inset: -40%;
+  top: var(--float-gap, 10px);
+  left: 50%;
+  transform: translateX(-50%);
   background-size: cover;
   background-position: center;
-  filter: blur(48px) saturate(1.5);
+  filter: blur(44px) saturate(1.8);
   pointer-events: none;
   z-index: 0;
-  animation: aura-in 0.6s ease both;
+  border-radius: 36px;
+  animation: aura-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.aura.vibrant {
-  opacity: 0.48;
+.aura-backdrop.vibrant {
+  opacity: 0.55;
 }
-.aura.subtle {
-  opacity: 0.22;
+.aura-backdrop.subtle {
+  opacity: 0.26;
 }
 @keyframes aura-in {
-  from { opacity: 0; }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
 }
 
 /* ==========================================================================
@@ -1760,17 +1756,18 @@ button:focus-visible {
   color: var(--accent);
 }
 
-.preview-aura {
+.preview-aura-backdrop {
   position: absolute;
-  inset: -20px;
-  filter: blur(28px);
+  inset: -14px;
+  filter: blur(24px);
   pointer-events: none;
-  border-radius: inherit;
+  border-radius: 28px;
+  z-index: 0;
 }
-.preview-aura.vibrant {
+.preview-aura-backdrop.vibrant {
   opacity: 0.45;
 }
-.preview-aura.subtle {
+.preview-aura-backdrop.subtle {
   opacity: 0.2;
 }
 
