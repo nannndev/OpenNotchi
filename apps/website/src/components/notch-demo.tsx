@@ -38,7 +38,7 @@ const LINES = [
   "Turn it up for the long way home",
 ]
 const DURATION = 204
-const TABS = ["Home", "Smarthome", "Prompter", "Dev", "Timer"] as const
+const TABS = ["Home", "AI", "Smarthome", "Prompter", "Dev", "Timer"] as const
 type Tab = (typeof TABS)[number]
 
 const spring = { type: "spring", stiffness: 260, damping: 28 } as const
@@ -243,15 +243,33 @@ export function NotchDemo() {
                 )}
               </button>
 
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsPlaying((p) => !p)
-                }}
-                className="flex items-center gap-1.5"
-              >
-                <Wave bars={4} isPlaying={isPlaying} className="h-[18px]" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    triggerPeek("Notchi: ♥ Loved!")
+                  }}
+                  title="Pet Notchi!"
+                  className="group flex items-center gap-[2.5px] px-1 py-0.5 hover:scale-115 transition"
+                >
+                  {[0.42, 0.68, 1.0, 0.68, 0.42].map((h, i) => (
+                    <span
+                      key={i}
+                      className="w-[2.5px] rounded-full bg-white group-hover:bg-pink-400 transition-colors"
+                      style={{ height: `${h * 16}px` }}
+                    />
+                  ))}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsPlaying((p) => !p)
+                  }}
+                  className="flex items-center gap-1.5"
+                >
+                  <Wave bars={4} isPlaying={isPlaying} className="h-[18px]" />
+                </button>
+              </div>
             </motion.div>
           ) : (
             <motion.div
@@ -630,6 +648,50 @@ export function NotchDemo() {
                       </>
                     )}
                   </>
+                )}
+
+                {/* AI Agents & Quota Tab */}
+                {tab === "AI" && (
+                  <div className="flex w-full items-center justify-between gap-4 text-xs h-full py-0.5">
+                    {/* Live Agents List */}
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-neutral-400">
+                        <span className="flex items-center gap-1.5">
+                          <Sparkles className="size-3 text-purple-400" /> Active Agents
+                        </span>
+                        <span className="text-[10px] text-emerald-400 font-medium">● 3 sessions</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-2 py-0.5">
+                          <span className="font-medium text-white text-[11px]">Claude Code</span>
+                          <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-semibold text-sky-300">working</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-2 py-0.5">
+                          <span className="font-medium text-white text-[11px]">Codex</span>
+                          <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-semibold text-amber-300">needs you</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-2 py-0.5">
+                          <span className="font-medium text-white text-[11px]">Antigravity</span>
+                          <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300">done</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quota & Reset Meter */}
+                    <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5 min-w-[160px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-neutral-300">9router Quota</span>
+                        <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-bold text-purple-300">85%</span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                        <div className="h-full w-[85%] rounded-full bg-gradient-to-r from-purple-500 to-pink-500" />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-neutral-400">
+                        <span>12.4M tokens</span>
+                        <span>resets 3h 20m</span>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* Smarthome Showcase Tab */}

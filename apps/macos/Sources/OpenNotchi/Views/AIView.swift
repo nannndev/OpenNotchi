@@ -3,24 +3,110 @@ import SwiftUI
 
 /// The AI tab: agent status, usage per account, and Ask AI.
 struct AIView: View {
-    enum Section: String, CaseIterable { case agents = "Agents", usage = "Usage", ask = "Ask" }
+    enum Section: String, CaseIterable {
+        case usage = "Quota & Accounts"
+        case agents = "Agents"
+        case ask = "Ask"
+
+        var icon: String {
+            switch self {
+            case .usage: return "chart.bar.xaxis"
+            case .agents: return "cpu"
+            case .ask: return "sparkles"
+            }
+        }
+    }
 
     @EnvironmentObject private var settings: AppSettings
-    @AppStorage("aiSection") private var section: Section = .agents
+    @EnvironmentObject private var agents: AgentMonitor
+    @EnvironmentObject private var vm: NotchViewModel
+    @AppStorage("aiSection") private var section: Section = .usage
+
+    private var activeAgentCount: Int {
+        agents.sessions.filter { $0.state == .working || $0.state == .needsYou }.count
+    }
 
     var body: some View {
         VStack(spacing: 8) {
-            Picker("", selection: $section) {
-                ForEach(Section.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            // Interactive Tab Bar & Expand/Collapse Controller
+            HStack(spacing: 8) {
+                // Custom Pill Tab Switcher
+                HStack(spacing: 4) {
+                    ForEach(Section.allCases, id: \.self) { s in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                section = s
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: s.icon)
+                                    .font(.system(size: 10.5, weight: .semibold))
+                                Text(s.rawValue)
+                                    .font(.system(size: 11, weight: section == s ? .bold : .medium))
+                                if s == .agents && activeAgentCount > 0 {
+                                    Circle()
+                                        .fill(agents.sessions.contains(where: { $0.state == .needsYou }) ? Color.orange : Color.cyan)
+                                        .frame(width: 6, height: 6)
+                                }
+                            }
+                            .foregroundStyle(section == s ? Color.white : Color.secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                ZStack {
+                                    if section == s {
+                                        Capsule()
+                                            .fill(Color.white.opacity(0.18))
+                                            .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.8))
+                                    } else {
+                                        Capsule()
+                                            .fill(Color.clear)
+                                    }
+                                }
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(3)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.06))
+                        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.8))
+                )
+
+                Spacer()
+
+                // Expand / Collapse Notch Button
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                        vm.isAiExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: vm.isAiExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 9.5, weight: .bold))
+                        Text(vm.isAiExpanded ? "Compact" : "Expand")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(vm.isAiExpanded ? Color.cyan : Color.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4.5)
+                    .background(
+                        Capsule()
+                            .fill(vm.isAiExpanded ? Color.cyan.opacity(0.18) : Color.white.opacity(0.06))
+                            .overlay(Capsule().stroke(vm.isAiExpanded ? Color.cyan.opacity(0.4) : Color.white.opacity(0.1), lineWidth: 0.8))
+                    )
+                }
+                .buttonStyle(.plain)
+                .help(vm.isAiExpanded ? "Collapse notch to standard height" : "Expand notch downward for spacious view")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 240)
+            .padding(.horizontal, 4)
 
             Group {
                 switch section {
-                case .agents: AgentsSection()
                 case .usage: UsageSection()
+                case .agents: AgentsSection()
                 case .ask: AskSection()
                 }
             }
@@ -31,11 +117,16 @@ struct AIView: View {
 }
 
 private func emptyState(_ text: String, icon: String) -> some View {
-    VStack(spacing: 6) {
-        Image(systemName: icon).font(.system(size: 20, weight: .light))
-        Text(text).font(.system(size: 12, weight: .medium)).multilineTextAlignment(.center)
+    VStack(spacing: 8) {
+        Image(systemName: icon)
+            .font(.system(size: 24, weight: .light))
+            .foregroundStyle(.secondary)
+        Text(text)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 24)
     }
-    .foregroundStyle(.secondary)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
 }
 
@@ -48,15 +139,85 @@ private struct AgentsSection: View {
     var body: some View {
         if !settings.aiAgents {
             emptyState("Agent status is off in Settings › AI.", icon: "terminal")
-        } else if agents.sessions.isEmpty {
-            emptyState("No Claude Code or Codex sessions in the last 30 minutes.", icon: "terminal")
         } else {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 4) {
-                    ForEach(agents.sessions) { AgentRow(session: $0) }
+            VStack(spacing: 8) {
+                // Quick Launch Bar
+                HStack(spacing: 8) {
+                    Text("Agents:")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+
+                    quickAgentButton(tool: .claude, name: "Claude Code", tint: .orange)
+                    quickAgentButton(tool: .codex, name: "Codex", tint: .green)
+                    quickAgentButton(tool: .antigravity, name: "Antigravity", tint: Color(red: 0.65, green: 0.45, blue: 0.98))
+                    quickAgentButton(tool: .commandcode, name: "Command Code", tint: .cyan)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 4)
+
+                if agents.sessions.isEmpty {
+                    VStack(spacing: 10) {
+                        Image(systemName: "cpu")
+                            .font(.system(size: 28, weight: .light))
+                            .foregroundStyle(.secondary)
+
+                        VStack(spacing: 3) {
+                            Text("Agent Monitor Active")
+                                .font(.system(size: 12.5, weight: .bold))
+                            Text("Run `claude`, `codex`, or Antigravity in your terminal or IDE. Real-time token usage, tool invocations, and approval prompts will appear here automatically.")
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 28)
+                        }
+
+                        Button {
+                            AgentMonitor.activateTerminal(for: .claude)
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "terminal.fill")
+                                Text("Open Terminal")
+                            }
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(Color.white.opacity(0.1)))
+                            .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.8))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 6) {
+                            ForEach(agents.sessions) { AgentRow(session: $0) }
+                        }
+                        .padding(.horizontal, 2)
+                    }
                 }
             }
         }
+    }
+
+    private func quickAgentButton(tool: AgentTool, name: String, tint: Color) -> some View {
+        Button {
+            AgentMonitor.activateTerminal(for: tool)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: tool.icon)
+                    .font(.system(size: 9, weight: .bold))
+                Text(name)
+                    .font(.system(size: 9.5, weight: .semibold))
+            }
+            .foregroundStyle(tint)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3.5)
+            .background(Capsule().fill(tint.opacity(0.14)).overlay(Capsule().stroke(tint.opacity(0.3), lineWidth: 0.8)))
+        }
+        .buttonStyle(.plain)
+        .help("Open terminal or app for \(name)")
     }
 }
 
@@ -74,49 +235,79 @@ private struct AgentRow: View {
         }
     }
 
+    private var toolTint: Color {
+        switch session.tool {
+        case .claude: return .orange
+        case .antigravity: return Color(red: 0.65, green: 0.45, blue: 0.98)
+        case .codex: return .green
+        case .commandcode: return .cyan
+        }
+    }
+
     var body: some View {
         Button {
             AgentMonitor.activateTerminal(for: session.tool)
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 9) {
                 Image(systemName: session.tool.icon)
                     .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 22, height: 22)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(.white.opacity(0.1)))
-                Text(session.project.isEmpty ? session.tool.displayName : session.project)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .lineLimit(1)
-                Text(session.state == .needsYou ? session.message ?? "" : session.tool.displayName)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .foregroundStyle(toolTint)
+                    .frame(width: 24, height: 24)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(toolTint.opacity(0.18)))
+
+                VStack(alignment: .leading, spacing: 1.5) {
+                    HStack(spacing: 6) {
+                        Text(session.project.isEmpty ? session.tool.displayName : session.project)
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                        Text("· \(session.tool.displayName)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                    if let msg = session.message, !msg.isEmpty {
+                        Text(msg)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(session.state == .needsYou ? Color.orange : Color.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
                 Spacer(minLength: 4)
-                HStack(spacing: 4) {
+
+                HStack(spacing: 5) {
                     if session.state == .working {
                         ProgressView().controlSize(.mini).tint(chipColor)
                     }
                     Text(session.state.label)
                 }
-                .font(.system(size: 10.5, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(chipColor)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Capsule().fill(chipColor.opacity(0.18)))
+                .background(Capsule().fill(chipColor.opacity(0.18)).overlay(Capsule().stroke(chipColor.opacity(0.35), lineWidth: 0.8)))
+
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     Text(timeAgo(session.updatedAt, now: context.date))
-                        .font(.system(size: 10.5, weight: .medium).monospacedDigit())
+                        .font(.system(size: 10, weight: .medium).monospacedDigit())
                         .foregroundStyle(.tertiary)
-                        .frame(width: 30, alignment: .trailing)
+                        .frame(width: 28, alignment: .trailing)
                 }
             }
-            .padding(.horizontal, 8)
-            .frame(height: 32)
-            .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(hovering ? 0.1 : 0.05)))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 11)
+                    .fill(session.state == .needsYou ? Color.orange.opacity(0.12) : Color.white.opacity(hovering ? 0.08 : 0.04))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11)
+                            .stroke(session.state == .needsYou ? Color.orange.opacity(0.4) : Color.white.opacity(0.06), lineWidth: 1)
+                    )
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(session.message ?? "Open the terminal")
+        .help(session.message ?? "Open the session")
         .accessibilityLabel("\(session.tool.displayName), \(session.project), \(session.state.label)")
     }
 
@@ -127,24 +318,164 @@ private struct AgentRow: View {
     }
 }
 
-// MARK: - Usage
+// MARK: - Usage & Quotas
 
 private struct UsageSection: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var usage: AIUsageManager
+    @EnvironmentObject private var vm: NotchViewModel
+    @State private var selectedFilter: String = "ALL"
+
+    private var totalTokens: Int {
+        usage.reports.reduce(0) { $0 + $1.today.tokens }
+    }
+
+    private var totalCost: Double {
+        usage.reports.reduce(0) { $0 + $1.today.cost }
+    }
+
+    private var activeCount: Int {
+        usage.reports.filter { $0.account.isActive && $0.found }.count
+    }
+
+    private var healthState: (label: String, color: Color) {
+        if usage.reports.contains(where: { $0.account.isActive && $0.quota.health == .exhausted }) {
+            return ("Exhausted", .red)
+        }
+        if usage.reports.contains(where: { $0.account.isActive && $0.quota.health == .warning }) {
+            return ("Warning", .orange)
+        }
+        return ("Healthy", .green)
+    }
+
+    private var providerFilters: [String] {
+        var set: [String] = ["ALL"]
+        for r in usage.reports {
+            let key = r.account.tool.rawValue.uppercased()
+            if !set.contains(key) {
+                set.append(key)
+            }
+        }
+        return set
+    }
+
+    private var filteredReports: [UsageReport] {
+        if selectedFilter == "ALL" { return usage.reports }
+        return usage.reports.filter { $0.account.tool.rawValue.uppercased() == selectedFilter }
+    }
 
     var body: some View {
-        if settings.aiAccounts.isEmpty {
-            emptyState("Add a Claude Code or Codex folder in Settings › AI.", icon: "chart.bar")
-        } else if usage.reports.isEmpty {
-            emptyState("Reading usage…", icon: "chart.bar")
+        if usage.reports.isEmpty && !usage.scanning && settings.aiAccounts.isEmpty && !usage.is9RouterConnected {
+            emptyState("Add Claude Code, Codex, or Antigravity in Settings › AI.", icon: "chart.bar")
+        } else if usage.reports.isEmpty && usage.scanning {
+            VStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Connecting to 9router & analyzing accounts…")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 10) {
-                    ForEach(usage.reports) { UsageCard(report: $0) }
+            VStack(spacing: 8) {
+                // Aggregated Summary Strip with 9router status, Totals, and Live Refresh
+                HStack(spacing: 10) {
+                    if usage.is9RouterConnected {
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.green).frame(width: 6, height: 6)
+                            Text("9router")
+                                .font(.system(size: 9.5, weight: .bold))
+                                .foregroundStyle(.green)
+                            Text("(\(usage.reports.count))")
+                                .font(.system(size: 8.5, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.green.opacity(0.12)))
+                    }
+
+                    summaryItem(label: "Today's Tokens", val: formatTokens(totalTokens))
+                    if totalCost > 0 {
+                        summaryItem(label: "Est. Spend", val: formatCost(totalCost))
+                    }
+                    summaryItem(label: "System Health", val: healthState.label, tint: healthState.color)
+                    summaryItem(label: "Active Accounts", val: "\(activeCount)/\(usage.reports.count)")
+
+                    Spacer(minLength: 4)
+
+                    Button {
+                        usage.refresh(force: true)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 10, weight: .bold))
+                                .rotationEffect(.degrees(usage.scanning ? 360 : 0))
+                                .animation(usage.scanning ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: usage.scanning)
+                            Text("Refresh")
+                                .font(.system(size: 9.5, weight: .semibold))
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3.5)
+                        .background(Capsule().fill(Color.white.opacity(0.08)))
+                        .foregroundStyle(usage.scanning ? Color.accentColor : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Refresh All Accounts & Quotas")
+                }
+                .padding(.vertical, 5)
+                .padding(.horizontal, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.white.opacity(0.04))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(.white.opacity(0.08), lineWidth: 1))
+                )
+
+                // Provider Filter Pills (e.g. ALL (7), CLAUDE (4), ANTIGRAVITY (1), CODEX (1))
+                if providerFilters.count > 2 {
+                    HStack(spacing: 6) {
+                        ForEach(providerFilters, id: \.self) { filter in
+                            let count = filter == "ALL" ? usage.reports.count : usage.reports.filter { $0.account.tool.rawValue.uppercased() == filter }.count
+                            Button {
+                                selectedFilter = filter
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(filter == "ALL" ? "All" : filter.capitalized)
+                                        .font(.system(size: 10, weight: selectedFilter == filter ? .bold : .medium))
+                                    Text("\(count)")
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundStyle(selectedFilter == filter ? Color.primary : Color.secondary)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
+                                        .background(Capsule().fill(Color.white.opacity(selectedFilter == filter ? 0.2 : 0.08)))
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(selectedFilter == filter ? Color.white.opacity(0.18) : Color.white.opacity(0.04)))
+                                .overlay(Capsule().stroke(Color.white.opacity(selectedFilter == filter ? 0.3 : 0.06), lineWidth: 0.8))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 2)
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(filteredReports) { UsageCard(report: $0) }
+                    }
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 2)
                 }
             }
             .onAppear { usage.refresh() }
+        }
+    }
+
+    private func summaryItem(label: String, val: String, tint: Color? = nil) -> some View {
+        VStack(spacing: 1) {
+            Text(label).font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary).textCase(.uppercase)
+            Text(val).font(.system(size: 10.5, weight: .bold)).foregroundStyle(tint ?? .primary).monospacedDigit()
         }
     }
 }
@@ -152,49 +483,180 @@ private struct UsageSection: View {
 private struct UsageCard: View {
     let report: UsageReport
     @Environment(\.notchAccent) private var accent
+    @EnvironmentObject private var usage: AIUsageManager
+    @EnvironmentObject private var vm: NotchViewModel
+    @State private var isHovering = false
+
+    private var toolTint: Color {
+        switch report.account.tool {
+        case .claude: return .orange
+        case .antigravity: return Color(red: 0.65, green: 0.45, blue: 0.98)
+        case .codex: return .green
+        case .commandcode: return .cyan
+        }
+    }
+
+    private var healthColor: Color {
+        if !report.account.isActive { return .gray }
+        switch report.quota.health {
+        case .healthy: return .green
+        case .warning: return .orange
+        case .exhausted: return .red
+        }
+    }
+
+    private var healthLabel: String {
+        if !report.account.isActive { return "OFF" }
+        if report.testStatus == "unavailable" || (report.lastError?.contains("rate_limit") == true) {
+            return "RATE LIMIT"
+        }
+        return report.quota.health.rawValue.uppercased()
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Text(report.account.name).font(.system(size: 12, weight: .bold)).lineLimit(1)
-                Spacer()
-                if let plan = report.limits?.planType {
-                    Text(plan).font(.system(size: 9, weight: .bold)).padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Capsule().fill(.white.opacity(0.12)))
+        let q = report.quota
+        let cardHeight: CGFloat = vm.isAiExpanded ? 260 : 210
+
+        VStack(alignment: .leading, spacing: 6) {
+            // Header: Tool Icon, Name, Provider & Priority, Interactive ON/OFF Toggle & Health Pill
+            HStack(spacing: 6) {
+                Image(systemName: report.account.tool.icon)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(toolTint)
+                    .frame(width: 20, height: 20)
+                    .background(RoundedRectangle(cornerRadius: 5).fill(toolTint.opacity(0.18)))
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(report.account.name)
+                        .font(.system(size: 11.5, weight: .bold))
+                        .lineLimit(1)
+                    HStack(spacing: 3) {
+                        Text(report.account.tool.displayName)
+                            .font(.system(size: 8.5, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        if let p = report.account.priority {
+                            Text("· P\(p)")
+                                .font(.system(size: 8.5, weight: .bold))
+                                .foregroundStyle(toolTint)
+                        }
+                    }
                 }
+
+                Spacer(minLength: 4)
+
+                // Interactive 9router ON / OFF Toggle Pill
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        usage.toggleAccountActive(
+                            id: report.account.id,
+                            connectionId: report.account.connectionId,
+                            active: !report.account.isActive
+                        )
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Circle()
+                            .fill(report.account.isActive ? Color.green : Color.gray)
+                            .frame(width: 5, height: 5)
+                        Text(report.account.isActive ? "ON" : "OFF")
+                            .font(.system(size: 8, weight: .heavy))
+                    }
+                    .foregroundStyle(report.account.isActive ? Color.green : Color.secondary)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(report.account.isActive ? Color.green.opacity(0.18) : Color.white.opacity(0.08))
+                            .overlay(Capsule().stroke(report.account.isActive ? Color.green.opacity(0.4) : Color.white.opacity(0.12), lineWidth: 0.8))
+                    )
+                }
+                .buttonStyle(.plain)
+                .help(report.account.isActive ? "Active in 9router. Click to toggle OFF." : "Inactive. Click to toggle ON.")
+
+                // Health status badge
+                Text(healthLabel)
+                    .font(.system(size: 7.5, weight: .heavy))
+                    .foregroundStyle(healthColor)
+                    .padding(.horizontal, 4.5)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(healthColor.opacity(0.18)).overlay(Capsule().stroke(healthColor.opacity(0.35), lineWidth: 0.8)))
             }
+
             if !report.found {
-                note("No sessions found in \(report.account.dir)")
-            } else if report.account.tool == .codex {
-                if let w = report.limits?.primary { LimitBar(window: w) }
-                if let w = report.limits?.secondary { LimitBar(window: w) }
-                if report.limits == nil { note("No rate limits reported yet") }
-                stat("Today", "\(formatTokens(report.today.tokens)) tokens")
-            } else {
-                stat("Today", "\(formatTokens(report.today.tokens)) · \(formatCost(report.today.cost))")
-                stat("5h block", report.block.map { "\(formatTokens($0.tokens.tokens)) · \(formatCost($0.tokens.cost))" } ?? "not active")
-                if let block = report.block {
-                    note("\(resetsIn(block.start.addingTimeInterval(5 * 3600))) · cost is an estimate")
+                note("No logs found in \(report.account.dir)")
+            } else if report.isFrom9Router {
+                // 9router Quota Bars (e.g. session 5h and weekly 7d, or multiple models)
+                if !report.quotas.isEmpty {
+                    VStack(spacing: 5) {
+                        ForEach(report.quotas, id: \.name) { q in
+                            NineRouterQuotaBar(quota: q)
+                        }
+                    }
+                } else if let plan = report.planName {
+                    stat("Plan", plan)
                 }
+
+                stat("Today", "\(formatTokens(report.today.tokens)) \(report.today.cost > 0 ? "· " + formatCost(report.today.cost) : "tokens")")
+                sparkline
+            } else {
+                // Quota bar / Block gauge (Directory Fallback)
+                if report.account.tool == .codex {
+                    if let w = report.limits?.primary { LimitBar(window: w) }
+                    if let w = report.limits?.secondary { LimitBar(window: w) }
+                    if report.limits == nil { note("No rate limits reported yet") }
+                } else if let block = report.block {
+                    VStack(alignment: .leading, spacing: 3) {
+                        stat("5h block", formatTokens(block.tokens.tokens))
+                        let pct = min(100, max(0, q.percent))
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(.white.opacity(0.12)).frame(height: 5.5)
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: q.health == .exhausted ? [.orange, .red] : [accent.highlight.opacity(0.8), accent.highlight],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: max(3.5, geo.size.width * CGFloat(pct / 100)), height: 5.5)
+                            }
+                        }
+                        .frame(height: 5.5)
+                        if let resets = q.resetsText {
+                            note("\(resets) \(block.tokens.cost > 0 ? "· " + formatCost(block.tokens.cost) : "")")
+                        }
+                    }
+                } else {
+                    stat("5h block", "Idle (None active)")
+                }
+
+                stat("Today", "\(formatTokens(report.today.tokens)) \(report.today.cost > 0 ? "· " + formatCost(report.today.cost) : "tokens")")
                 sparkline
             }
             Spacer(minLength: 0)
         }
-        .padding(10)
-        .frame(width: 200, height: 150, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(.white.opacity(0.06)))
+        .padding(9)
+        .frame(width: 230, height: cardHeight, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 13)
+                .fill(.white.opacity(isHovering ? 0.08 : 0.04))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(healthColor.opacity(report.account.isActive ? 0.25 : 0.08), lineWidth: 1))
+        )
+        .opacity(report.account.isActive ? 1.0 : 0.55)
+        .onHover { isHovering = $0 }
     }
 
     private var sparkline: some View {
         let peak = max(1, report.days.max() ?? 1)
-        return HStack(alignment: .bottom, spacing: 3) {
+        return HStack(alignment: .bottom, spacing: 2.5) {
             ForEach(Array(report.days.enumerated()), id: \.offset) { i, tokens in
                 RoundedRectangle(cornerRadius: 2)
                     .fill(i == report.days.count - 1 ? accent.highlight : .white.opacity(0.25))
-                    .frame(height: max(2, 22 * CGFloat(tokens) / CGFloat(peak)))
+                    .frame(height: max(2, 20 * CGFloat(tokens) / CGFloat(peak)))
             }
         }
-        .frame(height: 22, alignment: .bottom)
+        .frame(height: 20, alignment: .bottom)
         .help("Tokens per day, last 7 days")
     }
 
@@ -204,11 +666,83 @@ private struct UsageCard: View {
             Spacer()
             Text(value).fontWeight(.semibold).monospacedDigit()
         }
-        .font(.system(size: 11))
+        .font(.system(size: 10.5))
     }
 
     private func note(_ text: String) -> some View {
-        Text(text).font(.system(size: 9.5)).foregroundStyle(.tertiary).lineLimit(2)
+        Text(text).font(.system(size: 9)).foregroundStyle(.tertiary).lineLimit(2)
+    }
+}
+
+private struct NineRouterQuotaBar: View {
+    let quota: NineRouterQuota
+    @Environment(\.notchAccent) private var accent
+
+    private var barColor: Color {
+        if quota.remainingPercentage <= 10 { return .red }
+        if quota.remainingPercentage <= 30 { return .orange }
+        return .green
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(quota.name)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer()
+                Text(quota.unlimited ? "Unlimited" : "\(Int(quota.remainingPercentage.rounded()))% left")
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(barColor)
+            }
+            .font(.system(size: 9.5))
+
+            if !quota.unlimited {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(.white.opacity(0.1))
+                        Capsule()
+                            .fill(barColor)
+                            .frame(width: max(2, geo.size.width * CGFloat(min(100.0, max(0.0, quota.remainingPercentage)) / 100.0)))
+                    }
+                }
+                .frame(height: 4.5)
+            }
+
+            // Prominent reset info displaying both relative countdown and exact local time
+            HStack(spacing: 3) {
+                if let resets = quota.resetAt, resets > .now {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 7.5, weight: .bold))
+                        .foregroundStyle(.cyan)
+                    Text(formatResetDetail(resets))
+                        .font(.system(size: 8.5, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.85))
+                } else if quota.unlimited {
+                    Image(systemName: "infinity")
+                        .font(.system(size: 7.5))
+                        .foregroundStyle(.secondary)
+                    Text("Unlimited quota")
+                        .font(.system(size: 8.5))
+                        .foregroundStyle(.secondary)
+                } else if quota.remainingPercentage >= 99.0 {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 7.5))
+                        .foregroundStyle(.green)
+                    Text("Full · 5h window starts on use")
+                        .font(.system(size: 8.5))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Image(systemName: "clock")
+                        .font(.system(size: 7.5))
+                        .foregroundStyle(.secondary)
+                    Text("Rolling window")
+                        .font(.system(size: 8.5))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }
 
@@ -231,7 +765,14 @@ private struct LimitBar: View {
                 }
             }
             .frame(height: 5)
-            Text(resetsIn(window.resetsAt)).font(.system(size: 9.5)).foregroundStyle(.tertiary)
+            HStack(spacing: 3) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 7.5, weight: .bold))
+                    .foregroundStyle(.cyan)
+                Text(formatResetDetail(window.resetsAt))
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.secondary)
+            }
         }
         .accessibilityElement(children: .combine)
     }
@@ -256,30 +797,59 @@ private struct AskSection: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 7) {
+            // Header with provider info
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(accent.highlight)
+                    Text("Ask AI")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("(\(settings.aiProvider.displayName))")
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if let lyricLine, !lyricLine.isEmpty {
+                    Text("Now playing lyric detected")
+                        .font(.system(size: 9))
+                        .foregroundStyle(accent.highlight)
+                }
+            }
+            .padding(.horizontal, 2)
+
+            // Input bar
             HStack(spacing: 6) {
                 TextField("Ask anything…", text: $text)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12.5))
                     .padding(.horizontal, 10)
-                    .frame(height: 28)
+                    .frame(height: 30)
                     .background(RoundedRectangle(cornerRadius: 8).fill(.white.opacity(0.08)))
                     .onSubmit { send(text) }
                     .onExitCommand(perform: reset)
+
                 if task != nil {
                     ProgressView().controlSize(.small)
                 } else {
-                    iconButton("arrow.up.circle.fill", help: "Send") { send(text) }.disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
+                    iconButton("arrow.up.circle.fill", help: "Send") { send(text) }
+                        .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+
                 if answer != nil || error != nil || !text.isEmpty {
                     iconButton("xmark.circle.fill", help: "Clear", action: reset)
                 }
             }
+
+            // Quick Action Pills
             HStack(spacing: 6) {
                 ForEach(QuickAction.allCases) { action in
                     Button { quick(action) } label: {
                         Label(action.label, systemImage: action.icon)
-                            .font(.system(size: 10.5, weight: .semibold))
+                            .font(.system(size: 10, weight: .semibold))
                             .padding(.horizontal, 8)
                             .frame(height: 22)
                             .background(Capsule().fill(.white.opacity(0.1)))
@@ -290,6 +860,8 @@ private struct AskSection: View {
                 }
                 Spacer()
             }
+
+            // Response Box
             ScrollView(.vertical, showsIndicators: false) {
                 Group {
                     if let error {
@@ -297,20 +869,23 @@ private struct AskSection: View {
                     } else if let answer {
                         Text(answer).textSelection(.enabled)
                     } else {
-                        Text("Type a question, or use a quick action on the clipboard or the current lyric line. Provider: \(settings.aiProvider.displayName).")
+                        Text("Type a question, or use a quick action on the clipboard or current song lyric. Powered by \(settings.aiProvider.displayName).")
                             .foregroundStyle(.tertiary)
                     }
                 }
-                .font(.system(size: 12))
+                .font(.system(size: 11.5))
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(0.03)))
             .overlay(alignment: .bottomTrailing) {
                 if let answer {
-                    iconButton(copied ? "checkmark" : "doc.on.doc", help: "Copy") {
+                    iconButton(copied ? "checkmark" : "doc.on.doc", help: "Copy Answer") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(answer, forType: .string)
                         copied = true
                     }
+                    .padding(6)
                 }
             }
         }

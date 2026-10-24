@@ -2,11 +2,25 @@ import AppKit
 import Network
 
 enum AgentTool: String, Codable, CaseIterable, Identifiable {
-    case claude, codex
+    case claude, codex, antigravity, commandcode
 
     var id: String { rawValue }
-    var displayName: String { self == .claude ? "Claude Code" : "Codex" }
-    var icon: String { self == .claude ? "terminal.fill" : "chevron.left.forwardslash.chevron.right" }
+    var displayName: String {
+        switch self {
+        case .claude: return "Claude Code"
+        case .codex: return "Codex"
+        case .antigravity: return "Antigravity"
+        case .commandcode: return "Command Code"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .claude: return "terminal.fill"
+        case .codex: return "chevron.left.forwardslash.chevron.right"
+        case .antigravity: return "sparkles"
+        case .commandcode: return "bolt.fill"
+        }
+    }
 }
 
 enum AgentState: String {
@@ -24,21 +38,55 @@ struct AgentSession: Identifiable, Equatable {
     var message: String?
 }
 
-/// A Claude Code or Codex config folder to read usage (and agent status) from.
+/// A Claude Code, Codex, Antigravity, or 9router connection to read usage (and agent status) from.
 struct AIAccount: Codable, Hashable, Identifiable {
     var id = UUID()
     var name: String
     var tool: AgentTool
     var dir: String
+    var connectionId: String? = nil
+    var email: String? = nil
+    var priority: Int? = nil
+    var isActive: Bool = true
 
-    private enum CodingKeys: String, CodingKey { case name, tool, dir }
+    private enum CodingKeys: String, CodingKey {
+        case name, tool, dir, connectionId, email, priority, isActive
+    }
+
+    init(id: UUID = UUID(), name: String, tool: AgentTool, dir: String, connectionId: String? = nil, email: String? = nil, priority: Int? = nil, isActive: Bool = true) {
+        self.id = id
+        self.name = name
+        self.tool = tool
+        self.dir = dir
+        self.connectionId = connectionId
+        self.email = email
+        self.priority = priority
+        self.isActive = isActive
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = UUID()
+        self.name = try container.decode(String.self, forKey: .name)
+        self.tool = try container.decode(AgentTool.self, forKey: .tool)
+        self.dir = try container.decode(String.self, forKey: .dir)
+        self.connectionId = try container.decodeIfPresent(String.self, forKey: .connectionId)
+        self.email = try container.decodeIfPresent(String.self, forKey: .email)
+        self.priority = try container.decodeIfPresent(Int.self, forKey: .priority)
+        self.isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+    }
 
     var url: URL { expandPath(dir) }
 
-    /// `~/.claude` and `~/.codex`, when they exist.
+    /// Defaults: checks ~/.claude, ~/.gemini/antigravity-ide, ~/.codex
     static var defaults: [AIAccount] {
-        [AIAccount(name: "Claude Code", tool: .claude, dir: "~/.claude"), AIAccount(name: "Codex", tool: .codex, dir: "~/.codex")]
-            .filter { FileManager.default.fileExists(atPath: $0.url.path) }
+        let all = [
+            AIAccount(name: "Claude Code", tool: .claude, dir: "~/.claude"),
+            AIAccount(name: "Antigravity", tool: .antigravity, dir: "~/.gemini/antigravity-ide"),
+            AIAccount(name: "Codex", tool: .codex, dir: "~/.codex"),
+        ]
+        let existing = all.filter { FileManager.default.fileExists(atPath: $0.url.path) }
+        return existing.isEmpty ? all : existing
     }
 }
 
@@ -108,18 +156,146 @@ enum AgentLogs {
         return data.split(separator: UInt8(ascii: "\n"), maxSplits: 1).first.flatMap { jsonObject(String(decoding: $0, as: UTF8.self)) }
     }
 
+    /// Transcripts under an Antigravity IDE home (`<dir>/brain/*/.system_generated/logs/transcript.jsonl`).
+    static func antigravityTranscripts(_ ideHome: URL) -> [(URL, Date)] {
+        let brain = ideHome.appendingPathComponent("brain")
+        guard let dirs = try? FileManager.default.contentsOfDirectory(at: brain, includingPropertiesForKeys: [.isDirectoryKey]) else { return [] }
+        var out: [(URL, Date)] = []
+        for d in dirs where (try? d.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            let transcript = d.appendingPathComponent(".system_generated/logs/transcript.jsonl")
+            if let date = (try? transcript.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) {
+                out.append((transcript, date))
+            }
+        }
+        return out
+    }
+
+    /// State, cwd and optional prompt/question from an Antigravity transcript tail.
+    static func antigravityState(_ lines: [String]) -> (state: AgentState?, cwd: String, message: String?) {
+        var state: AgentState? = nil
+        var cwd = ""
+        var message: String? = nil
+
+        for line in lines {
+            guard let v = jsonObject(line) else { continue }
+
+            if cwd.isEmpty {
+                if let content = v["content"] as? String {
+                    if let arrowRange = content.range(of: " -> ") {
+                        let before = String(content[..<arrowRange.lowerBound])
+                        if let lastWs = before.rangeOfCharacter(from: CharacterSet(charactersIn: "\n \"'"), options: .backwards) {
+                            let cand = String(before[lastWs.upperBound...]).trimmingCharacters(in: .whitespaces)
+                            if cand.hasPrefix("/") || cand.contains(":") { cwd = cand }
+                        }
+                    }
+                    if cwd.isEmpty, let docRange = content.range(of: "Active Document: ") {
+                        let doc = String(content[docRange.upperBound...])
+                        let endRange = doc.rangeOfCharacter(from: CharacterSet(charactersIn: "\n<\"\r"))
+                        let pathStr = String(doc[..<(endRange?.lowerBound ?? doc.endIndex)]).trimmingCharacters(in: .whitespaces)
+                        let path = URL(fileURLWithPath: pathStr)
+                        if !path.pathExtension.isEmpty {
+                            let parent = path.deletingLastPathComponent()
+                            cwd = (parent.lastPathComponent == "src" || parent.lastPathComponent == "lib")
+                                ? parent.deletingLastPathComponent().path
+                                : parent.path
+                        } else {
+                            cwd = path.path
+                        }
+                    }
+                }
+            }
+
+            if let toolCalls = v["tool_calls"] as? [[String: Any]] {
+                for tc in toolCalls {
+                    let name = tc["name"] as? String ?? (tc["function"] as? [String: Any])?["name"] as? String
+                    var args = tc["args"] as? [String: Any]
+                    if args == nil, let fn = tc["function"] as? [String: Any] {
+                        if let dict = fn["arguments"] as? [String: Any] {
+                            args = dict
+                        } else if let str = fn["arguments"] as? String, let parsed = jsonObject(str) {
+                            args = parsed
+                        }
+                    }
+
+                    if let args = args {
+                        for key in ["Cwd", "DirectoryPath", "SearchPath", "TargetFile", "AbsolutePath"] {
+                            if let val = args[key] as? String {
+                                let unquoted = val.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+                                if unquoted.hasPrefix("/") || unquoted.contains(":") {
+                                    let path = URL(fileURLWithPath: unquoted)
+                                    if !path.pathExtension.isEmpty {
+                                        let parent = path.deletingLastPathComponent()
+                                        cwd = (parent.lastPathComponent == "src" || parent.lastPathComponent == "lib")
+                                            ? parent.deletingLastPathComponent().path
+                                            : parent.path
+                                    } else {
+                                        cwd = path.path
+                                    }
+                                    break
+                                }
+                            }
+                        }
+                    }
+                    if name == "ask_question" {
+                        state = .needsYou
+                        if let args = args {
+                            if let q = args["question"] as? String {
+                                message = q
+                            } else if let q = args["questions"] as? String {
+                                message = q
+                            } else if let qList = args["questions"] as? [[String: Any]],
+                                      let firstQ = qList.first?["question"] as? String {
+                                message = firstQ
+                            }
+                        }
+                    }
+                }
+            }
+
+            switch v["type"] as? String {
+            case "USER_INPUT":
+                state = .working
+            case "PLANNER_RESPONSE":
+                let tools = v["tool_calls"] as? [[String: Any]] ?? []
+                let isAskQ = tools.contains { tc in
+                    let name = tc["name"] as? String ?? (tc["function"] as? [String: Any])?["name"] as? String
+                    return name == "ask_question"
+                }
+                if isAskQ {
+                    state = .needsYou
+                } else if !tools.isEmpty {
+                    state = .working
+                } else if (v["status"] as? String) == "DONE" {
+                    state = .done
+                }
+            case let t? where t.hasPrefix("RUN_") || t.hasPrefix("VIEW_") || t.hasPrefix("REPLACE_") || t.hasPrefix("WRITE_") || t.hasPrefix("EXEC_"):
+                state = .working
+            default:
+                break
+            }
+        }
+        return (state, cwd, message)
+    }
+
     static func readSession(tool: AgentTool, url: URL, mtime: Date) -> AgentSession? {
         let lines = tailLines(url)
-        var state: AgentState?, cwd = "", sid = ""
+        var state: AgentState?, cwd = "", sid = "", msg: String? = nil
         if tool == .claude {
             (state, cwd, sid) = claudeState(lines)
-        } else {
+        } else if tool == .codex {
             let meta = firstLine(url)?["payload"] as? [String: Any]
             (state, cwd, sid) = (codexState(lines), meta?["cwd"] as? String ?? "", meta?["id"] as? String ?? "")
+        } else {
+            let res = antigravityState(lines)
+            state = res.state
+            cwd = res.cwd
+            let convId = url.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().lastPathComponent
+            sid = convId.isEmpty ? url.deletingPathExtension().lastPathComponent : convId
+            msg = res.message
         }
         guard let state else { return nil }
         return AgentSession(tool: tool, id: sid.isEmpty ? url.deletingPathExtension().lastPathComponent : sid,
-                            project: projectName(cwd), state: state, updatedAt: mtime)
+                            project: projectName(cwd), state: state, updatedAt: mtime, message: msg)
     }
 
     static func jsonlFiles(in dir: URL) -> [(URL, Date)] {
@@ -375,8 +551,10 @@ final class AgentMonitor: ObservableObject {
         for a in accounts {
             if a.tool == .claude {
                 files += AgentLogs.claudeLogs(a.url, recursive: false).map { (.claude, $0.0, $0.1) }
-            } else {
+            } else if a.tool == .codex {
                 for day in AgentLogs.codexDayDirs(a.url, 2) { files += AgentLogs.jsonlFiles(in: day).map { (.codex, $0.0, $0.1) } }
+            } else if a.tool == .antigravity {
+                files += AgentLogs.antigravityTranscripts(a.url).map { (.antigravity, $0.0, $0.1) }
             }
         }
         return files.filter { $0.2 >= since }.compactMap { tool, url, mtime in
@@ -395,7 +573,10 @@ final class AgentMonitor: ObservableObject {
                 onPeek?(Banner(icon: s.state == .done ? "checkmark.circle.fill" : "hand.raised.fill",
                                tint: s.state == .done ? .green : .orange,
                                badge: s.state == .done ? "Done" : "Needs you",
-                               title: title, subtitle: s.message, duration: 4))
+                               title: title, subtitle: s.message,
+                               // "Needs you" waits longer: you may be in another window.
+                               duration: s.state == .done ? 5 : 10,
+                               kind: s.state == .done ? .success : .attention))
             }
         }
         lastStates = Dictionary(merged.map { ($0.id, $0.state) }, uniquingKeysWith: { a, _ in a })

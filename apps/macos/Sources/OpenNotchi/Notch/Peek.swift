@@ -64,6 +64,28 @@ enum BannerActionType: String, Equatable {
     case triggerUpdate
 }
 
+/// How much a banner should interrupt: drives its sound, glow and how long it stays.
+enum BannerKind: Equatable {
+    /// Something finished well (agent done, download done).
+    case success
+    /// Waiting on you (agent needs input, meeting starting).
+    case attention
+    /// A scheduled moment (prayer time, reminder ahead of an event).
+    case reminder
+    /// Nice to know (update available).
+    case info
+
+    /// System sound name; nil stays silent.
+    var sound: String? {
+        switch self {
+        case .success: return "Glass"
+        case .attention: return "Hero"
+        case .reminder: return "Ping"
+        case .info: return nil
+        }
+    }
+}
+
 struct Banner: Equatable {
     var icon: String
     var tint: Color
@@ -75,5 +97,6 @@ struct Banner: Equatable {
     var actionURL: URL?
     var actionType: BannerActionType = .openURL
     var duration: TimeInterval = 12
+    var kind: BannerKind = .info
 }
 

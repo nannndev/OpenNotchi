@@ -100,7 +100,11 @@ export interface AppSettings {
   aiAnthropicModel: string
   aiOpenaiUrl: string
   aiOpenaiModel: string
+  showMascot: boolean
+  notificationSounds: boolean
 }
+
+
 
 export const THEME_OPTIONS: { id: NotchTheme; name: string; desc: string; previewClass: string }[] = [
   { id: "classic", name: "Classic Black", desc: "Solid deep black, sleek & minimalist", previewClass: "theme-classic" },
@@ -197,7 +201,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   aiAnthropicModel: "claude-haiku-5-5",
   aiOpenaiUrl: "https://api.openai.com/v1",
   aiOpenaiModel: "gpt-4o-mini",
+  showMascot: true,
+  notificationSounds: true,
 }
+
+
 
 export function loadSettings(): AppSettings {
   try {

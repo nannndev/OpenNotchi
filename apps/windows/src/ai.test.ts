@@ -4,6 +4,7 @@ import {
   closedMeter,
   formatCost,
   formatTokens,
+  getAccountQuota,
   mergeSessions,
   quickPrompt,
   resetsIn,
@@ -42,6 +43,8 @@ test("mergeSessions lays newer hook states over the logs and turns old done into
 test("transitionPeek fires on working → done and on → needs you", () => {
   assert.equal(transitionPeek("working", session({ state: "done" })), "Claude Code finished · notch")
   assert.equal(transitionPeek("working", session({ state: "needs_you", tool: "codex" })), "Codex needs you · notch")
+  assert.equal(transitionPeek("working", session({ state: "done", tool: "antigravity" })), "Antigravity finished · notch")
+  assert.equal(transitionPeek("working", session({ state: "needs_you", tool: "antigravity" })), "Antigravity needs you · notch")
   assert.equal(transitionPeek(undefined, session({ state: "done" })), null)
   assert.equal(transitionPeek("done", session({ state: "done" })), null)
   assert.equal(transitionPeek("idle", session({ state: "working" })), null)
@@ -60,6 +63,20 @@ test("formatting", () => {
   assert.equal(resetsIn(now + 3 * 86_400_000, now), "resets in 3d")
   assert.equal(timeAgo(now - 30_000, now), "now")
   assert.equal(timeAgo(now - 7 * 60_000, now), "7m")
+})
+
+test("getAccountQuota evaluates rate limits and blocks", () => {
+  const base: UsageReport = { name: "Test", tool: "codex", dir: "", found: true, today: { tokens: 0, cost: 0 }, block: null, days: [], limits: null }
+  const codexWarn = { ...base, limits: { planType: "plus", primary: { usedPercent: 75, windowMinutes: 300, resetsAt: now / 1000 + 1800 }, secondary: null } }
+  assert.deepEqual(getAccountQuota(codexWarn, now), { percent: 75, label: "75%", resetsText: "resets in 30m", health: "warning" })
+
+  const codexHot = { ...base, limits: { planType: "plus", primary: { usedPercent: 95, windowMinutes: 300, resetsAt: now / 1000 + 600 }, secondary: null } }
+  assert.deepEqual(getAccountQuota(codexHot, now), { percent: 95, label: "95%", resetsText: "resets in 10m", health: "exhausted" })
+
+  const blockReport: UsageReport = { ...base, tool: "antigravity", limits: null, block: { start: now - 3_600_000, end: now + 4 * 3_600_000, tokens: 2500, cost: 0.001 } }
+  assert.deepEqual(getAccountQuota(blockReport, now), { percent: 20, label: "2.5K", resetsText: "resets in 4h", health: "healthy" })
+
+  assert.deepEqual(getAccountQuota(base, now), { percent: 0, label: "Idle", resetsText: null, health: "healthy" })
 })
 
 test("closedMeter prefers a hot Codex window over a Claude block", () => {

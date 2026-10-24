@@ -1,8 +1,9 @@
 /** AI features: agent status, usage and Ask AI. Pure helpers here; the file reading is in Rust (src-tauri/src/ai.rs). */
 
 export type AiProvider = "ollama" | "anthropic" | "openai"
-export type AgentTool = "claude" | "codex"
+export type AgentTool = "claude" | "codex" | "antigravity"
 export type AgentState = "working" | "needs_you" | "done" | "idle"
+export type AccountHealth = "healthy" | "warning" | "exhausted"
 
 export interface AiAccount {
   name: string
@@ -45,10 +46,17 @@ export interface UsageReport {
   limits: { planType: string | null; primary: RateWindow | null; secondary: RateWindow | null } | null
 }
 
+export interface QuotaInfo {
+  percent: number
+  label: string
+  resetsText: string | null
+  health: AccountHealth
+}
+
 export const IDLE_AFTER_MS = 5 * 60_000
 export const MAX_AGENT_ROWS = 5
 
-export const TOOL_NAMES: Record<AgentTool, string> = { claude: "Claude Code", codex: "Codex" }
+export const TOOL_NAMES: Record<AgentTool, string> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity" }
 export const STATE_LABELS: Record<AgentState, string> = { working: "working", needs_you: "needs you", done: "done", idle: "idle" }
 
 export const PROVIDERS: { id: AiProvider; name: string }[] = [
@@ -133,6 +141,41 @@ export function closedMeter(reports: UsageReport[], now: number): { label: strin
   if (!block) return null
   const percent = ((now - block.start) / (block.end - block.start)) * 100
   return { label: formatTokens(block.tokens), percent, hot: false }
+}
+
+/** 9router-style quota and rate-limit gauge info for an account. */
+export function getAccountQuota(r: UsageReport, now: number): QuotaInfo {
+  const primary = r.limits?.primary
+  if (primary) {
+    const percent = Math.min(100, Math.max(0, primary.usedPercent))
+    const health: AccountHealth = percent >= 90 ? "exhausted" : percent >= 70 ? "warning" : "healthy"
+    const resetsText = primary.resetsAt > 0 ? resetsIn(primary.resetsAt * 1000, now) : null
+    return {
+      percent: Math.round(percent),
+      label: `${Math.round(percent)}%`,
+      resetsText,
+      health,
+    }
+  }
+
+  if (r.block && r.block.end > now) {
+    const elapsedShare = Math.min(100, Math.max(0, ((now - r.block.start) / (r.block.end - r.block.start)) * 100))
+    const health: AccountHealth = r.block.tokens >= 250_000 ? "warning" : "healthy"
+    const resetsText = resetsIn(r.block.end, now)
+    return {
+      percent: Math.round(elapsedShare),
+      label: formatTokens(r.block.tokens),
+      resetsText,
+      health,
+    }
+  }
+
+  return {
+    percent: 0,
+    label: "Idle",
+    resetsText: null,
+    health: "healthy",
+  }
 }
 
 export type QuickAction = "summarize" | "fix" | "translate" | "explain"

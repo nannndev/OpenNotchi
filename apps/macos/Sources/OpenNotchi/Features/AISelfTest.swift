@@ -60,6 +60,17 @@ enum AISelfTest {
         check(AgentLogs.peekTitle(previous: .working, next: done) == "Claude Code finished · p", "peek text finished")
         check(AgentLogs.peekTitle(previous: nil, next: done) == nil, "no peek for sessions first seen as done")
 
+        print("Antigravity state")
+        let agUser = #"{"type":"USER_INPUT","content":"Fix the build\nActive Document: /Users/yubidev/work/notch/src/main.rs"}"#
+        let agStateUser = AgentLogs.antigravityState([agUser])
+        check(agStateUser.state == .working && agStateUser.cwd.contains("notch") == true, "antigravity USER_INPUT → working + project cwd")
+        let agAsk = #"{"type":"PLANNER_RESPONSE","content":"Which approach?","tool_calls":[{"function":{"name":"ask_question","arguments":"{\"question\":\"Choose\"}"}}]}"#
+        let agStateAsk = AgentLogs.antigravityState([agUser, agAsk])
+        check(agStateAsk.state == .needsYou && agStateAsk.message == "Choose", "antigravity ask_question → needs_you + message")
+        let agDone = #"{"type":"PLANNER_RESPONSE","status":"DONE","content":"All tests passed!"}"#
+        let agStateDone = AgentLogs.antigravityState([agUser, agDone])
+        check(agStateDone.state == .done, "antigravity status DONE without tools → done")
+
         print("Codex rate limits")
         let codex = #"{"timestamp":"2026-09-15T07:57:21.537Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"output_tokens":20,"total_tokens":120}},"rate_limits":{"primary":{"used_percent":82.5,"window_minutes":300,"resets_at":1784685946},"secondary":{"used_percent":3.0,"window_minutes":10080,"resets_at":1785000000},"plan_type":"plus"}}}"#
         let c = AIUsage.parseCodexLine(codex)
@@ -116,6 +127,19 @@ enum AISelfTest {
         try! Data("{not json".utf8).write(to: tmp.appendingPathComponent("settings.json"))
         check((try? ClaudeHooks.apply(dir: tmp, install: true)) == nil, "invalid JSON is left alone")
         try? FileManager.default.removeItem(at: tmp)
+
+        print("9router quotas")
+        func quota(_ name: String, _ pct: Double) -> NineRouterQuota {
+            NineRouterQuota(name: name, used: 0, total: 1000, remaining: 0, remainingPercentage: pct, resetAt: nil, unlimited: false)
+        }
+        let antigravity = NineRouterService.displayQuotas([
+            quota("claude-opus-5-5-high", 100), quota("gemini-3.8-flash-low", 77), quota("gemini_session", 77),
+            quota("claude_gpt_session", 100), quota("gemini_weekly", 92), quota("claude_gpt_weekly", 100),
+        ])
+        check(antigravity.map(\.name) == ["Gemini (5h)", "Claude & GPT (5h)", "Gemini (Weekly)", "Claude & GPT (Weekly)"], "pools only, dashboard labels and order")
+        check(antigravity.first?.remainingPercentage == 77, "pool keeps its numbers")
+        let claude = NineRouterService.displayQuotas([quota("weekly (7d)", 2), quota("session (5h)", 82)])
+        check(claude.map(\.name) == ["session (5h)", "weekly (7d)"], "no pools: every quota, sorted")
 
         print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) FAILED.")
 

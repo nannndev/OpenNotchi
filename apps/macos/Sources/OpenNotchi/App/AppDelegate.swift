@@ -60,12 +60,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateLyricsOverlay()
         updateAI()
 
+        if CommandLine.arguments.contains("--settings") || CommandLine.arguments.contains("-s") {
+            showSettings()
+        }
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        screenManager.toggle()
+        return true
     }
 
     @objc private func screensChanged() {
@@ -125,7 +134,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 title: url.lastPathComponent,
                 subtitle: "Downloaded",
                 actionTitle: "Open",
-                actionURL: url
+                actionURL: url,
+                kind: .success
             )))
         }
 
@@ -241,6 +251,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .environmentObject(updater)
                     .environmentObject(lyrics)
                     .environmentObject(AgentMonitor.shared)
+                    .environmentObject(AIUsageManager.shared)
             )
             let window = NSWindow(contentViewController: hosting)
             window.title = "OpenNotchi Settings"

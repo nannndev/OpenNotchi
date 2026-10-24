@@ -1,12 +1,13 @@
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
-import { Bot, Check, ClipboardPaste, Copy, Music2, SendHorizontal, Terminal, X } from "lucide-react"
+import { Bot, Check, ClipboardPaste, Copy, Music2, SendHorizontal, Sparkles, Terminal, X } from "lucide-react"
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import {
   formatCost,
+  formatTokens,
+  getAccountQuota,
   mergeSessions,
   transitionPeek,
-  formatTokens,
   QUICK_ACTIONS,
   quickPrompt,
   resetsIn,
@@ -24,8 +25,9 @@ import {
 } from "../ai"
 import type { NowPlaying } from "../media"
 import { useSettings } from "../settings"
+import { transitionBanner, type Banner } from "../banner"
 
-type Section = "agents" | "usage" | "ask"
+type Section = "usage" | "agents" | "ask"
 
 export function AITab({
   sessions,
@@ -39,47 +41,73 @@ export function AITab({
   np: NowPlaying | null
 }) {
   const [settings] = useSettings()
-  const [section, setSection] = useState<Section>(settings.aiAgents ? "agents" : "usage")
+  const [section, setSection] = useState<Section>(settings.aiAccounts.length > 0 ? "usage" : settings.aiAgents ? "agents" : "usage")
   const now = Date.now()
+
+  const totalTokensToday = usage?.reduce((sum, r) => sum + r.today.tokens, 0) ?? 0
+  const totalCostToday = usage?.reduce((sum, r) => sum + r.today.cost, 0) ?? 0
+  const activeCount = usage?.filter((r) => r.found).length ?? 0
 
   return (
     <div className="tab-ai">
       <div className="segmented ai-segments">
-        {(["agents", "usage", "ask"] as const).map((s) => (
+        {(["usage", "agents", "ask"] as const).map((s) => (
           <button key={s} className={section === s ? "active" : ""} onClick={() => setSection(s)}>
-            {s === "agents" ? "Agents" : s === "usage" ? "Usage" : "Ask"}
+            {s === "usage" ? "Quota & Accounts" : s === "agents" ? "Agents" : "Ask"}
           </button>
         ))}
       </div>
       <div className="ai-body">
+        {section === "usage" && (
+          <div className="ai-usage-wrap">
+            {usage && usage.length > 0 && (
+              <div className="ai-summary-bar">
+                <div className="ai-summary-item">
+                  <span className="ai-summary-label">Today</span>
+                  <b className="ai-summary-val">{formatTokens(totalTokensToday)} tokens</b>
+                </div>
+                {totalCostToday > 0 && (
+                  <div className="ai-summary-item">
+                    <span className="ai-summary-label">Est. Cost</span>
+                    <b className="ai-summary-val">{formatCost(totalCostToday)}</b>
+                  </div>
+                )}
+                <div className="ai-summary-item">
+                  <span className="ai-summary-label">Accounts</span>
+                  <b className="ai-summary-val">{activeCount} active</b>
+                </div>
+              </div>
+            )}
+
+            {settings.aiAccounts.length === 0 ? (
+              <div className="ai-empty">Add Claude Code, Codex, or Antigravity in Settings › AI.</div>
+            ) : !usage ? (
+              <div className="ai-empty">Reading usage & quotas…</div>
+            ) : (
+              <div className="ai-usage">
+                {usage.map((r, i) => (
+                  <UsageCard key={i} r={r} now={now} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {section === "agents" &&
           (!settings.aiAgents ? (
             <div className="ai-empty">Agent status is off in Settings › AI.</div>
           ) : sessions.length === 0 ? (
-            <div className="ai-empty">No Claude Code or Codex sessions in the last 30 minutes.</div>
+            <div className="ai-empty">No Claude Code, Codex, or Antigravity sessions in the last 30 minutes.</div>
           ) : (
             <div className="ai-agents">
               {sessions.map((s) => (
                 <div key={s.sessionId} className="ai-agent-row" title={s.message ?? undefined}>
-                  {s.tool === "claude" ? <Terminal size={13} /> : <Bot size={13} />}
+                  <AgentToolIcon tool={s.tool} />
                   <span className="ai-agent-project">{s.project || TOOL_NAMES[s.tool]}</span>
                   <span className="ai-agent-msg">{s.state === "needs_you" ? s.message : TOOL_NAMES[s.tool]}</span>
                   <span className={`ai-chip ${s.state}`}>{STATE_LABELS[s.state]}</span>
                   <span className="ai-agent-time">{timeAgo(s.updatedAt, now)}</span>
                 </div>
-              ))}
-            </div>
-          ))}
-
-        {section === "usage" &&
-          (settings.aiAccounts.length === 0 ? (
-            <div className="ai-empty">Add a Claude Code or Codex folder in Settings › AI.</div>
-          ) : !usage ? (
-            <div className="ai-empty">Reading usage…</div>
-          ) : (
-            <div className="ai-usage">
-              {usage.map((r, i) => (
-                <UsageCard key={i} r={r} now={now} />
               ))}
             </div>
           ))}
@@ -90,39 +118,51 @@ export function AITab({
   )
 }
 
+function AgentToolIcon({ tool }: { tool: string }) {
+  if (tool === "claude") return <Terminal size={13} className="ai-icon-tool ai-icon-claude" />
+  if (tool === "antigravity") return <Sparkles size={13} className="ai-icon-tool ai-icon-antigravity" />
+  return <Bot size={13} className="ai-icon-tool ai-icon-codex" />
+}
+
 function UsageCard({ r, now }: { r: UsageReport; now: number }) {
   const max = Math.max(1, ...r.days)
+  const quota = getAccountQuota(r, now)
+
   return (
-    <div className="ai-card">
+    <div className={`ai-card ai-card-${quota.health}`}>
       <div className="ai-card-head">
-        <strong>{r.name}</strong>
-        {r.limits?.planType && <span className="ai-plan">{r.limits.planType}</span>}
+        <AgentToolIcon tool={r.tool} />
+        <strong className="ai-card-title">{r.name}</strong>
+        <span className={`ai-health-badge ${quota.health}`}>{quota.health}</span>
       </div>
       {!r.found ? (
         <div className="ai-card-empty">No sessions found in {r.dir}</div>
-      ) : r.tool === "codex" ? (
-        <>
-          {r.limits?.primary && <LimitBar w={r.limits.primary} now={now} />}
-          {r.limits?.secondary && <LimitBar w={r.limits.secondary} now={now} />}
-          {!r.limits && <div className="ai-card-empty">No rate limits reported yet</div>}
-          <div className="ai-stat">
-            <span>Today</span>
-            <b>{formatTokens(r.today.tokens)} tokens</b>
-          </div>
-        </>
       ) : (
         <>
+          {r.tool === "codex" ? (
+            <>
+              {r.limits?.primary && <LimitBar w={r.limits.primary} now={now} />}
+              {r.limits?.secondary && <LimitBar w={r.limits.secondary} now={now} />}
+              {!r.limits && <div className="ai-card-empty">No rate limits reported yet</div>}
+            </>
+          ) : r.block ? (
+            <div className="ai-limit">
+              <div className="ai-stat">
+                <span>5h rolling block</span>
+                <b>{formatTokens(r.block.tokens)}</b>
+              </div>
+              <div className={`ai-bar ${quota.health === "exhausted" ? "hot" : ""}`} style={{ "--p": `${quota.percent}%` } as CSSProperties} />
+              <div className="ai-card-note">{resetsIn(r.block.end, now)} {r.block.cost > 0 ? `· ${formatCost(r.block.cost)}` : ""}</div>
+            </div>
+          ) : null}
+
           <div className="ai-stat">
             <span>Today</span>
             <b>
-              {formatTokens(r.today.tokens)} · {formatCost(r.today.cost)}
+              {formatTokens(r.today.tokens)} {r.today.cost > 0 ? `· ${formatCost(r.today.cost)}` : "tokens"}
             </b>
           </div>
-          <div className="ai-stat">
-            <span>5h block</span>
-            <b>{r.block ? `${formatTokens(r.block.tokens)} · ${formatCost(r.block.cost)}` : "not active"}</b>
-          </div>
-          {r.block && <div className="ai-card-note">{resetsIn(r.block.end, now)} · cost estimate</div>}
+
           <div className="ai-spark" title="Tokens per day, last 7 days">
             {r.days.map((d, i) => (
               <i key={i} style={{ height: `${Math.max(4, (d / max) * 100)}%` }} className={i === r.days.length - 1 ? "today" : ""} />
@@ -253,8 +293,8 @@ function AskPanel({ lyricLine, np }: { lyricLine: string | null; np: NowPlaying 
   )
 }
 
-/** Agent sessions from the logs every 2 s plus live hook events, and a peek on working → done / needs you. */
-export function useAgents(enabled: boolean, onPeek: (text: string) => void): AgentSession[] {
+/** Agent sessions from the logs every 2 s plus live hook events, and a banner peek on working → done / needs you. */
+export function useAgents(enabled: boolean, onPeek?: (banner: Banner) => void): AgentSession[] {
   const [settings] = useSettings()
   const [logs, setLogs] = useState<AgentSession[]>([])
   const [hooks, setHooks] = useState<Record<string, HookEvent & { at: number }>>({})
@@ -262,11 +302,13 @@ export function useAgents(enabled: boolean, onPeek: (text: string) => void): Age
   const dirs = (tool: string) => settings.aiAccounts.filter((a) => a.tool === tool).map((a) => a.dir)
   const claudeDirs = dirs("claude")
   const codexDirs = dirs("codex")
-  const key = JSON.stringify([claudeDirs, codexDirs])
+  const antigravityDirs = dirs("antigravity")
+  const key = JSON.stringify([claudeDirs, codexDirs, antigravityDirs])
 
   useEffect(() => {
     if (!enabled) return setLogs([])
-    const poll = () => invoke<AgentSession[]>("agent_sessions", { claudeDirs, codexDirs }).then(setLogs).catch(() => {})
+    const poll = () =>
+      invoke<AgentSession[]>("agent_sessions", { claudeDirs, codexDirs, antigravityDirs }).then(setLogs).catch(() => {})
     poll()
     const id = setInterval(poll, 2000)
     return () => clearInterval(id)
@@ -290,8 +332,8 @@ export function useAgents(enabled: boolean, onPeek: (text: string) => void): Age
   useEffect(() => {
     const next: Record<string, AgentState> = {}
     for (const s of sessions) {
-      const text = transitionPeek(prev.current[s.sessionId], s)
-      if (text && settings.aiNotify) onPeek(text)
+      const banner = transitionBanner(prev.current[s.sessionId], s)
+      if (banner && settings.aiNotify && onPeek) onPeek(banner)
       next[s.sessionId] = s.state
     }
     prev.current = next

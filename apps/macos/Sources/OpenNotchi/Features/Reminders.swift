@@ -64,7 +64,9 @@ final class ReminderCenter {
     }
 
     private func show(_ banner: Banner) {
-        if settings.reminderSound { NSSound(named: "Glass")?.play() }
+        // The banner plays its own sound when notification sounds are on; this setting keeps reminders quiet otherwise.
+        var banner = banner
+        if !settings.reminderSound { banner.kind = .info }
         onBanner?(banner)
     }
 
@@ -79,7 +81,8 @@ final class ReminderCenter {
             title: title ?? "Untitled event",
             subtitle: start.formatted(date: .omitted, time: .shortened) + (link.map { " · \($0.service)" } ?? ""),
             actionTitle: link == nil ? nil : "Join",
-            actionURL: link?.url
+            actionURL: link?.url,
+            kind: minutes <= 0 ? .attention : .reminder
         )
     }
 
@@ -101,7 +104,8 @@ final class ReminderCenter {
             tint: .teal,
             badge: time,
             title: title,
-            subtitle: place.isEmpty ? nil : place
+            subtitle: place.isEmpty ? nil : place,
+            kind: .reminder
         )
     }
 }

@@ -28,6 +28,8 @@ SPARKLE="Vendor/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework
 ditto "$SPARKLE" "$APP/Contents/Frameworks/Sparkle.framework"
 
 # Ad-hoc signature so macOS can show the Automation (Apple Events) prompt.
-codesign --force --deep --sign - "$APP"
+# Ad-hoc builds get a new identity every build, so macOS forgets Accessibility and Keychain access each time.
+# Set SIGN_IDENTITY (e.g. "Apple Development: you@example.com (TEAMID)") for local builds that keep them.
+codesign --force --deep --sign "${SIGN_IDENTITY:--}" "$APP"
 
 echo "Built $APP"

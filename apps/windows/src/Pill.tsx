@@ -23,6 +23,9 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { currentIndex } from "./lyrics"
 import { control, currentLine, formatTime, positionAt, useLyrics, useNowPlaying, useTick, type NowPlaying } from "./media"
 import { closedMeter } from "./ai"
+import { NotchiMascot } from "./NotchiMascot"
+import { NotchiStatus } from "./NotchiStatus"
+import { filterRecentAgentStates, notchiMood, playPetPopSound, type NotchiMood } from "./notchi"
 import { useAccent } from "./palette"
 import { resolveAccentColor, useSettings } from "./settings"
 import { AITab, useAgents, useUsage } from "./tabs/AITab"
@@ -32,10 +35,13 @@ import { NotesTab } from "./tabs/NotesTab"
 import { PrompterTab } from "./tabs/PrompterTab"
 import { TimerTab } from "./tabs/TimerTab"
 import { useUpdateChecker } from "./updater"
+import { BannerView } from "./BannerView"
+import { playBannerSound, type Banner } from "./banner"
 
 // Pill sizes in logical pixels. The window is a fixed 640×280 transparent canvas; the pill animates inside it.
 const CLOSED = { width: 340, height: 38 }
 const PEEKING = { width: 380, height: 38 }
+const BANNER_SIZE = { width: 420, height: 96 }
 const OPEN = { width: 600, height: 210 }
 /** Gap above the floating pill. */
 const FLOAT_GAP = 10
@@ -54,23 +60,102 @@ export function Pill() {
 
   const resolvedAccent = resolveAccentColor(settings.accentChoice, rawAccent, settings.customAccent)
 
-  const [open, setOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<TabKey>("music")
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null
+  const defaultOpen = searchParams?.get("open") === "1"
+  const defaultTab = (searchParams?.get("tab") as TabKey) || "music"
+  const defaultBanner = searchParams?.get("banner") === "1" ? {
+    id: "demo",
+    kind: "success" as const,
+    title: "Claude Code: Task completed",
+    description: "47/47 tests passed · OpenNotchi",
+    actionLabel: "Open Terminal",
+    durationMs: 12000,
+    startedAt: Date.now(),
+  } : null
+
+  const [open, setOpen] = useState(defaultOpen)
+  const [activeTab, setActiveTab] = useState<TabKey>(defaultTab)
   const [lyricsMode, setLyricsMode] = useState(false)
   const [awake, setAwake] = useState(false)
   const [widgetOn, setWidgetOn] = useState(false)
   const [peek, setPeek] = useState<Privacy | null>(null)
-  // "Claude Code finished · project" for a few seconds when an agent finishes or needs you.
-  const [agentPeek, setAgentPeek] = useState<string | null>(null)
-  const agentPeekTimer = useRef<number | undefined>(undefined)
-  const showAgentPeek = (text: string) => {
-    setAgentPeek(text)
-    clearTimeout(agentPeekTimer.current)
-    agentPeekTimer.current = window.setTimeout(() => setAgentPeek(null), 4000)
+  
+  // Notification banners (macOS parity with kinds: success, attention, reminder, info)
+  const [activeBanner, setActiveBanner] = useState<Banner | null>(defaultBanner)
+  const activeBannerRef = useRef<Banner | null>(null)
+  activeBannerRef.current = activeBanner
+  const [bannerHovered, setBannerHovered] = useState(false)
+
+  const showBanner = (b: Banner) => {
+    setActiveBanner(b)
+    playBannerSound(b.kind, settings.notificationSounds)
   }
-  const agents = useAgents(settings.aiEnabled && settings.aiAgents, showAgentPeek)
+
+  const agents = useAgents(settings.aiEnabled && settings.aiAgents, showBanner)
   const usage = useUsage(settings.aiEnabled)
   const meter = settings.aiEnabled && settings.aiClosedMeter && usage ? closedMeter(usage, Date.now()) : null
+
+  // Notchi Mascot state
+  const [pettedAt, setPettedAt] = useState<number | null>(null)
+  const [pets, setPets] = useState(0)
+  const [mascotHovered, setMascotHovered] = useState(false)
+  const [gaze, setGaze] = useState(0)
+  const [quietSince, setQuietSince] = useState(Date.now())
+
+  const handlePet = () => {
+    const now = Date.now()
+    if (pettedAt && now - pettedAt > 6000) {
+      setPets(0)
+    }
+    setPets((p) => p + 1)
+    setPettedAt(now)
+    setQuietSince(now)
+    playPetPopSound()
+  }
+
+  const isPetted = (pettedAt != null && Date.now() - pettedAt < 4000) || mascotHovered
+
+  // Agent states with 8-second expiry for done
+  const recentAgents = filterRecentAgentStates(
+    agents.map((a) => ({ state: a.state, updatedAt: a.updatedAt })),
+    Date.now(),
+    8
+  )
+
+  const mascotMood: NotchiMood = notchiMood({
+    agentStates: recentAgents,
+    musicPlaying: Boolean(np?.isPlaying),
+    idleFor: (Date.now() - quietSince) / 1000,
+    hour: new Date().getHours(),
+    petted: isPetted,
+  })
+
+  // Follow pointer for gaze when closed
+  useEffect(() => {
+    if (open) return
+    const onMouseMove = (e: MouseEvent) => {
+      const target = Math.max(-1, Math.min(1, (e.clientX - window.innerWidth / 2) / 400))
+      setGaze(target)
+    }
+    window.addEventListener("mousemove", onMouseMove)
+    return () => window.removeEventListener("mousemove", onMouseMove)
+  }, [open])
+
+  // Mascot bounding box reporting to Rust backend
+  const handleMascotRectChange = (rect: { x: number; y: number; width: number; height: number } | null) => {
+    if (open || !rect) {
+      invoke("set_mascot_rect", { x: null, y: null, width: null, height: null }).catch(() => {})
+    } else {
+      invoke("set_mascot_rect", { x: rect.x, y: rect.y, width: rect.width, height: rect.height }).catch(() => {})
+    }
+  }
+
+  useEffect(() => {
+    if (open) {
+      invoke("set_mascot_rect", { x: null, y: null, width: null, height: null }).catch(() => {})
+    }
+  }, [open])
+
   // A countdown or photobox in progress keeps the pill open even if the cursor drifts away.
   const [mirrorBusy, setMirrorBusy] = useState(false)
   const mirrorBusyRef = useRef(false)
@@ -81,9 +166,12 @@ export function Pill() {
 
   const onMirror = activeTab === "mirror" && settings.tabMirror
   const openSize = onMirror ? { width: 620, height: settings.mirrorHeight } : OPEN
-  const size = open ? openSize : peek || agentPeek ? PEEKING : CLOSED
+  const isMascotIdle = settings.showMascot && !peek && !activeBanner && !np && !meter
+  const closedWidth = isMascotIdle ? 220 : CLOSED.width
+  const closedSize = { width: closedWidth, height: CLOSED.height }
+  const size = open ? openSize : activeBanner ? BANNER_SIZE : peek ? PEEKING : closedSize
   const mode = settings.notchMode ?? "pinned"
-  const hidden = mode === "autoHide" && !open && !peek && !agentPeek
+  const hidden = mode === "autoHide" && !open && !peek && !activeBanner
   // The hover zone Rust checks starts at the window's top edge, so it covers the floating gap too.
   const hover = hidden
     ? { width: size.width, height: REVEAL_STRIP }
@@ -118,15 +206,31 @@ export function Pill() {
   // Hover comes from Rust polling the cursor, so the pill reacts without first being clicked.
   useEffect(() => {
     let closeTimer: number | undefined
-    const unlisten = listen<boolean>("pill-hover", ({ payload: inside }) => {
+    const unlistenHover = listen<boolean>("pill-hover", ({ payload: inside }) => {
       clearTimeout(closeTimer)
+      if (activeBannerRef.current) {
+        setBannerHovered(inside)
+        return
+      }
       if (inside) setOpen(true)
       else closeTimer = window.setTimeout(() => !mirrorBusyRef.current && setOpen(false), settings.closeDelayMs ?? 300)
     })
+    const unlistenMascot = listen<boolean>("pill-hover-mascot", ({ payload: inside }) => {
+      setMascotHovered(inside)
+      if (inside) {
+        setQuietSince(Date.now())
+      }
+    })
+    const unlistenBanner = listen<Banner>("show-banner", ({ payload }) => {
+      showBanner(payload)
+    })
     return () => {
-      unlisten.then((f) => f())
+      unlistenHover.then((f) => f())
+      unlistenMascot.then((f) => f())
+      unlistenBanner.then((f) => f())
     }
-  }, [settings.closeDelayMs])
+  }, [settings.closeDelayMs, settings.notificationSounds])
+
 
   // A pill for a few seconds whenever any app starts using the camera or mic.
   useEffect(() => {
@@ -202,8 +306,14 @@ export function Pill() {
         )}
 
         {/* Closed Pill State */}
-        <div className="pill-closed" aria-hidden={open}>
-          {peek ? (
+        <div className={`pill-closed ${activeBanner ? "is-banner" : ""}`} aria-hidden={open}>
+          {activeBanner ? (
+            <BannerView
+              banner={activeBanner}
+              onDismiss={() => setActiveBanner(null)}
+              isHovered={bannerHovered}
+            />
+          ) : peek ? (
             <>
               <span className="peek-icons">
                 {peek.camera && <Camera size={15} color="var(--green)" />}
@@ -213,19 +323,67 @@ export function Pill() {
                 IN USE
               </span>
             </>
-          ) : agentPeek ? (
-            <>
-              <Sparkles size={14} color={agentPeek.includes("needs you") ? "var(--orange)" : "var(--green)"} />
-              <span className="closed-text">{agentPeek}</span>
-            </>
           ) : np ? (
             <>
               <Vinyl src={np.artwork} size={24} playing={np.isPlaying} />
               <span className="closed-text" key={line.text ?? np.title}>
                 {line.text ?? np.title}
               </span>
-              {meter ? <UsageMeter {...meter} /> : <Bars playing={np.isPlaying} />}
+              {meter ? (
+                <UsageMeter {...meter} />
+              ) : settings.showMascot ? (
+                <NotchiMascot
+                  mood="vibing"
+                  size={24}
+                  accent={resolvedAccent}
+                  gaze={gaze}
+                  pettedAt={pettedAt}
+                  hovered={mascotHovered}
+                  onClick={handlePet}
+                  onHoverChange={setMascotHovered}
+                />
+              ) : (
+                <Bars playing={np.isPlaying} />
+              )}
             </>
+          ) : meter ? (
+            <>
+              {settings.showMascot && (
+                <NotchiMascot
+                  mood={mascotMood}
+                  size={24}
+                  accent={resolvedAccent}
+                  gaze={gaze}
+                  pettedAt={pettedAt}
+                  hovered={mascotHovered}
+                  onClick={handlePet}
+                  onHoverChange={setMascotHovered}
+                  onRectChange={handleMascotRectChange}
+                />
+              )}
+              <UsageMeter {...meter} />
+            </>
+          ) : settings.showMascot ? (
+            <div className="notchi-idle-row">
+              <NotchiMascot
+                mood={mascotMood}
+                size={28}
+                accent={resolvedAccent}
+                gaze={gaze}
+                pettedAt={pettedAt}
+                hovered={mascotHovered}
+                onClick={handlePet}
+                onHoverChange={setMascotHovered}
+                onRectChange={handleMascotRectChange}
+              />
+              <div style={{ flex: 1 }} />
+              <NotchiStatus
+                mood={mascotMood}
+                size={28}
+                accent={resolvedAccent}
+                pets={pets}
+              />
+            </div>
           ) : (
             <span className="closed-text muted">
               {awake
@@ -235,8 +393,8 @@ export function Pill() {
                 : "OpenNotchi"}
             </span>
           )}
-          {!peek && !agentPeek && !np && meter && <UsageMeter {...meter} />}
         </div>
+
 
         {/* Open Pill State with Header & Tabs */}
         <div className="pill-open" aria-hidden={!open}>

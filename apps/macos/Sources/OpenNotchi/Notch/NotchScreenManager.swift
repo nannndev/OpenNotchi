@@ -198,6 +198,10 @@ final class NotchScreenManager: ObservableObject {
     }
 
     func showPeek(_ peek: Peek) {
+        // Played here, once, rather than per screen.
+        if case .banner(let banner) = peek, settings.notificationSounds, let sound = banner.kind.sound {
+            NSSound(named: sound)?.play()
+        }
         switch settings.displayTarget {
         case .allScreens:
             for controller in controllers {
@@ -253,6 +257,10 @@ final class NotchScreenManager: ObservableObject {
                 battery: 80,
                 info: DeviceBatteryInfo(left: nil, right: nil, caseBattery: nil, single: 80)
             ))
+        case "peek-agent-done":
+            showPeek(.banner(Banner(icon: "checkmark.circle.fill", tint: .green, badge: "Done", title: "Claude Code finished · OpenNotchi", subtitle: "All checks passed", duration: 6, kind: .success)))
+        case "peek-agent-needs":
+            showPeek(.banner(Banner(icon: "hand.raised.fill", tint: .orange, badge: "Needs you", title: "Claude Code needs you · OpenNotchi", subtitle: "Allow Bash: swift build?", duration: 10, kind: .attention)))
         case "peek-volume": showPeek(.volume(level: 0.68, muted: false))
         case "peek-mute": showPeek(.volume(level: 0, muted: true))
         case "peek-brightness": showPeek(.brightness(level: 0.75))

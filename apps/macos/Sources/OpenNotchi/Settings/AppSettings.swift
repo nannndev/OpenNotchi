@@ -433,6 +433,8 @@ final class AppSettings: ObservableObject {
     @Published var marketsEnabled: Bool { didSet { defaults.set(marketsEnabled, forKey: "marketsEnabled") } }
     @Published var showTickerInHeader: Bool { didSet { defaults.set(showTickerInHeader, forKey: "showTickerInHeader") } }
     @Published var networkLiveActivity: Bool { didSet { defaults.set(networkLiveActivity, forKey: "networkLiveActivity") } }
+    /// Notchi, the mascot, beside the closed notch when nothing else is showing.
+    @Published var showMascot: Bool { didSet { defaults.set(showMascot, forKey: "showMascot") } }
     @Published var showStatsInHeader: Bool { didSet { defaults.set(showStatsInHeader, forKey: "showStatsInHeader") } }
     @Published var marketTickers: [String] { didSet { defaults.set(marketTickers, forKey: "marketTickers") } }
     @Published var weatherEnabled: Bool { didSet { defaults.set(weatherEnabled, forKey: "weatherEnabled") } }
@@ -524,6 +526,8 @@ final class AppSettings: ObservableObject {
     @Published var meetingReminderMinutes: Int { didSet { defaults.set(meetingReminderMinutes, forKey: "meetingReminderMinutes") } }
     @Published var meetingRemindersOnlyWithLink: Bool { didSet { defaults.set(meetingRemindersOnlyWithLink, forKey: "meetingRemindersOnlyWithLink") } }
     @Published var reminderSound: Bool { didSet { defaults.set(reminderSound, forKey: "reminderSound") } }
+    /// Sounds for important banners: an agent finishing or needing you, a download, a meeting or prayer.
+    @Published var notificationSounds: Bool { didSet { defaults.set(notificationSounds, forKey: "notificationSounds") } }
     @Published var prayerEnabled: Bool { didSet { defaults.set(prayerEnabled, forKey: "prayerEnabled") } }
     @Published var prayerMethod: PrayerMethod { didSet { defaults.set(prayerMethod.rawValue, forKey: "prayerMethod") } }
     @Published var hanafiAsr: Bool { didSet { defaults.set(hanafiAsr, forKey: "hanafiAsr") } }
@@ -594,6 +598,7 @@ final class AppSettings: ObservableObject {
             "marketsEnabled": false,
             "showTickerInHeader": true,
             "networkLiveActivity": true,
+            "showMascot": true,
             "showStatsInHeader": true,
             "marketTickers": ["^JKSE", "BBCA.JK", "^GSPC", "AAPL", "BTC-USD", "IDR=X"],
             "useFahrenheit": Locale.current.measurementSystem == .us,
@@ -648,6 +653,7 @@ final class AppSettings: ObservableObject {
             "meetingReminderMinutes": 5,
             "meetingRemindersOnlyWithLink": false,
             "reminderSound": false,
+            "notificationSounds": true,
             "prayerEnabled": Locale.current.region?.identifier == "ID",
             "prayerMethod": PrayerMethod.regionalDefault.rawValue,
             "hanafiAsr": false,
@@ -655,7 +661,7 @@ final class AppSettings: ObservableObject {
             "prayerNotify": true,
             "prayerReminderMinutes": 0,
             "prompterTabEnabled": true,
-            "aiEnabled": false,
+            "aiEnabled": true,
             "aiAgents": true,
             "aiNotify": true,
             "aiClosedMeter": false,
@@ -702,6 +708,7 @@ final class AppSettings: ObservableObject {
         marketsEnabled = defaults.bool(forKey: "marketsEnabled")
         showTickerInHeader = defaults.bool(forKey: "showTickerInHeader")
         networkLiveActivity = defaults.bool(forKey: "networkLiveActivity")
+        showMascot = defaults.bool(forKey: "showMascot")
         showStatsInHeader = defaults.bool(forKey: "showStatsInHeader")
         marketTickers = defaults.stringArray(forKey: "marketTickers") ?? []
         useFahrenheit = defaults.bool(forKey: "useFahrenheit")
@@ -762,6 +769,7 @@ final class AppSettings: ObservableObject {
         meetingReminderMinutes = defaults.integer(forKey: "meetingReminderMinutes")
         meetingRemindersOnlyWithLink = defaults.bool(forKey: "meetingRemindersOnlyWithLink")
         reminderSound = defaults.bool(forKey: "reminderSound")
+        notificationSounds = defaults.bool(forKey: "notificationSounds")
         prayerEnabled = defaults.bool(forKey: "prayerEnabled")
         prayerMethod = PrayerMethod(rawValue: defaults.string(forKey: "prayerMethod") ?? "") ?? .regionalDefault
         hanafiAsr = defaults.bool(forKey: "hanafiAsr")
@@ -777,10 +785,11 @@ final class AppSettings: ObservableObject {
         prompterShowCameraPreview = defaults.bool(forKey: "prompterShowCameraPreview")
         prompterMirrorText = defaults.bool(forKey: "prompterMirrorText")
         prompterScript = defaults.string(forKey: "prompterScript") ?? "Hello everyone! Welcome to today's meeting."
-        aiEnabled = defaults.bool(forKey: "aiEnabled")
-        aiAgents = defaults.bool(forKey: "aiAgents")
-        aiNotify = defaults.bool(forKey: "aiNotify")
-        aiAccounts = defaults.data(forKey: "aiAccounts").flatMap { try? JSONDecoder().decode([AIAccount].self, from: $0) } ?? []
+        aiEnabled = defaults.object(forKey: "aiEnabled") as? Bool ?? true
+        aiAgents = defaults.object(forKey: "aiAgents") as? Bool ?? true
+        aiNotify = defaults.object(forKey: "aiNotify") as? Bool ?? true
+        let loadedAccounts = defaults.data(forKey: "aiAccounts").flatMap { try? JSONDecoder().decode([AIAccount].self, from: $0) } ?? []
+        aiAccounts = loadedAccounts.isEmpty ? AIAccount.defaults : loadedAccounts
         aiClosedMeter = defaults.bool(forKey: "aiClosedMeter")
         // Apple Intelligence is the default where the on-device model is available, Ollama elsewhere.
         aiProvider = AIProvider(rawValue: defaults.string(forKey: "aiProvider") ?? "").flatMap { AIProvider.available.contains($0) ? $0 : nil }

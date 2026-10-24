@@ -4,6 +4,7 @@ import SwiftUI
 struct AISettingsPane: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var agents: AgentMonitor
+    @EnvironmentObject private var usage: AIUsageManager
     @State private var hooksInstalled = false
     @State private var hookMessage: String?
 
@@ -21,6 +22,31 @@ struct AISettingsPane: View {
             }
 
             Group {
+                if NineRouterService.shared.isAvailable {
+                    Section {
+                        HStack(spacing: 8) {
+                            Circle().fill(Color.green).frame(width: 8, height: 8)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("9router Integration Active")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text("Detected \(usage.reports.filter(\.isFrom9Router).count) accounts across providers")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Resync") {
+                                usage.refresh(force: true)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                    } header: {
+                        Text("9router Multi-Account Sync")
+                    } footer: {
+                        Text("OpenNotchi automatically reads and monitors all multiple accounts, rate limit reset times, and real-time token quotas directly from your 9router daemon and database.")
+                    }
+                }
+
                 Section("Agents") {
                     Toggle("Show Claude Code and Codex sessions", isOn: $settings.aiAgents)
                     LabeledContent {
@@ -63,16 +89,32 @@ struct AISettingsPane: View {
                         }
                         .labelsHidden()
                     }
-                    Button {
-                        settings.aiAccounts.append(AIAccount(name: "Claude Code (work)", tool: .claude, dir: "~/.claude-work"))
-                    } label: {
-                        Label("Add account", systemImage: "plus")
+                    HStack(spacing: 8) {
+                        Button {
+                            settings.aiAccounts.append(AIAccount(name: "Claude Code", tool: .claude, dir: "~/.claude"))
+                        } label: {
+                            Label("Add Claude", systemImage: "plus")
+                        }
+                        Button {
+                            settings.aiAccounts.append(AIAccount(name: "Antigravity", tool: .antigravity, dir: "~/.gemini/antigravity-ide"))
+                        } label: {
+                            Label("Add Antigravity", systemImage: "plus")
+                        }
+                        Button {
+                            settings.aiAccounts.append(AIAccount(name: "Codex", tool: .codex, dir: "~/.codex"))
+                        } label: {
+                            Label("Add Codex", systemImage: "plus")
+                        }
                     }
                     Toggle("Show usage in the closed notch", isOn: $settings.aiClosedMeter)
                 } header: {
-                    Text("Usage")
+                    Text("Quota & Accounts")
                 } footer: {
-                    Text("Accounts to track. Add another folder for a second CLAUDE_CONFIG_DIR or CODEX_HOME.")
+                    if NineRouterService.shared.isAvailable {
+                        Text("Usage comes from 9router for every tool it routes, so these folders aren't counted twice. They still power the Agents list, and add usage for tools 9router doesn't cover.")
+                    } else {
+                        Text("Folders to read sessions and usage from. Add one per account (e.g. a second CLAUDE_CONFIG_DIR).")
+                    }
                 }
 
                 Section("Ask AI") {

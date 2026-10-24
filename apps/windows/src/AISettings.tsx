@@ -87,8 +87,8 @@ export function AISettings() {
           </div>
         </div>
 
-        <h2 className="section-title" style={{ marginTop: 24 }}>Usage</h2>
-        <p className="section-desc">Accounts to track. Add another folder for a second CLAUDE_CONFIG_DIR or CODEX_HOME.</p>
+        <h2 className="section-title" style={{ marginTop: 24 }}>Quota & Accounts</h2>
+        <p className="section-desc">Accounts to track. Monitor tokens, quotas, and sessions for Claude Code, Codex, and Antigravity.</p>
         <div className="toggle-list">
           {settings.aiAccounts.map((a, i) => (
             <div className="toggle-row ai-account-row" key={i}>
@@ -96,6 +96,7 @@ export function AISettings() {
               <select className="settings-select" value={a.tool} onChange={(e) => setAccount(i, { tool: e.target.value as AiAccount["tool"] })} aria-label="Tool">
                 <option value="claude">Claude Code</option>
                 <option value="codex">Codex</option>
+                <option value="antigravity">Antigravity</option>
               </select>
               <input className="settings-input ai-account-dir" value={a.dir} onChange={(e) => setAccount(i, { dir: e.target.value })} aria-label="Folder" />
               <button
@@ -108,12 +109,24 @@ export function AISettings() {
               </button>
             </div>
           ))}
-          <div className="toggle-row">
+          <div className="toggle-row" style={{ gap: 8 }}>
             <button
               className="ai-settings-btn"
-              onClick={() => setSettings({ aiAccounts: [...settings.aiAccounts, { name: "Claude Code (work)", tool: "claude", dir: "~/.claude-work" }] })}
+              onClick={() => setSettings({ aiAccounts: [...settings.aiAccounts, { name: "Claude Code", tool: "claude", dir: "~/.claude" }] })}
             >
-              <Plus size={12} /> Add account
+              <Plus size={12} /> Add Claude
+            </button>
+            <button
+              className="ai-settings-btn"
+              onClick={() => setSettings({ aiAccounts: [...settings.aiAccounts, { name: "Antigravity", tool: "antigravity", dir: "~/.gemini/antigravity-ide" }] })}
+            >
+              <Plus size={12} /> Add Antigravity
+            </button>
+            <button
+              className="ai-settings-btn"
+              onClick={() => setSettings({ aiAccounts: [...settings.aiAccounts, { name: "Codex", tool: "codex", dir: "~/.codex" }] })}
+            >
+              <Plus size={12} /> Add Codex
             </button>
           </div>
           <div className="toggle-row">

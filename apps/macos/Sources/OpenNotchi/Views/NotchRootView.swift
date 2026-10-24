@@ -21,7 +21,13 @@ struct NotchRootView: View {
     private var showActivity: Bool {
         guard !vm.isOpen else { return false }
         if vm.peek != nil || airDrop.isTransferring { return true }
-        return settings.showLiveActivity && (timer.isActive || (media.info?.isPlaying ?? false) || isNetworkSpeedVisible || isAIMeterVisible)
+        return settings.showLiveActivity && (timer.isActive || (media.info?.isPlaying ?? false) || isNetworkSpeedVisible || isAIMeterVisible || isMascotVisible)
+    }
+
+    /// Notchi fills the slot only when nothing else would: no music, timer, network or AI meter.
+    private var isMascotVisible: Bool {
+        settings.showLiveActivity && settings.showMascot && !timer.isActive && !(media.info?.isPlaying ?? false)
+            && !isNetworkSpeedVisible && !isAIMeterVisible
     }
 
     private var bodySize: CGSize {
@@ -37,15 +43,41 @@ struct NotchRootView: View {
         }
         if showActivity {
             // HUD peeks need room for a level bar on the right. Network speed needs room for text.
-            let isNetOnly = (isNetworkSpeedVisible || isAIMeterVisible) && !timer.isActive && !(media.info?.isPlaying ?? false) && vm.peek == nil && !airDrop.isTransferring
+            let isNetOnly = (isNetworkSpeedVisible || isAIMeterVisible || isMascotVisible) && !timer.isActive && !(media.info?.isPlaying ?? false) && vm.peek == nil && !airDrop.isTransferring
             let extraForSleeve: CGFloat = (settings.artworkStyle == .vinylSleeve && (media.info?.isPlaying ?? false)) ? 6 : 0
-            let side = vm.peek?.isHUD == true ? size.height + 76 : isNetOnly ? size.height + 44 : size.height + 8 + extraForSleeve
+            // Notchi only needs a square on each side, like music artwork; text-heavy activities need more.
+            let notchiOnly = isMascotVisible && !isNetworkSpeedVisible && !isAIMeterVisible
+            let side = vm.peek?.isHUD == true ? size.height + 76 : notchiOnly && isNetOnly ? size.height + 12 : isNetOnly ? size.height + 44 : size.height + 8 + extraForSleeve
             size.width += 2 * side
         }
         return size
     }
 
     private var isIsland: Bool { !vm.hasPhysicalNotch }
+
+    /// Notchi sits in the closed notch's left slot and can be hovered and petted.
+    private var isNotchiInteractive: Bool {
+        showActivity && isMascotVisible && vm.peek == nil && !airDrop.isTransferring
+    }
+
+    /// Catches the pointer a little above the closed notch so it opens easily. Over Notchi it leaves a gap,
+    /// so Notchi itself gets the hover and clicks instead of the notch opening.
+    private var hoverStrip: some View {
+        let catcher = Color.clear
+            .contentShape(Rectangle())
+            .onHover { inside in
+                if inside { vm.hoverChanged(true) }
+            }
+        return HStack(spacing: 0) {
+            if isNotchiInteractive {
+                catcher.frame(width: isIsland ? 12 : topRadius + 6)
+                Color.clear.frame(width: vm.notchSize.height + 6).allowsHitTesting(false)
+            }
+            catcher
+        }
+        .frame(width: bodySize.width + (isIsland ? 0 : 2 * topRadius), height: isIsland ? 28 : vm.notchSize.height + 4)
+        .offset(y: isIsland ? -8 : 0)
+    }
 
     private var topRadius: CGFloat {
         if isIsland { return vm.isOpen ? settings.cornerRadius : 16 }
@@ -90,15 +122,7 @@ struct NotchRootView: View {
                 .animation(vm.isResizing ? nil : settings.openAnimation.springAnimation, value: vm.openSize.height)
                 .onHover { vm.hoverChanged($0) }
                 .overlay(alignment: .top) {
-                    if !vm.isOpen {
-                        Color.clear
-                            .frame(width: bodySize.width + (isIsland ? 0 : 2 * topRadius), height: isIsland ? 28 : vm.notchSize.height + 4)
-                            .offset(y: isIsland ? -8 : 0)
-                            .contentShape(Rectangle())
-                            .onHover { inside in
-                                if inside { vm.hoverChanged(true) }
-                            }
-                    }
+                    if !vm.isOpen { hoverStrip }
                 }
                 .onDrop(of: [.fileURL], isTargeted: $vm.isDropTargeted) { providers in
                     tray.handleDrop(providers)
@@ -149,15 +173,7 @@ struct NotchRootView: View {
                 .animation(vm.isResizing ? nil : settings.openAnimation.springAnimation, value: vm.openSize.height)
                 .onHover { vm.hoverChanged($0) }
                 .overlay(alignment: .top) {
-                    if !vm.isOpen {
-                        Color.clear
-                            .frame(width: bodySize.width + (isIsland ? 0 : 2 * topRadius), height: isIsland ? 28 : vm.notchSize.height + 4)
-                            .offset(y: isIsland ? -8 : 0)
-                            .contentShape(Rectangle())
-                            .onHover { inside in
-                                if inside { vm.hoverChanged(true) }
-                            }
-                    }
+                    if !vm.isOpen { hoverStrip }
                 }
                 .onDrop(of: [.fileURL], isTargeted: $vm.isDropTargeted) { providers in
                     tray.handleDrop(providers)
@@ -326,10 +342,16 @@ struct ClosedActivityView: View {
                 }
                 .frame(width: height + 36, alignment: .trailing)
             } else if settings.aiEnabled && settings.aiClosedMeter && !(media.info?.isPlaying ?? false), let meter = aiUsage.closedMeter {
-                Image(systemName: "sparkles")
-                    .font(.system(size: height * 0.38, weight: .semibold))
-                    .foregroundStyle(meter.hot ? .orange : accent.highlight)
-                    .frame(width: height + 36, alignment: .leading)
+                Group {
+                    if settings.showMascot {
+                        NotchiLive(size: height - 4)
+                    } else {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: height * 0.38, weight: .semibold))
+                            .foregroundStyle(meter.hot ? .orange : accent.highlight)
+                    }
+                }
+                .frame(width: height + 36, alignment: .leading)
                 Spacer()
                 HStack(spacing: 4) {
                     Text(meter.label)
@@ -341,6 +363,8 @@ struct ClosedActivityView: View {
                         .frame(width: 18)
                 }
                 .frame(width: height + 36, alignment: .trailing)
+            } else if settings.showMascot && !(media.info?.isPlaying ?? false) {
+                NotchiIdleRow(height: height)
             } else {
                 let isPlaying = media.info?.isPlaying ?? false
                 CompactArtworkView(
@@ -353,7 +377,14 @@ struct ClosedActivityView: View {
                 .onTapGesture { media.playPause() }
                 .help(isPlaying ? "Pause music" : "Play music")
                 Spacer()
-                WaveformView(isPlaying: isPlaying, barCount: 4, maxHeight: height - 16, color: accent.color)
+                Group {
+                    // Notchi puts its headphones on and bops along instead of the waveform.
+                    if settings.showMascot && isPlaying {
+                        NotchiLive(size: height - 4)
+                    } else {
+                        WaveformView(isPlaying: isPlaying, barCount: 4, maxHeight: height - 16, color: accent.color)
+                    }
+                }
                     .frame(width: height - 10)
                     .contentShape(Rectangle())
                     .onTapGesture { media.playPause() }
@@ -515,31 +546,55 @@ struct MiniSpinningVinylDisc: View {
 
 /// A reminder below the notch: icon and badge beside the camera, title and an action underneath.
 struct BannerView: View {
-    static let contentHeight: CGFloat = 50
+    static let contentHeight: CGFloat = 56
 
     @EnvironmentObject private var vm: NotchViewModel
     let banner: Banner
     let height: CGFloat
+    @State private var appeared = false
+    @State private var shownAt = Date.now
+
+    /// Attention banners pulse until dismissed; the rest settle after one bounce.
+    private var pulses: Bool { banner.kind == .attention }
 
     var body: some View {
         VStack(spacing: 0) {
+            // Beside the notch: a tinted badge on the right; the icon moves down into the card.
             HStack {
-                Image(systemName: banner.icon)
-                    .symbolRenderingMode(.multicolor)
-                    .font(.system(size: height * 0.42, weight: .semibold))
-                    .foregroundStyle(banner.tint)
+                Circle()
+                    .fill(banner.tint)
+                    .frame(width: 6, height: 6)
+                    .shadow(color: banner.tint, radius: 4)
+                    .opacity(pulses ? (appeared ? 1 : 0.3) : 1)
+                    .animation(pulses ? .easeInOut(duration: 0.7).repeatForever() : .default, value: appeared)
                     .frame(width: height - 6)
                 Spacer()
                 Text(banner.badge)
-                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(banner.tint)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(banner.tint.opacity(0.18)))
             }
             .frame(height: height)
 
             HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(RadialGradient(colors: [banner.tint.opacity(0.55), banner.tint.opacity(0.12)], center: .center, startRadius: 2, endRadius: 22))
+                    Circle().stroke(banner.tint.opacity(0.5), lineWidth: 1)
+                    Image(systemName: banner.icon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .symbolEffect(.bounce, value: appeared)
+                }
+                .frame(width: 36, height: 36)
+                .scaleEffect(appeared ? 1 : 0.4)
+                .shadow(color: banner.tint.opacity(0.6), radius: appeared ? 8 : 0)
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text(banner.title)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13.5, weight: .semibold))
                         .lineLimit(1)
                     if let subtitle = banner.subtitle {
                         Text(subtitle)
@@ -548,6 +603,9 @@ struct BannerView: View {
                             .lineLimit(1)
                     }
                 }
+                .offset(x: appeared ? 0 : -8)
+                .opacity(appeared ? 1 : 0)
+
                 Spacer(minLength: 4)
                 if let title = banner.actionTitle {
                     Button {
@@ -562,7 +620,7 @@ struct BannerView: View {
                             .font(.system(size: 12, weight: .semibold))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(Capsule().fill(banner.actionType == .triggerUpdate ? Color.cyan : Color.green))
+                            .background(Capsule().fill(banner.tint.gradient))
                             .foregroundStyle(.white)
                     }
                     .buttonStyle(.plain)
@@ -580,12 +638,38 @@ struct BannerView: View {
                 .help("Dismiss")
             }
             .padding(.leading, 6)
-            .frame(height: Self.contentHeight - 6)
+            .frame(height: Self.contentHeight - 8)
+
+            // Time left before the banner closes itself.
+            TimelineView(.animation(minimumInterval: 1 / 20)) { context in
+                let left = max(0, 1 - context.date.timeIntervalSince(shownAt) / banner.duration)
+                GeometryReader { geo in
+                    Capsule()
+                        .fill(banner.tint.opacity(0.7))
+                        .frame(width: geo.size.width * left, height: 2)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 2)
+            .padding(.horizontal, 24)
+        }
+        // A soft glow in the banner's color from the bottom edge.
+        .background(alignment: .bottom) {
+            Ellipse()
+                .fill(banner.tint.opacity(appeared ? 0.22 : 0))
+                .frame(height: 40)
+                .blur(radius: 18)
+                .offset(y: 14)
+                .allowsHitTesting(false)
         }
         .contentShape(Rectangle())
         .onTapGesture {
             vm.dismissPeek()
             vm.open()
+        }
+        .onAppear {
+            shownAt = .now
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.62)) { appeared = true }
         }
     }
 }

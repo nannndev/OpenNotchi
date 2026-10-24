@@ -125,6 +125,8 @@ pub struct AgentSession {
     /// "working" or "done" from the logs; the frontend adds "needs_you" (hooks) and "idle".
     pub state: &'static str,
     pub updated_at: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
 /// The complete lines in the last 64 KB of a file.
@@ -176,20 +178,153 @@ fn codex_state(lines: &[String]) -> Option<&'static str> {
     })
 }
 
+/// State, cwd and optional prompt/question from an Antigravity transcript tail.
+fn antigravity_state(lines: &[String]) -> (Option<&'static str>, String, Option<String>) {
+    let mut state = None;
+    let mut cwd = String::new();
+    let mut message = None;
+
+    for line in lines {
+        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+
+        if cwd.is_empty() {
+            if let Some(content) = v["content"].as_str() {
+                if let Some(pos) = content.find(" -> ") {
+                    let before = &content[..pos];
+                    let start = before.rfind(['\n', ' ', '"', '\'']).map_or(0, |i| i + 1);
+                    let candidate = before[start..].trim();
+                    if candidate.starts_with('/') || candidate.starts_with('\\') || candidate.contains(':') {
+                        cwd = candidate.to_string();
+                    }
+                }
+                if cwd.is_empty() {
+                    if let Some(pos) = content.find("Active Document: ") {
+                        let doc = &content[pos + 17..];
+                        let end = doc.find(|c: char| c == '\n' || c == '<' || c == '"' || c == '\r').unwrap_or(doc.len());
+                        let path = Path::new(doc[..end].trim());
+                        let dir = if path.extension().is_some() {
+                            let parent = path.parent().unwrap_or(path);
+                            if parent.file_name().is_some_and(|n| n == "src" || n == "lib") {
+                                parent.parent().unwrap_or(parent)
+                            } else {
+                                parent
+                            }
+                        } else {
+                            path
+                        };
+                        cwd = dir.to_string_lossy().to_string();
+                    }
+                }
+            }
+        }
+
+        if let Some(tool_calls) = v["tool_calls"].as_array() {
+            for tc in tool_calls {
+                let name = tc["name"].as_str().or_else(|| tc["function"]["name"].as_str());
+                let args_obj = tc["args"].as_object().or_else(|| tc["function"]["arguments"].as_object());
+                let args_parsed: Option<serde_json::Map<String, Value>> = if args_obj.is_none() {
+                    tc["function"]["arguments"].as_str().and_then(|s| serde_json::from_str(s).ok())
+                } else {
+                    None
+                };
+                let args = args_obj.or(args_parsed.as_ref());
+
+                if let Some(args) = args {
+                    for key in ["Cwd", "DirectoryPath", "SearchPath", "TargetFile", "AbsolutePath"] {
+                        if let Some(val) = args.get(key).and_then(|x| x.as_str()) {
+                            let unquoted = val.trim_matches('"');
+                            if unquoted.starts_with('/') || unquoted.starts_with('\\') || unquoted.contains(':') {
+                                cwd = unquoted.to_string();
+                                break;
+                            }
+                        }
+                    }
+                }
+                if name == Some("ask_question") {
+                    state = Some("needs_you");
+                    if let Some(args) = args {
+                        if let Some(q) = args.get("question").and_then(|qs| qs.as_str()) {
+                            message = Some(q.to_string());
+                        } else if let Some(q) = args.get("questions").and_then(|qs| qs.as_str()) {
+                            message = Some(q.to_string());
+                        } else if let Some(arr) = args.get("questions").and_then(|qs| qs.as_array()) {
+                            if let Some(first_q) = arr.first().and_then(|item| item.get("question")).and_then(|q| q.as_str()) {
+                                message = Some(first_q.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        match v["type"].as_str() {
+            Some("USER_INPUT") => state = Some("working"),
+            Some("PLANNER_RESPONSE") => {
+                let is_ask_q = v["tool_calls"].as_array().map_or(false, |arr| {
+                    arr.iter().any(|tc| {
+                        let name = tc["name"].as_str().or_else(|| tc["function"]["name"].as_str());
+                        name == Some("ask_question")
+                    })
+                });
+                let has_tools = v["tool_calls"].as_array().map_or(false, |arr| !arr.is_empty());
+                if is_ask_q {
+                    state = Some("needs_you");
+                } else if has_tools {
+                    state = Some("working");
+                } else if v["status"].as_str() == Some("DONE") {
+                    state = Some("done");
+                }
+            }
+            Some(t) if t.starts_with("RUN_") || t.starts_with("VIEW_") || t.starts_with("REPLACE_") || t.starts_with("WRITE_") || t.starts_with("EXEC_") => {
+                state = Some("working");
+            }
+            _ => {}
+        }
+    }
+    (state, cwd, message)
+}
+
 fn first_line(path: &Path) -> Option<Value> {
     let mut line = String::new();
     BufReader::new(File::open(path).ok()?.take(4 << 20)).read_line(&mut line).ok()?;
     serde_json::from_str(&line).ok()
 }
 
+/// Transcripts under an Antigravity IDE home (`<dir>/brain/*/.system_generated/logs/transcript.jsonl`).
+fn antigravity_transcripts(ide_home: &Path) -> Vec<(PathBuf, fs::Metadata)> {
+    let brain = ide_home.join("brain");
+    let Ok(entries) = fs::read_dir(&brain) else { return vec![] };
+    let mut out = vec![];
+    for e in entries.flatten() {
+        if e.file_type().is_ok_and(|t| t.is_dir()) {
+            let log_path = e.path().join(".system_generated").join("logs").join("transcript.jsonl");
+            if let Ok(meta) = log_path.metadata() {
+                out.push((log_path, meta));
+            }
+        }
+    }
+    out
+}
+
 fn read_session(tool: &'static str, path: &Path, mtime: i64) -> Option<AgentSession> {
     let lines = tail_lines(path);
-    let (state, cwd, sid) = if tool == "claude" {
-        claude_state(&lines)
-    } else {
+    let (state, cwd, sid, msg) = if tool == "claude" {
+        let (s, c, id) = claude_state(&lines);
+        (s, c, id, None)
+    } else if tool == "codex" {
         let meta = first_line(path)?;
         let p = &meta["payload"];
-        (codex_state(&lines), p["cwd"].as_str().unwrap_or("").into(), p["id"].as_str().unwrap_or("").into())
+        (codex_state(&lines), p["cwd"].as_str().unwrap_or("").into(), p["id"].as_str().unwrap_or("").into(), None)
+    } else {
+        let (s, c, m) = antigravity_state(&lines);
+        let id = path
+            .parent()
+            .and_then(Path::parent)
+            .and_then(Path::parent)
+            .and_then(|p| p.file_name())
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        (s, c, id, m)
     };
     let stem = path.file_stem()?.to_string_lossy().to_string();
     Some(AgentSession {
@@ -198,6 +333,7 @@ fn read_session(tool: &'static str, path: &Path, mtime: i64) -> Option<AgentSess
         project: project_name(&cwd),
         state: state?,
         updated_at: mtime,
+        message: msg,
     })
 }
 
@@ -206,7 +342,11 @@ static SESSIONS: LazyLock<Mutex<HashMap<PathBuf, (i64, Option<AgentSession>)>>> 
 
 /// Agent sessions written to in the last 30 minutes, newest first.
 #[tauri::command]
-pub fn agent_sessions(claude_dirs: Vec<String>, codex_dirs: Vec<String>) -> Vec<AgentSession> {
+pub fn agent_sessions(
+    claude_dirs: Vec<String>,
+    codex_dirs: Vec<String>,
+    antigravity_dirs: Option<Vec<String>>,
+) -> Vec<AgentSession> {
     let since = now_ms() - ACTIVE_MS;
     let mut files: Vec<(&'static str, PathBuf, i64)> = vec![];
     for d in &claude_dirs {
@@ -216,6 +356,9 @@ pub fn agent_sessions(claude_dirs: Vec<String>, codex_dirs: Vec<String>) -> Vec<
         for day in codex_day_dirs(&expand(d), 2) {
             files.extend(jsonl_in(&day).into_iter().map(|(p, m)| ("codex", p, mtime_ms(&m))));
         }
+    }
+    for d in antigravity_dirs.unwrap_or_default() {
+        files.extend(antigravity_transcripts(&expand(&d)).into_iter().map(|(p, m)| ("antigravity", p, mtime_ms(&m))));
     }
     files.retain(|f| f.2 >= since);
 
@@ -545,6 +688,70 @@ fn codex_report(account: &Account, now: i64, tz: i64) -> UsageReport {
     }
 }
 
+fn antigravity_report(account: &Account, now: i64, tz: i64) -> UsageReport {
+    let dir = expand(&account.dir);
+    let week_ago = now - 8 * DAY;
+    let transcripts = antigravity_transcripts(&dir);
+    let found = !transcripts.is_empty();
+    let today = local_day(now, tz);
+    let mut days = vec![0u64; 7];
+    let mut today_totals = Totals::default();
+    let mut recent_ts = vec![];
+
+    for (path, _) in transcripts.iter().filter(|(_, m)| mtime_ms(m) >= week_ago) {
+        let Ok(file) = File::open(path) else { continue };
+        let reader = BufReader::new(file);
+        for line in reader.lines().flatten() {
+            if !line.contains("\"created_at\"") {
+                continue;
+            }
+            let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
+            let Some(ts_str) = v["created_at"].as_str() else { continue };
+            let Some(ts) = parse_iso_ms(ts_str) else { continue };
+            if ts < week_ago {
+                continue;
+            }
+            let content_len = v["content"].as_str().map_or(0, |s| s.len());
+            let thinking_len = v["thinking"].as_str().map_or(0, |s| s.len());
+            let total_chars = content_len + thinking_len;
+            let tokens = ((total_chars / 4) as u64).max(1);
+
+            let ago = today - local_day(ts, tz);
+            if (0..7).contains(&ago) {
+                days[6 - ago as usize] += tokens;
+            }
+            if ago == 0 {
+                today_totals.tokens += tokens;
+                today_totals.cost += (tokens as f64) * 0.0000004; // ~$0.40/M
+            }
+            recent_ts.push(ts);
+        }
+    }
+    recent_ts.sort_unstable();
+
+    let block = current_block_start(&recent_ts, now).map(|start| {
+        let block_tokens: u64 = recent_ts.iter().filter(|&&t| t >= start).count() as u64 * 300;
+        let tokens = block_tokens.max(500);
+        Block {
+            start,
+            end: start + FIVE_H,
+            tokens,
+            cost: (tokens as f64) * 0.0000004,
+        }
+    });
+
+    UsageReport {
+        name: account.name.clone(),
+        tool: account.tool.clone(),
+        dir: account.dir.clone(),
+        found,
+        today: today_totals,
+        block,
+        days,
+        limits: None,
+    }
+}
+
 /// Usage per configured account. `tz_offset_min` is JS `Date#getTimezoneOffset()`, for local days.
 #[tauri::command]
 pub async fn ai_usage(accounts: Vec<Account>, tz_offset_min: i64) -> Vec<UsageReport> {
@@ -552,21 +759,29 @@ pub async fn ai_usage(accounts: Vec<Account>, tz_offset_min: i64) -> Vec<UsageRe
         let now = now_ms();
         accounts
             .iter()
-            .map(|a| if a.tool == "codex" { codex_report(a, now, tz_offset_min) } else { claude_report(a, now, tz_offset_min) })
+            .map(|a| match a.tool.as_str() {
+                "codex" => codex_report(a, now, tz_offset_min),
+                "antigravity" => antigravity_report(a, now, tz_offset_min),
+                _ => claude_report(a, now, tz_offset_min),
+            })
             .collect()
     })
     .await
     .unwrap_or_default()
 }
 
-/// The default accounts whose folders exist: `~/.claude` and `~/.codex`.
+/// The default accounts whose folders exist: `~/.claude`, `~/.codex`, and `~/.gemini/antigravity-ide`.
 #[tauri::command]
 pub fn ai_default_accounts() -> Vec<Value> {
-    [("Claude Code", "claude", "~/.claude"), ("Codex", "codex", "~/.codex")]
-        .into_iter()
-        .filter(|(_, _, dir)| expand(dir).is_dir())
-        .map(|(name, tool, dir)| json!({ "name": name, "tool": tool, "dir": dir }))
-        .collect()
+    [
+        ("Claude Code", "claude", "~/.claude"),
+        ("Codex", "codex", "~/.codex"),
+        ("Antigravity", "antigravity", "~/.gemini/antigravity-ide"),
+    ]
+    .into_iter()
+    .filter(|(_, _, dir)| expand(dir).is_dir())
+    .map(|(name, tool, dir)| json!({ "name": name, "tool": tool, "dir": dir }))
+    .collect()
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1089,6 +1304,24 @@ mod tests {
         for r in &reports {
             println!("{r:#?}");
         }
-        println!("{:#?}", agent_sessions(vec!["~/.claude".into()], vec!["~/.codex".into()]));
+        println!("{:#?}", agent_sessions(vec!["~/.claude".into()], vec!["~/.codex".into()], Some(vec!["~/.gemini/antigravity-ide".into()])));
+    }
+
+    #[test]
+    fn antigravity_state_from_log_tail() {
+        let lines = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let user = r#"{"type":"USER_INPUT","content":"<USER_REQUEST>Fix bug</USER_REQUEST><ADDITIONAL_METADATA>Active Document: /Users/me/repo/src/main.rs</ADDITIONAL_METADATA>"}"#;
+        let running_tool = r#"{"type":"PLANNER_RESPONSE","status":"DONE","tool_calls":[{"name":"run_command","args":{"Cwd":"/Users/me/repo"}}]}"#;
+        let ask_q = r#"{"type":"PLANNER_RESPONSE","status":"DONE","tool_calls":[{"name":"ask_question","args":{"questions":"Proceed with rewrite?"}}]}"#;
+        let finished = r#"{"type":"PLANNER_RESPONSE","status":"DONE","tool_calls":[]}"#;
+
+        let (s, cwd, msg) = antigravity_state(&lines(&[user, running_tool]));
+        assert_eq!((s, project_name(&cwd).as_str(), msg), (Some("working"), "repo", None));
+
+        let (s, cwd, msg) = antigravity_state(&lines(&[user, ask_q]));
+        assert_eq!((s, project_name(&cwd).as_str(), msg.as_deref()), (Some("needs_you"), "repo", Some("Proceed with rewrite?")));
+
+        let (s, cwd, msg) = antigravity_state(&lines(&[user, finished]));
+        assert_eq!((s, project_name(&cwd).as_str(), msg), (Some("done"), "repo", None));
     }
 }

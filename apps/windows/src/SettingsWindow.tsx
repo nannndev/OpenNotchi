@@ -21,11 +21,14 @@ import {
   Video,
   Wand2,
   Bot,
+  Search,
+  X,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { CURRENT_VERSION, openExternalUrl, useUpdateChecker } from "./updater"
 import { AISettings } from "./AISettings"
 import { MirrorSettings } from "./MirrorSettings"
+import { filterSettingItems, SETTING_ITEMS, type SettingsSection } from "./settingsSearch"
 import {
   ACCENT_PRESETS,
   ANIMATION_OPTIONS,
@@ -55,7 +58,35 @@ export function SettingsWindow() {
   const [monitors, setMonitors] = useState<MonitorInfo[]>([])
   const [autostartEnabled, setAutostartEnabled] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const { updateInfo, isChecking, error, checkNow } = useUpdateChecker()
+
+  const filteredItems = useMemo(
+    () => filterSettingItems(SETTING_ITEMS, searchQuery),
+    [searchQuery]
+  )
+  const hasSearch = searchQuery.trim().length > 0
+  const matchingSections = useMemo(() => {
+    if (!hasSearch) return null
+    return new Set(filteredItems.map((i) => i.section))
+  }, [hasSearch, filteredItems])
+
+  const sectionCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const item of filteredItems) {
+      counts[item.section] = (counts[item.section] || 0) + 1
+    }
+    return counts
+  }, [filteredItems])
+
+  // Automatically switch tab if active tab has no matches during search
+  useEffect(() => {
+    if (hasSearch && matchingSections && !matchingSections.has(activeTab)) {
+      const order: TabKey[] = ["appearance", "animations", "tabs", "mirror", "ai", "general", "about"]
+      const first = order.find((s) => matchingSections.has(s))
+      if (first) setActiveTab(first)
+    }
+  }, [hasSearch, matchingSections, activeTab])
 
   // Query monitors and autostart on mount
   useEffect(() => {
@@ -99,63 +130,159 @@ export function SettingsWindow() {
           </div>
         </div>
 
+        {/* Sidebar Search Bar */}
+        <div className="sidebar-search">
+          <Search size={13} className="search-icon" />
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search settings…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              className="search-clear-btn"
+              onClick={() => setSearchQuery("")}
+              title="Clear search"
+              aria-label="Clear search"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
         <nav className="sidebar-nav">
-          <button
-            className={`nav-item ${activeTab === "appearance" ? "active" : ""}`}
-            onClick={() => setActiveTab("appearance")}
-          >
-            <Palette size={16} />
-            <span>Appearance & Themes</span>
-          </button>
-          <button
-            className={`nav-item ${activeTab === "animations" ? "active" : ""}`}
-            onClick={() => setActiveTab("animations")}
-          >
-            <Sparkles size={16} />
-            <span>Open Animations</span>
-          </button>
-          <button
-            className={`nav-item ${activeTab === "tabs" ? "active" : ""}`}
-            onClick={() => setActiveTab("tabs")}
-          >
-            <Sliders size={16} />
-            <span>Pill Tabs & Features</span>
-          </button>
-          <button
-            className={`nav-item ${activeTab === "mirror" ? "active" : ""}`}
-            onClick={() => setActiveTab("mirror")}
-          >
-            <Video size={16} />
-            <span>Mirror & Photobox</span>
-          </button>
-          <button
-            className={`nav-item ${activeTab === "ai" ? "active" : ""}`}
-            onClick={() => setActiveTab("ai")}
-          >
-            <Bot size={16} />
-            <span>AI</span>
-          </button>
-          <button
-            className={`nav-item ${activeTab === "general" ? "active" : ""}`}
-            onClick={() => setActiveTab("general")}
-          >
-            <Monitor size={16} />
-            <span>General & System</span>
-          </button>
-          <button
-            className={`nav-item ${activeTab === "about" ? "active" : ""}`}
-            onClick={() => setActiveTab("about")}
-          >
-            <Info size={16} />
-            <span>About OpenNotchi</span>
-            {updateInfo?.available && <span className="nav-update-badge">NEW</span>}
-          </button>
+          {(!hasSearch || matchingSections?.has("appearance")) && (
+            <button
+              className={`nav-item ${activeTab === "appearance" ? "active" : ""}`}
+              onClick={() => setActiveTab("appearance")}
+            >
+              <Palette size={16} />
+              <span>Appearance & Themes</span>
+              {hasSearch && sectionCounts["appearance"] && (
+                <span className="nav-match-count">{sectionCounts["appearance"]}</span>
+              )}
+            </button>
+          )}
+
+          {(!hasSearch || matchingSections?.has("animations")) && (
+            <button
+              className={`nav-item ${activeTab === "animations" ? "active" : ""}`}
+              onClick={() => setActiveTab("animations")}
+            >
+              <Sparkles size={16} />
+              <span>Open Animations</span>
+              {hasSearch && sectionCounts["animations"] && (
+                <span className="nav-match-count">{sectionCounts["animations"]}</span>
+              )}
+            </button>
+          )}
+
+          {(!hasSearch || matchingSections?.has("tabs")) && (
+            <button
+              className={`nav-item ${activeTab === "tabs" ? "active" : ""}`}
+              onClick={() => setActiveTab("tabs")}
+            >
+              <Sliders size={16} />
+              <span>Pill Tabs & Features</span>
+              {hasSearch && sectionCounts["tabs"] && (
+                <span className="nav-match-count">{sectionCounts["tabs"]}</span>
+              )}
+            </button>
+          )}
+
+          {(!hasSearch || matchingSections?.has("mirror")) && (
+            <button
+              className={`nav-item ${activeTab === "mirror" ? "active" : ""}`}
+              onClick={() => setActiveTab("mirror")}
+            >
+              <Video size={16} />
+              <span>Mirror & Photobox</span>
+              {hasSearch && sectionCounts["mirror"] && (
+                <span className="nav-match-count">{sectionCounts["mirror"]}</span>
+              )}
+            </button>
+          )}
+
+          {(!hasSearch || matchingSections?.has("ai")) && (
+            <button
+              className={`nav-item ${activeTab === "ai" ? "active" : ""}`}
+              onClick={() => setActiveTab("ai")}
+            >
+              <Bot size={16} />
+              <span>AI</span>
+              {hasSearch && sectionCounts["ai"] && (
+                <span className="nav-match-count">{sectionCounts["ai"]}</span>
+              )}
+            </button>
+          )}
+
+          {(!hasSearch || matchingSections?.has("general")) && (
+            <button
+              className={`nav-item ${activeTab === "general" ? "active" : ""}`}
+              onClick={() => setActiveTab("general")}
+            >
+              <Monitor size={16} />
+              <span>General & System</span>
+              {hasSearch && sectionCounts["general"] && (
+                <span className="nav-match-count">{sectionCounts["general"]}</span>
+              )}
+            </button>
+          )}
+
+          {(!hasSearch || matchingSections?.has("about")) && (
+            <button
+              className={`nav-item ${activeTab === "about" ? "active" : ""}`}
+              onClick={() => setActiveTab("about")}
+            >
+              <Info size={16} />
+              <span>About OpenNotchi</span>
+              {hasSearch && sectionCounts["about"] ? (
+                <span className="nav-match-count">{sectionCounts["about"]}</span>
+              ) : (
+                updateInfo?.available && <span className="nav-update-badge">NEW</span>
+              )}
+            </button>
+          )}
         </nav>
       </aside>
 
       {/* Main Content Area */}
       <main className="settings-main">
-        {/* Live Pill Preview Header */}
+        {hasSearch && filteredItems.length === 0 ? (
+          <div className="search-empty-state">
+            <Search size={36} className="empty-search-icon" />
+            <div className="empty-search-title">No settings found for "{searchQuery}"</div>
+            <div className="empty-search-subtitle">
+              Try searching for other keywords, feature names, or Indonesian synonyms.
+            </div>
+            <button className="clear-search-btn" onClick={() => setSearchQuery("")}>
+              Clear Search
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Matches Chip Row */}
+            {hasSearch && filteredItems.length > 0 && (
+              <div className="search-matches-row">
+                <span className="matches-label">Matches:</span>
+                <div className="matches-chips">
+                  {filteredItems.map((item) => (
+                    <button
+                      key={item.id}
+                      className={`match-chip ${activeTab === item.section ? "active" : ""}`}
+                      onClick={() => setActiveTab(item.section)}
+                      title={item.subtitle}
+                    >
+                      <span>{item.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Live Pill Preview Header */}
         <section className="settings-preview-banner">
           <div className="preview-top">
             <span className="preview-label">Live Pill Preview</span>
@@ -466,6 +593,33 @@ export function SettingsWindow() {
                 />
               </div>
 
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">Notchi Mascot</div>
+                  <div className="toggle-desc">Notchi, the mascot, when the notch is idle.</div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={settings.showMascot}
+                  onChange={(e) => setSettings({ showMascot: e.target.checked })}
+                />
+              </div>
+
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">Play sounds for important notifications</div>
+                  <div className="toggle-desc">Chimes for agent status, reminders, and alerts.</div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={settings.notificationSounds}
+                  onChange={(e) => setSettings({ notificationSounds: e.target.checked })}
+                />
+              </div>
+
+
               <div className="toggle-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
                 <div className="toggle-info">
                   <div className="toggle-title">Notch Style</div>
@@ -625,6 +779,8 @@ export function SettingsWindow() {
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </main>
     </div>

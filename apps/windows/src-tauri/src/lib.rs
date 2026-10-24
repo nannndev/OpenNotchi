@@ -12,6 +12,9 @@ use tauri::{Emitter, Manager, State, WebviewWindow};
 /// pill can animate inside it; clicks outside the pill pass through to the desktop.
 struct PillSize(Mutex<(f64, f64)>);
 
+/// (x, y, width, height) of Notchi relative to the pill in logical pixels.
+struct MascotRect(Mutex<Option<(f64, f64, f64, f64)>>);
+
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct MonitorInfo {
     pub name: String,
@@ -56,6 +59,24 @@ fn place_pill(window: &WebviewWindow) -> tauri::Result<()> {
 fn set_pill_size(size: State<PillSize>, width: f64, height: f64) {
     *size.0.lock().unwrap() = (width, height);
 }
+
+/// The frontend reports Notchi's bounding box relative to the pill, so hovering Notchi does not open the pill.
+#[tauri::command]
+fn set_mascot_rect(
+    rect: State<MascotRect>,
+    x: Option<f64>,
+    y: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
+) {
+    let mut lock = rect.0.lock().unwrap();
+    if let (Some(x), Some(y), Some(w), Some(h)) = (x, y, width, height) {
+        *lock = Some((x, y, w, h));
+    } else {
+        *lock = None;
+    }
+}
+
 
 /// Grows or shrinks the transparent pill window (keeping it top-centered) so a taller pill, like a
 /// resized Mirror, isn't clipped.
@@ -181,14 +202,40 @@ fn cursor_in_pill(cursor: (f64, f64), window_pos: (f64, f64), window_width: f64,
     cursor.0 >= left && cursor.0 <= left + pill.0 * scale && cursor.1 >= window_pos.1 && cursor.1 <= window_pos.1 + pill.1 * scale
 }
 
+/// True when the cursor (physical px) is over a sub-rect (in logical px relative to the pill) of the pill.
+fn cursor_in_pill_subrect(
+    cursor: (f64, f64),
+    window_pos: (f64, f64),
+    window_width: f64,
+    pill: (f64, f64),
+    subrect: (f64, f64, f64, f64),
+    scale: f64,
+) -> bool {
+    let pill_left = window_pos.0 + (window_width - pill.0 * scale) / 2.0;
+    let pill_top = window_pos.1;
+    let left = pill_left + subrect.0 * scale;
+    let top = pill_top + subrect.1 * scale;
+    let right = left + subrect.2 * scale;
+    let bottom = top + subrect.3 * scale;
+    cursor.0 >= left && cursor.0 <= right && cursor.1 >= top && cursor.1 <= bottom
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+enum HoverState {
+    Outside,
+    Pill,
+    Mascot,
+}
+
 /// Polls the cursor so the pill reacts to hover without needing focus (like the macOS notch),
-/// and lets clicks through everywhere outside the pill.
+/// lets clicks through everywhere outside the pill, and treats hovering over Notchi separately
+/// so the pill stays closed while Notchi is petted.
 fn watch_hover(window: WebviewWindow) {
     std::thread::spawn(move || {
         // Allow WebView2 and native window 500ms to mount and stabilize before polling
         std::thread::sleep(Duration::from_millis(500));
 
-        let mut inside: Option<bool> = None;
+        let mut current_state: Option<HoverState> = None;
         let mut cached_geom: Option<((f64, f64), f64, f64)> = None; // (pos, width, scale)
         let mut last_geom_refresh = std::time::Instant::now();
 
@@ -216,16 +263,32 @@ fn watch_hover(window: WebviewWindow) {
             };
 
             let pill = *window.state::<PillSize>().0.lock().unwrap();
-            let now = cursor_in_pill((cursor.x, cursor.y), win_pos, win_width, pill, scale);
+            let mascot = *window.state::<MascotRect>().0.lock().unwrap();
 
-            if inside != Some(now) {
-                inside = Some(now);
-                let _ = window.set_ignore_cursor_events(!now);
-                let _ = window.emit_to("pill", "pill-hover", now);
+            let in_pill = cursor_in_pill((cursor.x, cursor.y), win_pos, win_width, pill, scale);
+            let state = if !in_pill {
+                HoverState::Outside
+            } else if let Some(m) = mascot {
+                if cursor_in_pill_subrect((cursor.x, cursor.y), win_pos, win_width, pill, m, scale) {
+                    HoverState::Mascot
+                } else {
+                    HoverState::Pill
+                }
+            } else {
+                HoverState::Pill
+            };
+
+            if current_state != Some(state) {
+                current_state = Some(state);
+                let ignore_events = state == HoverState::Outside;
+                let _ = window.set_ignore_cursor_events(ignore_events);
+                let _ = window.emit_to("pill", "pill-hover", state == HoverState::Pill);
+                let _ = window.emit_to("pill", "pill-hover-mascot", state == HoverState::Mascot);
             }
         }
     });
 }
+
 
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
@@ -251,6 +314,7 @@ fn open_external_url(url: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(PillSize(Mutex::new((360.0, 44.0))))
+        .manage(MascotRect(Mutex::new(None)))
         // Only remember the position and size where the desktop lyrics widget was dragged;
         // Never restore window visibility so the lyrics widget does not open at launch.
         .plugin(
@@ -272,6 +336,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             set_pill_size,
+            set_mascot_rect,
             set_pill_window_height,
             cursor_over_pill,
             toggle_lyrics,
@@ -352,7 +417,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::cursor_in_pill;
+    use super::{cursor_in_pill, cursor_in_pill_subrect};
 
     #[test]
     fn hover_zone_is_the_centered_pill_scaled_to_physical_pixels() {
@@ -364,4 +429,37 @@ mod tests {
         assert!(!hit(1061.0, 10.0));
         assert!(!hit(700.0, 89.0));
     }
+
+    #[test]
+    fn mascot_subrect_detects_cursor_inside_mascot_vs_rest_of_pill() {
+        // Pill is 340x38, at window x=100, scale=2.0, window_width=1200.
+        // Pill left = 100 + (1200 - 340*2)/2 = 100 + 260 = 360.
+        // Pill spans physical x 360..1040, y 0..76.
+        // Mascot is at (x=10, y=5, w=30, h=28) relative to pill.
+        // In physical px: mascot spans x (360 + 10*2)..(360 + 40*2) = 380..440, y 10..66.
+        let hit_pill = |x, y| cursor_in_pill((x, y), (100.0, 0.0), 1200.0, (340.0, 38.0), 2.0);
+        let hit_mascot = |x, y| {
+            cursor_in_pill_subrect(
+                (x, y),
+                (100.0, 0.0),
+                1200.0,
+                (340.0, 38.0),
+                (10.0, 5.0, 30.0, 28.0),
+                2.0,
+            )
+        };
+
+        // (400, 30) is inside both the pill AND the mascot
+        assert!(hit_pill(400.0, 30.0));
+        assert!(hit_mascot(400.0, 30.0));
+
+        // (600, 30) is inside the pill, but NOT inside the mascot (rest of the pill)
+        assert!(hit_pill(600.0, 30.0));
+        assert!(!hit_mascot(600.0, 30.0));
+
+        // (100, 30) is outside the pill entirely
+        assert!(!hit_pill(100.0, 30.0));
+        assert!(!hit_mascot(100.0, 30.0));
+    }
 }
+

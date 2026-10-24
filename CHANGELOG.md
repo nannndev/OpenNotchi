@@ -3,6 +3,23 @@
 All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
+## [0.12.0] - 2026-10-24
+
+### Added
+- **Notchi Mascot (macOS & Windows)**:
+  - Retro-digital companion living right inside your closed notch or pill.
+  - Expressive moods and animations: idle blinks, vibing to your music beat, focused during active Pomodoro timers, and celebration when agent tasks finish.
+  - Interactive petting: hover or click Notchi to show floating hearts, boost happiness, and track your pet count.
+- **9router & Multi-Account AI Quota Management (macOS & Windows)**:
+  - Multiple accounts per provider (OpenAI, Anthropic, OpenRouter, Google, Groq, and more).
+  - Quota and credit tracking with reset time countdowns and one-click account toggle switches.
+  - Live AI agent monitoring (Claude Code, Codex, Cursor) with real-time status banners and cost breakdown.
+- **Notification Banners & Chimes**:
+  - Interactive notification banners dropped from the notch when agent tasks finish or require input.
+  - Synthesized WebAudio/native chimes and one-click terminal activation.
+- **Settings Search (macOS & Windows)**:
+  - Spotlight-style instant search across all settings sections and options.
+  - Comprehensive keyword coverage with bilingual English and Indonesian synonyms.
 
 ## [0.11.0] - 2026-10-24
 

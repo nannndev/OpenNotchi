@@ -50,6 +50,7 @@ final class NotchViewModel: ObservableObject {
     }
 
     @Published var isStudioOpen = false
+    @Published var isAiExpanded = false
 
     static let openWidth: CGFloat = 680
     static let defaultOpenHeight: CGFloat = 200
@@ -66,13 +67,16 @@ final class NotchViewModel: ObservableObject {
             height = min(max(settings.prompterHeight, 240), Self.maxOpenHeight)
         } else if tab == .dev {
             height = 230
-        } else if tab == .smarthome || tab == .ai {
+        } else if tab == .ai {
+            height = isAiExpanded ? 460 : 340
+        } else if tab == .smarthome {
             height = 240
         } else {
             height = Self.defaultOpenHeight
         }
-        return CGSize(width: Self.openWidth, height: height)
+        return CGSize(width: tab == .ai ? 720 : Self.openWidth, height: height)
     }
+
 
     /// True while the bottom edge is being dragged, so the notch doesn't close if the pointer slips outside.
     @Published var isResizing = false
@@ -85,6 +89,15 @@ final class NotchViewModel: ObservableObject {
     private let settings: AppSettings
     private var isHovering = false
     private var pending: DispatchWorkItem?
+
+    /// True while the pointer is on Notchi: hovering it is for playing with it, not for opening the notch.
+    /// Moving on to the rest of the notch opens it as usual.
+    var isOverMascot = false {
+        didSet {
+            guard isOverMascot != oldValue else { return }
+            if isOverMascot { pending?.cancel() } else if isHovering, !isOpen { hoverChanged(true) }
+        }
+    }
 
     var onOpen: (() -> Void)?
 
@@ -111,7 +124,11 @@ final class NotchViewModel: ObservableObject {
             return
         }
         if inside {
-            let work = DispatchWorkItem { [weak self] in self?.open() }
+            guard !isOverMascot else { return }
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, !self.isOverMascot else { return }
+                self.open()
+            }
             pending = work
             DispatchQueue.main.asyncAfter(deadline: .now() + settings.hoverDelay, execute: work)
         } else if !isDropTargeted && !staysOpenOnHoverExit {
