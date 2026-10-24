@@ -46,7 +46,7 @@ fn project_name(cwd: &str) -> String {
 
 /// Unix ms from a timestamp like `2026-10-24T04:20:54.407Z`.
 /// shortcut: assumes UTC (`Z`), which both Claude Code and Codex write; parse offsets if that changes.
-fn parse_iso_ms(s: &str) -> Option<i64> {
+pub fn parse_iso_ms(s: &str) -> Option<i64> {
     let n = |a: usize, b: usize| -> Option<i64> { s.get(a..b)?.parse().ok() };
     let (y, mo, d, h, mi, se) = (n(0, 4)?, n(5, 7)?, n(8, 10)?, n(11, 13)?, n(14, 16)?, n(17, 19)?);
     let ms = match s.get(19..20) {
@@ -398,7 +398,7 @@ pub struct Totals {
     pub cost: f64,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Block {
     pub start: i64,
@@ -424,12 +424,17 @@ pub struct CodexLimits {
     pub secondary: Option<RateWindow>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct UsageReport {
+    pub id: Option<String>,
     pub name: String,
     pub tool: String,
     pub dir: String,
+    pub connection_id: Option<String>,
+    pub email: Option<String>,
+    pub priority: Option<i32>,
+    pub is_active: bool,
     /// False when the folder has no session logs.
     pub found: bool,
     pub today: Totals,
@@ -437,6 +442,11 @@ pub struct UsageReport {
     /// Tokens per local day, oldest first, today last.
     pub days: Vec<u64>,
     pub limits: Option<CodexLimits>,
+    pub quotas: Vec<crate::ninerouter::NineRouterQuota>,
+    pub plan_name: Option<String>,
+    pub test_status: Option<String>,
+    pub last_error: Option<String>,
+    pub is_from_9router: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -620,7 +630,26 @@ fn claude_report(account: &Account, now: i64, tz: i64) -> UsageReport {
         entries.iter().filter(|e| e.ts >= start).for_each(|e| add(&mut t, e));
         Block { start, end: start + FIVE_H, tokens: t.tokens, cost: t.cost }
     });
-    UsageReport { name: account.name.clone(), tool: account.tool.clone(), dir: account.dir.clone(), found, today: today_totals, block, days, limits: None }
+    UsageReport {
+        id: None,
+        name: account.name.clone(),
+        tool: account.tool.clone(),
+        dir: account.dir.clone(),
+        connection_id: None,
+        email: None,
+        priority: None,
+        is_active: true,
+        found,
+        today: today_totals,
+        block,
+        days,
+        limits: None,
+        quotas: vec![],
+        plan_name: None,
+        test_status: None,
+        last_error: None,
+        is_from_9router: false,
+    }
 }
 
 fn rate_window(v: &Value) -> Option<RateWindow> {
@@ -677,14 +706,24 @@ fn codex_report(account: &Account, now: i64, tz: i64) -> UsageReport {
         }
     }
     UsageReport {
+        id: None,
         name: account.name.clone(),
         tool: account.tool.clone(),
         dir: account.dir.clone(),
+        connection_id: None,
+        email: None,
+        priority: None,
+        is_active: true,
         found,
         today: Totals { tokens: days[6], cost: 0.0 },
         block: None,
         days,
         limits: latest.map(|(_, l)| l),
+        quotas: vec![],
+        plan_name: None,
+        test_status: None,
+        last_error: None,
+        is_from_9router: false,
     }
 }
 
@@ -741,14 +780,24 @@ fn antigravity_report(account: &Account, now: i64, tz: i64) -> UsageReport {
     });
 
     UsageReport {
+        id: None,
         name: account.name.clone(),
         tool: account.tool.clone(),
         dir: account.dir.clone(),
+        connection_id: None,
+        email: None,
+        priority: None,
+        is_active: true,
         found,
         today: today_totals,
         block,
         days,
         limits: None,
+        quotas: vec![],
+        plan_name: None,
+        test_status: None,
+        last_error: None,
+        is_from_9router: false,
     }
 }
 
@@ -757,17 +806,53 @@ fn antigravity_report(account: &Account, now: i64, tz: i64) -> UsageReport {
 pub async fn ai_usage(accounts: Vec<Account>, tz_offset_min: i64) -> Vec<UsageReport> {
     tauri::async_runtime::spawn_blocking(move || {
         let now = now_ms();
-        accounts
-            .iter()
-            .map(|a| match a.tool.as_str() {
-                "codex" => codex_report(a, now, tz_offset_min),
-                "antigravity" => antigravity_report(a, now, tz_offset_min),
-                _ => claude_report(a, now, tz_offset_min),
-            })
-            .collect()
+        let mut reports = Vec::new();
+
+        // 1. Prioritize 9router if available
+        if crate::ninerouter::is_available() {
+            let nine_reports = crate::ninerouter::fetch_reports();
+            if !nine_reports.is_empty() {
+                reports = nine_reports;
+            }
+        }
+
+        // 2. If 9router is not available or returned empty, scan local accounts
+        if reports.is_empty() {
+            reports = accounts
+                .iter()
+                .map(|a| match a.tool.as_str() {
+                    "codex" => codex_report(a, now, tz_offset_min),
+                    "antigravity" => antigravity_report(a, now, tz_offset_min),
+                    _ => claude_report(a, now, tz_offset_min),
+                })
+                .collect();
+        } else {
+            // Append accounts for tools 9router doesn't know
+            use std::collections::HashSet;
+            let routed: HashSet<String> = reports.iter().map(|r| r.tool.clone()).collect();
+            for a in &accounts {
+                if !routed.contains(&a.tool) {
+                    let r = match a.tool.as_str() {
+                        "codex" => codex_report(a, now, tz_offset_min),
+                        "antigravity" => antigravity_report(a, now, tz_offset_min),
+                        _ => claude_report(a, now, tz_offset_min),
+                    };
+                    if r.found {
+                        reports.push(r);
+                    }
+                }
+            }
+        }
+
+        reports
     })
     .await
     .unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn set_9router_connection_active(id: String, active: bool) -> Result<(), String> {
+    crate::ninerouter::set_connection_active(&id, active)
 }
 
 /// The default accounts whose folders exist: `~/.claude`, `~/.codex`, and `~/.gemini/antigravity-ide`.

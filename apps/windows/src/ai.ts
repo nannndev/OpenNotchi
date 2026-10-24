@@ -1,7 +1,7 @@
 /** AI features: agent status, usage and Ask AI. Pure helpers here; the file reading is in Rust (src-tauri/src/ai.rs). */
 
 export type AiProvider = "ollama" | "anthropic" | "openai"
-export type AgentTool = "claude" | "codex" | "antigravity"
+export type AgentTool = "claude" | "codex" | "antigravity" | "commandcode" | string
 export type AgentState = "working" | "needs_you" | "done" | "idle"
 export type AccountHealth = "healthy" | "warning" | "exhausted"
 
@@ -35,15 +35,35 @@ export interface RateWindow {
   resetsAt: number
 }
 
+export interface NineRouterQuota {
+  name: string
+  used: number
+  total: number
+  remaining: number
+  remainingPercentage: number
+  resetAt?: number | null
+  unlimited: boolean
+}
+
 export interface UsageReport {
+  id?: string
   name: string
   tool: AgentTool
   dir: string
+  connectionId?: string
+  email?: string | null
+  priority?: number
+  isActive?: boolean
   found: boolean
   today: { tokens: number; cost: number }
   block: { start: number; end: number; tokens: number; cost: number } | null
   days: number[]
   limits: { planType: string | null; primary: RateWindow | null; secondary: RateWindow | null } | null
+  quotas?: NineRouterQuota[]
+  planName?: string | null
+  testStatus?: string | null
+  lastError?: string | null
+  isFrom9Router?: boolean
 }
 
 export interface QuotaInfo {
@@ -56,7 +76,12 @@ export interface QuotaInfo {
 export const IDLE_AFTER_MS = 5 * 60_000
 export const MAX_AGENT_ROWS = 5
 
-export const TOOL_NAMES: Record<AgentTool, string> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity" }
+export const TOOL_NAMES: Record<string, string> = {
+  claude: "Claude Code",
+  codex: "Codex",
+  antigravity: "Antigravity",
+  commandcode: "Command Code",
+}
 export const STATE_LABELS: Record<AgentState, string> = { working: "working", needs_you: "needs you", done: "done", idle: "idle" }
 
 export const PROVIDERS: { id: AiProvider; name: string }[] = [
@@ -129,9 +154,17 @@ export function resetsIn(atMs: number, now: number): string {
   return `resets in ${m}m`
 }
 
-/** The compact closed-notch meter: a Codex window at ≥ 80 %, else an active Claude block's elapsed share. */
+/** The compact closed-notch meter: a hot 9router / Codex window at ≥ 80 %, else an active Claude block's elapsed share. */
 export function closedMeter(reports: UsageReport[], now: number): { label: string; percent: number; hot: boolean } | null {
   for (const r of reports) {
+    if (r.isFrom9Router && r.isActive !== false && r.quotas) {
+      for (const q of r.quotas) {
+        if (!q.unlimited && q.total > 0 && q.remainingPercentage <= 20) {
+          const pct = Math.min(100, Math.max(0, 100 - q.remainingPercentage))
+          return { label: `${r.name} ${Math.round(q.remainingPercentage)}%`, percent: pct, hot: true }
+        }
+      }
+    }
     for (const w of [r.limits?.primary, r.limits?.secondary]) {
       if (w && w.usedPercent >= 80 && w.resetsAt * 1000 > now)
         return { label: `${windowLabel(w.windowMinutes)} ${Math.round(w.usedPercent)}%`, percent: w.usedPercent, hot: true }
@@ -145,6 +178,27 @@ export function closedMeter(reports: UsageReport[], now: number): { label: strin
 
 /** 9router-style quota and rate-limit gauge info for an account. */
 export function getAccountQuota(r: UsageReport, now: number): QuotaInfo {
+  if (r.isFrom9Router && r.quotas && r.quotas.length > 0) {
+    const primary = r.quotas.find((q) => q.name.toLowerCase().includes("session") || q.name.includes("5h")) || r.quotas[0]
+    if (primary) {
+      const percent = primary.unlimited ? 0 : Math.min(100, Math.max(0, 100 - primary.remainingPercentage))
+      const health: AccountHealth = primary.unlimited
+        ? "healthy"
+        : primary.remainingPercentage <= 10
+        ? "exhausted"
+        : primary.remainingPercentage <= 30
+        ? "warning"
+        : "healthy"
+      const resetsText = primary.resetAt && primary.resetAt > now ? resetsIn(primary.resetAt, now) : null
+      return {
+        percent: Math.round(percent),
+        label: `${Math.round(percent)}%`,
+        resetsText,
+        health,
+      }
+    }
+  }
+
   const primary = r.limits?.primary
   if (primary) {
     const percent = Math.min(100, Math.max(0, primary.usedPercent))

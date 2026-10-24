@@ -94,7 +94,7 @@ export function Pill() {
   }
 
   const agents = useAgents(settings.aiEnabled && settings.aiAgents, showBanner)
-  const usage = useUsage(settings.aiEnabled)
+  const { usage, toggleActive } = useUsage(settings.aiEnabled)
   const meter = settings.aiEnabled && settings.aiClosedMeter && usage ? closedMeter(usage, Date.now()) : null
 
   // Notchi Mascot state
@@ -568,7 +568,15 @@ export function Pill() {
             {/* Mounted only while open so the camera light goes off when the pill closes. */}
             {currentTabSafe === "mirror" && open && <MirrorTab onBusy={setMirrorBusy} />}
 
-            {currentTabSafe === "ai" && <AITab sessions={agents} usage={usage} lyricLine={line.text} np={np} />}
+            {currentTabSafe === "ai" && (
+              <AITab
+                sessions={agents}
+                usage={usage}
+                onToggleActive={toggleActive}
+                lyricLine={line.text}
+                np={np}
+              />
+            )}
           </div>
         </div>
       </div>

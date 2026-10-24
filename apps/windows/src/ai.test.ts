@@ -77,12 +77,30 @@ test("getAccountQuota evaluates rate limits and blocks", () => {
   assert.deepEqual(getAccountQuota(blockReport, now), { percent: 20, label: "2.5K", resetsText: "resets in 4h", health: "healthy" })
 
   assert.deepEqual(getAccountQuota(base, now), { percent: 0, label: "Idle", resetsText: null, health: "healthy" })
+
+  const nineRouterReport: UsageReport = {
+    ...base,
+    isFrom9Router: true,
+    quotas: [
+      { name: "Gemini (5h)", used: 40, total: 1000, remaining: 960, remainingPercentage: 96, resetAt: now + 3_600_000, unlimited: false },
+      { name: "Gemini (Weekly)", used: 850, total: 1000, remaining: 150, remainingPercentage: 15, resetAt: now + 86_400_000, unlimited: false },
+    ],
+  }
+  assert.deepEqual(getAccountQuota(nineRouterReport, now), { percent: 4, label: "4%", resetsText: "resets in 1h", health: "healthy" })
 })
 
-test("closedMeter prefers a hot Codex window over a Claude block", () => {
+test("closedMeter prefers a hot 9router or Codex window over a Claude block", () => {
   const base: UsageReport = { name: "", tool: "claude", dir: "", found: true, today: { tokens: 0, cost: 0 }, block: null, days: [], limits: null }
   const block = { ...base, block: { start: now - 3_600_000, end: now + 4 * 3_600_000, tokens: 2500, cost: 1 } }
   const codex = { ...base, tool: "codex" as const, limits: { planType: "plus", primary: { usedPercent: 85, windowMinutes: 300, resetsAt: now / 1000 + 60 }, secondary: null } }
+  const nineRouterHot: UsageReport = {
+    ...base,
+    name: "Gemini",
+    isFrom9Router: true,
+    isActive: true,
+    quotas: [{ name: "Gemini (5h)", used: 850, total: 1000, remaining: 150, remainingPercentage: 15, unlimited: false }],
+  }
+  assert.deepEqual(closedMeter([nineRouterHot], now), { label: "Gemini 15%", percent: 85, hot: true })
   assert.deepEqual(closedMeter([block, codex], now), { label: "5h 85%", percent: 85, hot: true })
   assert.deepEqual(closedMeter([block], now), { label: "2.5K", percent: 20, hot: false })
   assert.equal(closedMeter([base], now), null)

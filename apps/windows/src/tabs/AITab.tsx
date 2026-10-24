@@ -32,21 +32,29 @@ type Section = "usage" | "agents" | "ask"
 export function AITab({
   sessions,
   usage,
+  onToggleActive,
   lyricLine,
   np,
 }: {
   sessions: AgentSession[]
   usage: UsageReport[] | null
+  onToggleActive?: (id: string, active: boolean) => void
   lyricLine: string | null
   np: NowPlaying | null
 }) {
   const [settings] = useSettings()
-  const [section, setSection] = useState<Section>(settings.aiAccounts.length > 0 ? "usage" : settings.aiAgents ? "agents" : "usage")
+  const [section, setSection] = useState<Section>(
+    (usage && usage.length > 0) || settings.aiAccounts.length > 0
+      ? "usage"
+      : settings.aiAgents
+      ? "agents"
+      : "usage"
+  )
   const now = Date.now()
 
   const totalTokensToday = usage?.reduce((sum, r) => sum + r.today.tokens, 0) ?? 0
   const totalCostToday = usage?.reduce((sum, r) => sum + r.today.cost, 0) ?? 0
-  const activeCount = usage?.filter((r) => r.found).length ?? 0
+  const activeCount = usage?.filter((r) => r.found && r.isActive !== false).length ?? 0
 
   return (
     <div className="tab-ai">
@@ -79,14 +87,19 @@ export function AITab({
               </div>
             )}
 
-            {settings.aiAccounts.length === 0 ? (
-              <div className="ai-empty">Add Claude Code, Codex, or Antigravity in Settings › AI.</div>
+            {(!usage || usage.length === 0) && settings.aiAccounts.length === 0 ? (
+              <div className="ai-empty">No AI accounts found. Connect 9router or add accounts in Settings › AI.</div>
             ) : !usage ? (
               <div className="ai-empty">Reading usage & quotas…</div>
             ) : (
               <div className="ai-usage">
                 {usage.map((r, i) => (
-                  <UsageCard key={i} r={r} now={now} />
+                  <UsageCard
+                    key={r.id || r.connectionId || i}
+                    r={r}
+                    now={now}
+                    onToggleActive={onToggleActive}
+                  />
                 ))}
               </div>
             )}
@@ -103,8 +116,8 @@ export function AITab({
               {sessions.map((s) => (
                 <div key={s.sessionId} className="ai-agent-row" title={s.message ?? undefined}>
                   <AgentToolIcon tool={s.tool} />
-                  <span className="ai-agent-project">{s.project || TOOL_NAMES[s.tool]}</span>
-                  <span className="ai-agent-msg">{s.state === "needs_you" ? s.message : TOOL_NAMES[s.tool]}</span>
+                  <span className="ai-agent-project">{s.project || TOOL_NAMES[s.tool] || s.tool}</span>
+                  <span className="ai-agent-msg">{s.state === "needs_you" ? s.message : TOOL_NAMES[s.tool] || s.tool}</span>
                   <span className={`ai-chip ${s.state}`}>{STATE_LABELS[s.state]}</span>
                   <span className="ai-agent-time">{timeAgo(s.updatedAt, now)}</span>
                 </div>
@@ -119,24 +132,130 @@ export function AITab({
 }
 
 function AgentToolIcon({ tool }: { tool: string }) {
-  if (tool === "claude") return <Terminal size={13} className="ai-icon-tool ai-icon-claude" />
-  if (tool === "antigravity") return <Sparkles size={13} className="ai-icon-tool ai-icon-antigravity" />
+  const t = tool.toLowerCase()
+  if (t === "claude") return <Terminal size={13} className="ai-icon-tool ai-icon-claude" />
+  if (t === "antigravity") return <Sparkles size={13} className="ai-icon-tool ai-icon-antigravity" />
+  if (t === "commandcode") return <Terminal size={13} className="ai-icon-tool ai-icon-commandcode" />
   return <Bot size={13} className="ai-icon-tool ai-icon-codex" />
 }
 
-function UsageCard({ r, now }: { r: UsageReport; now: number }) {
+function UsageCard({
+  r,
+  now,
+  onToggleActive,
+}: {
+  r: UsageReport
+  now: number
+  onToggleActive?: (id: string, active: boolean) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
   const max = Math.max(1, ...r.days)
   const quota = getAccountQuota(r, now)
+  const isActive = r.isActive !== false
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const targetId = r.connectionId || r.id
+    if (targetId && onToggleActive) {
+      onToggleActive(targetId, !isActive)
+    }
+  }
 
   return (
-    <div className={`ai-card ai-card-${quota.health}`}>
+    <div
+      className={`ai-card ai-card-${quota.health} ${!isActive ? "ai-card-inactive" : ""} ${r.isFrom9Router ? "ai-card-9router" : ""} ${expanded ? "expanded" : ""}`}
+      onClick={() => r.isFrom9Router && setExpanded(!expanded)}
+    >
       <div className="ai-card-head">
         <AgentToolIcon tool={r.tool} />
-        <strong className="ai-card-title">{r.name}</strong>
+        <div className="ai-card-title-group">
+          <strong className="ai-card-title">{r.name}</strong>
+          {r.email && <span className="ai-card-email">{r.email}</span>}
+        </div>
+
+        {r.isFrom9Router && (
+          <button
+            type="button"
+            className={`ai-toggle-pill ${isActive ? "active" : "inactive"}`}
+            onClick={handleToggle}
+            title={isActive ? "Active in 9router. Click to toggle OFF." : "Inactive. Click to toggle ON."}
+          >
+            {isActive ? "ON" : "OFF"}
+          </button>
+        )}
+
         <span className={`ai-health-badge ${quota.health}`}>{quota.health}</span>
+
+        {r.isFrom9Router && (
+          <span className={`ai-expand-arrow ${expanded ? "expanded" : ""}`} aria-hidden="true">
+            ▼
+          </span>
+        )}
       </div>
+
       {!r.found ? (
         <div className="ai-card-empty">No sessions found in {r.dir}</div>
+      ) : r.isFrom9Router ? (
+        <div className="ai-9router-body">
+          {r.quotas && r.quotas.length > 0 ? (
+            <div className="ai-quota-list">
+              {(expanded ? r.quotas : r.quotas.slice(0, 1)).map((q, idx) => {
+                const usedPct = q.unlimited ? 0 : Math.min(100, Math.max(0, 100 - q.remainingPercentage))
+                const isHot = !q.unlimited && q.remainingPercentage <= 20
+                return (
+                  <div key={idx} className="ai-quota-item">
+                    <div className="ai-stat">
+                      <span className="ai-quota-name">{q.name}</span>
+                      <b>{q.unlimited ? "Unlimited" : `${Math.round(usedPct)}%`}</b>
+                    </div>
+                    {!q.unlimited && (
+                      <div
+                        className={`ai-bar ${isHot ? "hot" : ""}`}
+                        style={{ "--p": `${usedPct}%` } as CSSProperties}
+                      />
+                    )}
+                    {q.resetAt && q.resetAt > now && (
+                      <div className="ai-card-note">{resetsIn(q.resetAt, now)}</div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : r.planName ? (
+            <div className="ai-stat">
+              <span>Plan</span>
+              <b>{r.planName}</b>
+            </div>
+          ) : null}
+
+          {expanded && r.planName && (
+            <div className="ai-stat">
+              <span>Plan</span>
+              <b>{r.planName}</b>
+            </div>
+          )}
+
+          {expanded && r.testStatus && (
+            <div className="ai-card-note">Status: {r.testStatus}</div>
+          )}
+
+          <div className="ai-stat">
+            <span>Today</span>
+            <b>
+              {formatTokens(r.today.tokens)} {r.today.cost > 0 ? `· ${formatCost(r.today.cost)}` : "tokens"}
+            </b>
+          </div>
+
+          <div className="ai-spark" title="Tokens per day, last 7 days">
+            {r.days.map((d, i) => (
+              <i
+                key={i}
+                style={{ height: `${Math.max(4, (d / max) * 100)}%` }}
+                className={i === r.days.length - 1 ? "today" : ""}
+              />
+            ))}
+          </div>
+        </div>
       ) : (
         <>
           {r.tool === "codex" ? (
@@ -342,21 +461,47 @@ export function useAgents(enabled: boolean, onPeek?: (banner: Banner) => void): 
   return sessions
 }
 
-/** Usage per account, rescanned every 60 s while AI features are on. */
-export function useUsage(enabled: boolean): UsageReport[] | null {
+/** Usage per account, rescanned every 30 s while AI features are on. Supports 9router toggle. */
+export function useUsage(enabled: boolean): {
+  usage: UsageReport[] | null
+  toggleActive: (id: string, active: boolean) => Promise<void>
+  refresh: () => Promise<void>
+} {
   const [settings] = useSettings()
   const [usage, setUsage] = useState<UsageReport[] | null>(null)
   const key = JSON.stringify(settings.aiAccounts)
+
+  const poll = () => {
+    if (!enabled) return Promise.resolve()
+    return invoke<UsageReport[]>("ai_usage", {
+      accounts: settings.aiAccounts,
+      tzOffsetMin: new Date().getTimezoneOffset(),
+    })
+      .then(setUsage)
+      .catch(() => {})
+  }
+
   useEffect(() => {
-    if (!enabled || !settings.aiAccounts.length) return setUsage(null)
-    const poll = () =>
-      invoke<UsageReport[]>("ai_usage", { accounts: settings.aiAccounts, tzOffsetMin: new Date().getTimezoneOffset() })
-        .then(setUsage)
-        .catch(() => {})
+    if (!enabled) return setUsage(null)
     poll()
-    const id = setInterval(poll, 60_000)
+    const id = setInterval(poll, 30_000)
     return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, key])
-  return usage
+
+  const toggleActive = async (id: string, active: boolean) => {
+    // Optimistic local update
+    setUsage((prev) =>
+      prev?.map((r) => ((r.connectionId === id || r.id === id) ? { ...r, isActive: active } : r)) ?? null
+    )
+    try {
+      await invoke("set_9router_connection_active", { id, active })
+      setTimeout(poll, 500)
+    } catch (e) {
+      console.error("Failed to toggle connection in 9router:", e)
+      poll()
+    }
+  }
+
+  return { usage, toggleActive, refresh: poll }
 }

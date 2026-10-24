@@ -1,5 +1,6 @@
 mod ai;
 mod media;
+mod ninerouter;
 mod system;
 
 use std::sync::Mutex;
@@ -362,6 +363,7 @@ pub fn run() {
             ai::ai_key_set,
             ai::ai_key_exists,
             ai::ask_ai,
+            ai::set_9router_connection_active,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
