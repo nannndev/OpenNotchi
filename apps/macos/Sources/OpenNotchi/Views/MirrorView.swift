@@ -761,7 +761,7 @@ private struct ResizeHandle: View {
                     }
             )
             .onTapGesture(count: 2) {
-                let tall = settings.mirrorHeight > (NotchViewModel.defaultOpenHeight + NotchViewModel.maxOpenHeight) / 2
+                let tall = settings.mirrorHeight > (NotchViewModel.defaultOpenHeight + NotchViewModel.maxOpenHeight) / 2.0
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                     settings.mirrorHeight = tall ? NotchViewModel.defaultOpenHeight : NotchViewModel.maxOpenHeight
                 }

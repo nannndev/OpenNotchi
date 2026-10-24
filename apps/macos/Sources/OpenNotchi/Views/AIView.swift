@@ -249,66 +249,80 @@ private struct AgentRow: View {
             AgentMonitor.activateTerminal(for: session.tool)
         } label: {
             HStack(spacing: 9) {
-                Image(systemName: session.tool.icon)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(toolTint)
-                    .frame(width: 24, height: 24)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(toolTint.opacity(0.18)))
-
-                VStack(alignment: .leading, spacing: 1.5) {
-                    HStack(spacing: 6) {
-                        Text(session.project.isEmpty ? session.tool.displayName : session.project)
-                            .font(.system(size: 12, weight: .semibold))
-                            .lineLimit(1)
-                        Text("· \(session.tool.displayName)")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    }
-                    if let msg = session.message, !msg.isEmpty {
-                        Text(msg)
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(session.state == .needsYou ? Color.orange : Color.secondary)
-                            .lineLimit(1)
-                    }
-                }
-
+                toolIcon
+                sessionInfo
                 Spacer(minLength: 4)
-
-                HStack(spacing: 5) {
-                    if session.state == .working {
-                        ProgressView().controlSize(.mini).tint(chipColor)
-                    }
-                    Text(session.state.label)
-                }
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(chipColor)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(chipColor.opacity(0.18)).overlay(Capsule().stroke(chipColor.opacity(0.35), lineWidth: 0.8)))
-
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    Text(timeAgo(session.updatedAt, now: context.date))
-                        .font(.system(size: 10, weight: .medium).monospacedDigit())
-                        .foregroundStyle(.tertiary)
-                        .frame(width: 28, alignment: .trailing)
-                }
+                statusBadge
+                timeBadge
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 11)
-                    .fill(session.state == .needsYou ? Color.orange.opacity(0.12) : Color.white.opacity(hovering ? 0.08 : 0.04))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 11)
-                            .stroke(session.state == .needsYou ? Color.orange.opacity(0.4) : Color.white.opacity(0.06), lineWidth: 1)
-                    )
-            )
+            .background(rowBackground)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help(session.message ?? "Open the session")
         .accessibilityLabel("\(session.tool.displayName), \(session.project), \(session.state.label)")
+    }
+
+    private var toolIcon: some View {
+        Image(systemName: session.tool.icon)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(toolTint)
+            .frame(width: 24, height: 24)
+            .background(RoundedRectangle(cornerRadius: 6).fill(toolTint.opacity(0.18)))
+    }
+
+    private var sessionInfo: some View {
+        VStack(alignment: .leading, spacing: 1.5) {
+            HStack(spacing: 6) {
+                Text(session.project.isEmpty ? session.tool.displayName : session.project)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                Text("· \(session.tool.displayName)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+            if let msg = session.message, !msg.isEmpty {
+                Text(msg)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(session.state == .needsYou ? Color.orange : Color.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var statusBadge: some View {
+        HStack(spacing: 5) {
+            if session.state == .working {
+                ProgressView().controlSize(.mini).tint(chipColor)
+            }
+            Text(session.state.label)
+        }
+        .font(.system(size: 10, weight: .bold))
+        .foregroundStyle(chipColor)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(chipColor.opacity(0.18)).overlay(Capsule().stroke(chipColor.opacity(0.35), lineWidth: 0.8)))
+    }
+
+    private var timeBadge: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            Text(timeAgo(session.updatedAt, now: context.date))
+                .font(.system(size: 10, weight: .medium).monospacedDigit())
+                .foregroundStyle(.tertiary)
+                .frame(width: 28, alignment: .trailing)
+        }
+    }
+
+    private var rowBackground: some View {
+        RoundedRectangle(cornerRadius: 11)
+            .fill(session.state == .needsYou ? Color.orange.opacity(0.12) : Color.white.opacity(hovering ? 0.08 : 0.04))
+            .overlay(
+                RoundedRectangle(cornerRadius: 11)
+                    .stroke(session.state == .needsYou ? Color.orange.opacity(0.4) : Color.white.opacity(0.06), lineWidth: 1)
+            )
     }
 
     private func timeAgo(_ date: Date, now: Date) -> String {
