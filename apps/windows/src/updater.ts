@@ -1,8 +1,10 @@
 import { invoke } from "@tauri-apps/api/core"
 import { emit, listen } from "@tauri-apps/api/event"
 import { useEffect, useState } from "react"
+import pkg from "../package.json" with { type: "json" }
 
-export const CURRENT_VERSION = "0.9.0"
+// Read from package.json so a version bump can never leave this stale (it once said 0.9.0 in a 0.10.0 build).
+export const CURRENT_VERSION: string = pkg.version
 export const GITHUB_REPO = "nannndev/OpenNotchi"
 
 export interface UpdateInfo {
@@ -115,7 +117,9 @@ export function useUpdateChecker(): {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(() => {
     try {
       const cached = localStorage.getItem(UPDATE_CACHE_KEY)
-      return cached ? (JSON.parse(cached) as UpdateInfo) : null
+      const info = cached ? (JSON.parse(cached) as UpdateInfo) : null
+      // A cache written by an older install must not keep showing the update banner after upgrading.
+      return info && info.currentVersion === CURRENT_VERSION ? info : null
     } catch {
       return null
     }
@@ -148,7 +152,7 @@ export function useUpdateChecker(): {
     // Check on startup if not checked in the last 4 hours
     try {
       const lastCheck = parseInt(localStorage.getItem(LAST_CHECK_KEY) || "0", 10)
-      if (Date.now() - lastCheck > CHECK_INTERVAL_MS) {
+      if (Date.now() - lastCheck > CHECK_INTERVAL_MS || !updateInfo) {
         checkNow().catch(() => {})
       }
     } catch {

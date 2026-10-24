@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { compareSemver } from "./updater.ts"
+import pkg from "../package.json" with { type: "json" }
+import { compareSemver, CURRENT_VERSION } from "./updater.ts"
 
 test("compareSemver detects newer patch versions", () => {
   assert.equal(compareSemver("0.1.0", "v0.1.1"), true)
@@ -25,4 +26,11 @@ test("compareSemver handles prefix variations and suffixes", () => {
   assert.equal(compareSemver("0.1.0", "V0.1.1-beta"), true)
   assert.equal(compareSemver("0.1.0-alpha", "0.1.1"), true)
   assert.equal(compareSemver("0.1.0", "v0.1.0-hotfix"), false)
+})
+
+test("CURRENT_VERSION matches package.json and the Tauri bundle version", async () => {
+  const { readFile } = await import("node:fs/promises")
+  const tauri = JSON.parse(await readFile(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"))
+  assert.equal(CURRENT_VERSION, pkg.version)
+  assert.equal(tauri.version, pkg.version)
 })
