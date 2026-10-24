@@ -1518,36 +1518,54 @@ struct LyricCard: View {
 
     private var glassPillHeader: some View {
         HStack(spacing: 10) {
-            if let artwork = song.artwork {
-                Image(nsImage: artwork)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 24, height: 24)
-                    .clipShape(Circle())
-            }
-            VStack(alignment: .leading, spacing: 1) {
-                Text(song.title)
-                    .font(.system(size: 11, weight: .bold))
-                    .lineLimit(1)
-                Text(song.artist)
-                    .font(.system(size: 9.5, weight: .medium))
-                    .opacity(0.6)
-                    .lineLimit(1)
-            }
+            glassArtwork
+            glassSongMeta
             Spacer()
-            HStack(spacing: 3) {
-                ForEach(0..<4) { i in
-                    Capsule()
-                        .fill(Color.accentColor)
-                        .frame(width: 3, height: 6 + CGFloat(sin(elapsed * 5 + Double(i) * 1.5)) * 5)
-                }
-            }
+            glassWaveform
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
         .background(Capsule().fill(.black.opacity(0.75)))
         .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+    }
+
+    @ViewBuilder
+    private var glassArtwork: some View {
+        if let artwork = song.artwork {
+            Image(nsImage: artwork)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 24, height: 24)
+                .clipShape(Circle())
+        }
+    }
+
+    private var glassSongMeta: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(song.title)
+                .font(.system(size: 11, weight: .bold))
+                .lineLimit(1)
+            Text(song.artist)
+                .font(.system(size: 9.5, weight: .medium))
+                .opacity(0.6)
+                .lineLimit(1)
+        }
+    }
+
+    private var glassWaveform: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<4) { i in
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: 3, height: waveformBarHeight(index: i))
+            }
+        }
+    }
+
+    private func waveformBarHeight(index: Int) -> CGFloat {
+        let wave = sin(elapsed * 5.0 + Double(index) * 1.5)
+        return CGFloat(6.0 + wave * 5.0)
     }
 
     private var glassLyricsBox: some View {
