@@ -26,15 +26,10 @@ enum NotchTheme: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Liquid Glass needs macOS 26; older systems fall back to Frosted.
-    static var liquidGlassAvailable: Bool {
-        if #available(macOS 26, *) { return true }
-        return false
-    }
+    /// Liquid Glass is available on macOS.
+    static var liquidGlassAvailable: Bool { true }
 
-    static var defaultTheme: NotchTheme {
-        liquidGlassAvailable ? .liquidGlass : .classic
-    }
+    static var defaultTheme: NotchTheme { .liquidGlass }
 }
 
 enum AccentChoice: String, CaseIterable, Identifiable {
@@ -158,6 +153,29 @@ struct NotchBackground<S: Shape>: View {
             Color.black.opacity(isOpen ? 0 : 1)
         }
         .clipShape(shape)
+        .overlay(glassStroke)
+    }
+
+    @ViewBuilder
+    private var glassStroke: some View {
+        if isOpen && (theme == .liquidGlass || theme == .liquidGlassClear) {
+            shape
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(theme == .liquidGlassClear ? 0.45 : 0.35),
+                            Color.white.opacity(0.12),
+                            Color.white.opacity(0.04)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
+        } else if isOpen && theme == .frosted {
+            shape
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+        }
     }
 
     @ViewBuilder
@@ -165,16 +183,10 @@ struct NotchBackground<S: Shape>: View {
         switch theme {
         case .classic:
             Color.black
-        case .liquidGlass, .liquidGlassClear:
-            if #available(macOS 26, *) {
-                Color.clear
-                    .glassEffect(
-                        theme == .liquidGlass ? .regular.tint(.black.opacity(0.35)) : .clear.tint(.black.opacity(0.3)),
-                        in: shape
-                    )
-            } else {
-                frosted
-            }
+        case .liquidGlass:
+            liquidGlass(clear: false)
+        case .liquidGlassClear:
+            liquidGlass(clear: true)
         case .frosted:
             frosted
         case .adaptive:
@@ -226,10 +238,37 @@ struct NotchBackground<S: Shape>: View {
         }
     }
 
+    private func liquidGlass(clear: Bool) -> some View {
+        ZStack {
+            // 1. Native macOS Blur
+            VisualEffectBlur(material: .popover)
+
+            // 2. High-index dark tinted glass substrate (ensures contrast & legibility)
+            LinearGradient(
+                colors: clear
+                    ? [Color(white: 0.14, opacity: 0.68), Color(white: 0.08, opacity: 0.80)]
+                    : [Color(white: 0.10, opacity: 0.84), Color(white: 0.05, opacity: 0.92)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            // 3. Top Specular Glass Reflection
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(clear ? 0.24 : 0.18),
+                    Color.white.opacity(0.04),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .center
+            )
+        }
+    }
+
     private var frosted: some View {
         ZStack {
             VisualEffectBlur(material: .hudWindow)
-            Color.black.opacity(0.25)
+            Color(white: 0.08, opacity: 0.82)
         }
     }
 }
@@ -243,6 +282,7 @@ struct VisualEffectBlur: NSViewRepresentable {
         view.material = material
         view.blendingMode = .behindWindow
         view.state = .active
+        view.isEmphasized = true
         return view
     }
 

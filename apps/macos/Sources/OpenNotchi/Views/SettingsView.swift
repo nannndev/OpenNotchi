@@ -360,13 +360,6 @@ private struct AppearancePane: View {
                         }
                     }
                 }
-                .padding(.vertical, 4)
-                if !NotchTheme.liquidGlassAvailable,
-                   settings.theme == .liquidGlass || settings.theme == .liquidGlassClear {
-                    Text("Liquid Glass needs macOS 26 or later. Using Frosted instead.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
                 if settings.theme == .adaptive || settings.theme == .albumArt {
                     Text("Changes with the artwork of the song that's playing.")
                         .font(.caption)
