@@ -85,7 +85,7 @@ struct NotchiMascot: View {
             let t = context.date.timeIntervalSinceReferenceDate
             let sincePet = pettedAt.map { context.date.timeIntervalSince($0) } ?? .infinity
             ZStack {
-                bars(t: t, sincePet: sincePet)
+                robotBody(t: t, sincePet: sincePet)
                 switch mood {
                 case .sleepy: zzz(t: t)
                 case .alert: exclaim(t: t)
@@ -96,16 +96,20 @@ struct NotchiMascot: View {
             }
             .frame(width: size, height: size)
         }
-        .accessibilityLabel("Notchi")
+        .accessibilityLabel("Notchi Cyber-Bot")
     }
 
     private var tint: Color {
         switch mood {
         case .alert: return .orange
         case .loved: return .pink
-        default: return color
+        case .happy: return Color(red: 0.06, green: 0.75, blue: 0.5)
+        case .tired: return Color(red: 0.58, green: 0.64, blue: 0.72)
+        default: return (color == .white ? Color(red: 0.22, green: 0.74, blue: 0.97) : color)
         }
     }
+
+    private var eyeColor: Color { tint }
 
     /// Glow strength: lively moods shine, quiet ones barely.
     private var glow: Double {
@@ -117,36 +121,239 @@ struct NotchiMascot: View {
         }
     }
 
-    private func bars(t: Double, sincePet: Double) -> some View {
-        let width = size * 0.86
-        let height = size * 0.86
-        let barWidth = width / (5 + 4 * 0.55)
-        // A pet squashes every bar, then they spring back.
-        let squish = sincePet < 0.5 ? 1 - 0.4 * sin(sincePet / 0.5 * .pi) : 1
-        let shake = mood == .alert ? sin(t * 32) * size * 0.025 : 0
-        return HStack(spacing: barWidth * 0.55) {
-            ForEach(0..<5, id: \.self) { i in
-                let level = max(0.12, min(1, Self.level(i, mood: mood, t: t, gaze: gaze) * squish))
-                Capsule()
-                    .fill(LinearGradient(colors: barColors, startPoint: .top, endPoint: .bottom))
-                    .frame(width: barWidth, height: max(barWidth, height * level))
-            }
+    private func robotBody(t: Double, sincePet: Double) -> some View {
+        let squishY = sincePet < 0.45 ? 1 - 0.35 * sin(sincePet / 0.45 * .pi) : 1
+        let squishX = sincePet < 0.45 ? 1 + 0.25 * sin(sincePet / 0.45 * .pi) : 1
+        let hopY = mood == .happy ? -abs(sin(t * 7)) * (size * 0.1) : 0
+        let shakeX = mood == .alert ? sin(t * 36) * (size * 0.05) : 0
+        let floatY = (mood == .idle || mood == .sleepy) ? sin(t * 2) * (size * 0.025) : 0
+
+        let blinkCycle = t.truncatingRemainder(dividingBy: 3.5)
+        let isBlinking = (mood == .idle || mood == .busy) && blinkCycle < 0.16
+        let blinkScale = isBlinking ? 0.1 : 1.0
+
+        let gazeShift: CGFloat = mood == .idle ? max(-2.2, min(2.2, gaze * 2.2)) : 0
+        let alertBlink = sin(t * 10) > 0
+
+        return Canvas { context, canvasSize in
+            let scale = canvasSize.width / 32.0
+            context.scaleBy(x: scale, y: scale)
+
+            drawRobot(
+                context: &context,
+                t: t,
+                gazeShift: gazeShift,
+                blinkScale: blinkScale,
+                isBlinking: isBlinking,
+                alertBlink: alertBlink
+            )
         }
-        .frame(width: width, height: height)
-        .opacity(mood == .tired || mood == .sleepy ? 0.7 : 1)
-        .shadow(color: tint.opacity(glow), radius: 3.5)
-        .shadow(color: tint.opacity(glow * 0.5), radius: 8)
-        .offset(x: shake)
+        .frame(width: size, height: size)
+        .scaleEffect(x: squishX, y: squishY, anchor: .bottom)
+        .offset(x: shakeX, y: hopY + floatY)
+        .shadow(color: tint.opacity(glow * 0.7), radius: 3)
+        .shadow(color: tint.opacity(glow * 0.35), radius: 6)
     }
 
-    /// The accent fading to white at the tips (brand gradient when the accent is plain white),
-    /// or a solid tint for the moods that need your eye.
-    private var barColors: [Color] {
-        switch mood {
-        case .alert: return [Color(red: 1, green: 0.75, blue: 0.4), .orange]
-        case .loved: return [Color(red: 1, green: 0.7, blue: 0.85), .pink]
-        default: return [.white, color.opacity(0.95), color]
+    private func drawRobot(
+        context: inout GraphicsContext,
+        t: Double,
+        gazeShift: CGFloat,
+        blinkScale: CGFloat,
+        isBlinking: Bool,
+        alertBlink: Bool
+    ) {
+        // 1. Top Antenna
+        var pole = Path()
+        pole.move(to: CGPoint(x: 16, y: 4.5))
+        pole.addLine(to: CGPoint(x: 16, y: 7.5))
+        context.stroke(pole, with: .color(Color(red: 0.28, green: 0.33, blue: 0.41)), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+
+        let beaconRect = CGRect(x: 16 - 1.8, y: 3.8 - 1.8, width: 3.6, height: 3.6)
+        let beaconAlpha = (mood == .alert && alertBlink) ? 1.0 : 0.85
+        context.fill(Path(ellipseIn: beaconRect), with: .color(eyeColor.opacity(beaconAlpha)))
+
+        // 2. Headphone Arc when vibing to music
+        if mood == .vibing {
+            var arc = Path()
+            arc.addArc(center: CGPoint(x: 16, y: 16), radius: 13.5, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+            context.stroke(arc, with: .color(tint), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
         }
+
+        // 3. Ear Pads
+        let earPadColor = (mood == .vibing) ? tint : Color(red: 0.2, green: 0.25, blue: 0.33)
+        let earStroke = (mood == .vibing) ? Color.white : Color.white.opacity(0.15)
+        let leftEarRect = CGRect(x: 1.8, y: 12, width: 3.2, height: 9)
+        let rightEarRect = CGRect(x: 27.0, y: 12, width: 3.2, height: 9)
+
+        context.fill(Path(roundedRect: leftEarRect, cornerRadius: 1.6), with: .color(earPadColor))
+        context.stroke(Path(roundedRect: leftEarRect, cornerRadius: 1.6), with: .color(earStroke), lineWidth: 0.8)
+
+        context.fill(Path(roundedRect: rightEarRect, cornerRadius: 1.6), with: .color(earPadColor))
+        context.stroke(Path(roundedRect: rightEarRect, cornerRadius: 1.6), with: .color(earStroke), lineWidth: 0.8)
+
+        // 4. Robot Head / Helmet Base
+        let helmetRect = CGRect(x: 4, y: 7.5, width: 24, height: 18)
+        let helmetPath = Path(roundedRect: helmetRect, cornerRadius: 6.5)
+        context.fill(helmetPath, with: .linearGradient(
+            Gradient(colors: [Color(red: 0.14, green: 0.16, blue: 0.2), Color(red: 0.07, green: 0.07, blue: 0.09)]),
+            startPoint: CGPoint(x: 16, y: 7.5),
+            endPoint: CGPoint(x: 16, y: 25.5)
+        ))
+        context.stroke(helmetPath, with: .color(Color.white.opacity(0.16)), lineWidth: 1)
+
+        // 5. OLED Visor Screen
+        let visorRect = CGRect(x: 6, y: 9.5, width: 20, height: 14)
+        let visorPath = Path(roundedRect: visorRect, cornerRadius: 4.5)
+        context.fill(visorPath, with: .color(Color(red: 0.024, green: 0.027, blue: 0.039)))
+        context.stroke(visorPath, with: .color(Color.white.opacity(0.08)), lineWidth: 0.7)
+
+        // 6. Visor Gloss Reflection
+        var glossPath = Path()
+        glossPath.move(to: CGPoint(x: 6.8, y: 11.5))
+        glossPath.addQuadCurve(to: CGPoint(x: 25.2, y: 12.2), control: CGPoint(x: 16, y: 9.8))
+        glossPath.addLine(to: CGPoint(x: 25.2, y: 10.5))
+        glossPath.addQuadCurve(to: CGPoint(x: 6.8, y: 10.5), control: CGPoint(x: 16, y: 9.0))
+        glossPath.closeSubpath()
+        context.fill(glossPath, with: .linearGradient(
+            Gradient(colors: [Color.white.opacity(0.22), Color.white.opacity(0.0)]),
+            startPoint: CGPoint(x: 6.8, y: 9.5),
+            endPoint: CGPoint(x: 25.2, y: 14.0)
+        ))
+
+        // 7. Cheeks / Blushing on Loved & Happy
+        if mood == .loved || mood == .happy {
+            let blushColor = Color(red: 0.96, green: 0.25, blue: 0.37).opacity(0.65)
+            context.fill(Path(ellipseIn: CGRect(x: 8.5 - 1.4, y: 19.5 - 1.4, width: 2.8, height: 2.8)), with: .color(blushColor))
+            context.fill(Path(ellipseIn: CGRect(x: 23.5 - 1.4, y: 19.5 - 1.4, width: 2.8, height: 2.8)), with: .color(blushColor))
+        }
+
+        // 8. Eyes / Visor Face by Mood
+        switch mood {
+        case .loved:
+            // Heart Eyes ♥ ♥
+            let heart1 = heartPath(cx: 11.5 + gazeShift, cy: 16)
+            let heart2 = heartPath(cx: 20.5 + gazeShift, cy: 16)
+            context.fill(heart1, with: .color(eyeColor))
+            context.fill(heart2, with: .color(eyeColor))
+
+        case .happy:
+            // Joyful Smiling Arcs ^ ^
+            var leftArc = Path()
+            leftArc.move(to: CGPoint(x: 9 + gazeShift, y: 18))
+            leftArc.addQuadCurve(to: CGPoint(x: 14 + gazeShift, y: 18), control: CGPoint(x: 11.5 + gazeShift, y: 14.2))
+            context.stroke(leftArc, with: .color(eyeColor), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+
+            var rightArc = Path()
+            rightArc.move(to: CGPoint(x: 18 + gazeShift, y: 18))
+            rightArc.addQuadCurve(to: CGPoint(x: 23 + gazeShift, y: 18), control: CGPoint(x: 20.5 + gazeShift, y: 14.2))
+            context.stroke(rightArc, with: .color(eyeColor), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+
+        case .vibing:
+            // Chill Groove Arcs ~ ~
+            var leftArc = Path()
+            leftArc.move(to: CGPoint(x: 9 + gazeShift, y: 16))
+            leftArc.addQuadCurve(to: CGPoint(x: 14 + gazeShift, y: 16), control: CGPoint(x: 11.5 + gazeShift, y: 18.2))
+            context.stroke(leftArc, with: .color(eyeColor), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+
+            var rightArc = Path()
+            rightArc.move(to: CGPoint(x: 18 + gazeShift, y: 16))
+            rightArc.addQuadCurve(to: CGPoint(x: 23 + gazeShift, y: 16), control: CGPoint(x: 20.5 + gazeShift, y: 18.2))
+            context.stroke(rightArc, with: .color(eyeColor), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+
+        case .sleepy:
+            // Relaxed Closed Lines - -
+            var leftLine = Path()
+            leftLine.move(to: CGPoint(x: 9.5, y: 16.5))
+            leftLine.addLine(to: CGPoint(x: 13.5, y: 16.5))
+            context.stroke(leftLine, with: .color(eyeColor.opacity(0.75)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+
+            var rightLine = Path()
+            rightLine.move(to: CGPoint(x: 18.5, y: 16.5))
+            rightLine.addLine(to: CGPoint(x: 22.5, y: 16.5))
+            context.stroke(rightLine, with: .color(eyeColor.opacity(0.75)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+
+        case .tired:
+            // Drooping Sad Lines v v
+            var leftLine = Path()
+            leftLine.move(to: CGPoint(x: 9.5, y: 15.8))
+            leftLine.addLine(to: CGPoint(x: 13.5, y: 17.2))
+            context.stroke(leftLine, with: .color(eyeColor.opacity(0.6)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+
+            var rightLine = Path()
+            rightLine.move(to: CGPoint(x: 18.5, y: 17.2))
+            rightLine.addLine(to: CGPoint(x: 22.5, y: 15.8))
+            context.stroke(rightLine, with: .color(eyeColor.opacity(0.6)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+
+        case .busy:
+            // Cyber Scanning Slits + Sweeping Scan Dot
+            let slitH = 2.2 * blinkScale
+            let leftSlit = CGRect(x: 9 + gazeShift, y: 16 - slitH / 2, width: 5, height: slitH)
+            let rightSlit = CGRect(x: 18 + gazeShift, y: 16 - slitH / 2, width: 5, height: slitH)
+            context.fill(Path(roundedRect: leftSlit, cornerRadius: 1.1), with: .color(eyeColor))
+            context.fill(Path(roundedRect: rightSlit, cornerRadius: 1.1), with: .color(eyeColor))
+
+            let dotX = 11.5 + 4.5 * sin(t * 8)
+            let dotRect = CGRect(x: dotX - 1.0, y: 16.1 - 1.0, width: 2.0, height: 2.0)
+            context.fill(Path(ellipseIn: dotRect), with: .color(.white))
+
+        case .alert:
+            // Startled Wide Alert Eyes O O
+            let leftCircle = CGRect(x: 11.5 - 3.2, y: 16 - 3.2, width: 6.4, height: 6.4)
+            let rightCircle = CGRect(x: 20.5 - 3.2, y: 16 - 3.2, width: 6.4, height: 6.4)
+            if alertBlink {
+                context.fill(Path(ellipseIn: leftCircle), with: .color(eyeColor))
+                context.fill(Path(ellipseIn: rightCircle), with: .color(eyeColor))
+            } else {
+                context.stroke(Path(ellipseIn: leftCircle), with: .color(eyeColor), lineWidth: 1.6)
+                context.stroke(Path(ellipseIn: rightCircle), with: .color(eyeColor), lineWidth: 1.6)
+            }
+            context.fill(Path(ellipseIn: CGRect(x: 11.5 - 1.2, y: 16 - 1.2, width: 2.4, height: 2.4)), with: .color(.white))
+            context.fill(Path(ellipseIn: CGRect(x: 20.5 - 1.2, y: 16 - 1.2, width: 2.4, height: 2.4)), with: .color(.white))
+
+        case .idle:
+            // Standard Rounded LED Eyes (with Blink + Gaze)
+            let eyeH = 5.6 * blinkScale
+            let eyeR = min(1.8, eyeH / 2)
+            let leftEye = CGRect(x: 11.5 + gazeShift - 1.8, y: 16 - eyeH / 2, width: 3.6, height: eyeH)
+            let rightEye = CGRect(x: 20.5 + gazeShift - 1.8, y: 16 - eyeH / 2, width: 3.6, height: eyeH)
+            context.fill(Path(roundedRect: leftEye, cornerRadius: eyeR), with: .color(eyeColor))
+            context.fill(Path(roundedRect: rightEye, cornerRadius: eyeR), with: .color(eyeColor))
+
+            if !isBlinking {
+                let hl1 = CGRect(x: 12.2 + gazeShift - 0.8, y: 14.8 - 0.8, width: 1.6, height: 1.6)
+                let hl2 = CGRect(x: 21.2 + gazeShift - 0.8, y: 14.8 - 0.8, width: 1.6, height: 1.6)
+                context.fill(Path(ellipseIn: hl1), with: .color(.white))
+                context.fill(Path(ellipseIn: hl2), with: .color(.white))
+            }
+        }
+    }
+
+    private func heartPath(cx: CGFloat, cy: CGFloat) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: cx, y: cy + 2.8))
+        p.addCurve(
+            to: CGPoint(x: cx - 3.2, y: cy - 0.5),
+            control1: CGPoint(x: cx - 1.2, y: cy + 1.8),
+            control2: CGPoint(x: cx - 3.2, y: cy + 0.8)
+        )
+        p.addCurve(
+            to: CGPoint(x: cx, y: cy - 2.8),
+            control1: CGPoint(x: cx - 3.2, y: cy - 2.2),
+            control2: CGPoint(x: cx - 0.8, y: cy - 3.2)
+        )
+        p.addCurve(
+            to: CGPoint(x: cx + 3.2, y: cy - 0.5),
+            control1: CGPoint(x: cx + 0.8, y: cy - 3.2),
+            control2: CGPoint(x: cx + 3.2, y: cy - 2.2)
+        )
+        p.addCurve(
+            to: CGPoint(x: cx, y: cy + 2.8),
+            control1: CGPoint(x: cx + 3.2, y: cy + 0.8),
+            control2: CGPoint(x: cx + 1.2, y: cy + 1.8)
+        )
+        p.closeSubpath()
+        return p
     }
 
     /// Height of bar `i` (0...4) as a fraction of the full height.
