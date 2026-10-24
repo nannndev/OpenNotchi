@@ -1507,71 +1507,76 @@ struct LyricCard: View {
 
     private var glassLayout: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                if let artwork = song.artwork {
-                    Image(nsImage: artwork)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 24, height: 24)
-                        .clipShape(Circle())
-                }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(song.title)
-                        .font(.system(size: 11, weight: .bold))
-                        .lineLimit(1)
-                    Text(song.artist)
-                        .font(.system(size: 9.5, weight: .medium))
-                        .opacity(0.6)
-                        .lineLimit(1)
-                }
-                Spacer()
-                HStack(spacing: 3) {
-                    ForEach(0..<4) { i in
-                        Capsule()
-                            .fill(Color.accentColor)
-                            .frame(width: 3, height: 6 + CGFloat(sin(elapsed * 5 + Double(i) * 1.5)) * 5)
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(Capsule().fill(.black.opacity(0.75)))
-            .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
-            .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-
+            glassPillHeader
             Spacer(minLength: 16)
-
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                    let isCurrent = activeLineIndex == nil || activeLineIndex == index
-                    Text(line)
-                        .font(lyricFont.font(.system(size: lyricSize, weight: .bold, design: .rounded), size: lyricSize, weight: .bold))
-                        .lyricAlignment(textAlign)
-                        .foregroundStyle(isCurrent ? Color.white : Color.white.opacity(0.35))
-                        .shadow(color: isCurrent && activeLineIndex != nil ? Color.accentColor.opacity(0.9) : .clear, radius: 10)
-                }
-            }
-            .padding(18)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Color.accentColor.opacity(0.8), Color.purple.opacity(0.6), Color.white.opacity(0.2)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1.5
-                            )
-                    )
-            )
-
+            glassLyricsBox
             Spacer(minLength: 16)
             footer
         }
         .padding(22)
+    }
+
+    private var glassPillHeader: some View {
+        HStack(spacing: 10) {
+            if let artwork = song.artwork {
+                Image(nsImage: artwork)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 24, height: 24)
+                    .clipShape(Circle())
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(song.title)
+                    .font(.system(size: 11, weight: .bold))
+                    .lineLimit(1)
+                Text(song.artist)
+                    .font(.system(size: 9.5, weight: .medium))
+                    .opacity(0.6)
+                    .lineLimit(1)
+            }
+            Spacer()
+            HStack(spacing: 3) {
+                ForEach(0..<4) { i in
+                    Capsule()
+                        .fill(Color.accentColor)
+                        .frame(width: 3, height: 6 + CGFloat(sin(elapsed * 5 + Double(i) * 1.5)) * 5)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(Capsule().fill(.black.opacity(0.75)))
+        .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
+        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+    }
+
+    private var glassLyricsBox: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                let isCurrent = activeLineIndex == nil || activeLineIndex == index
+                Text(line)
+                    .font(lyricFont.font(.system(size: lyricSize, weight: .bold, design: .rounded), size: lyricSize, weight: .bold))
+                    .lyricAlignment(textAlign)
+                    .foregroundStyle(isCurrent ? Color.white : Color.white.opacity(0.35))
+                    .shadow(color: isCurrent && activeLineIndex != nil ? Color.accentColor.opacity(0.9) : .clear, radius: 10)
+            }
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.accentColor.opacity(0.8), Color.purple.opacity(0.6), Color.white.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+        )
     }
 
     // MARK: - Receipt Style
