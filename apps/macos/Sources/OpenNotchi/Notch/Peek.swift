@@ -35,7 +35,7 @@ enum Peek: Equatable {
         case .device: return 3.8
         case .volume, .brightness, .micMute: return 1.8
         case .privacy: return 3
-        case .banner: return 12
+        case .banner(let banner): return banner.duration
         }
     }
 
@@ -74,5 +74,6 @@ struct Banner: Equatable {
     var actionTitle: String?
     var actionURL: URL?
     var actionType: BannerActionType = .openURL
+    var duration: TimeInterval = 12
 }
 

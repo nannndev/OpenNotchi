@@ -12,6 +12,7 @@ enum NotchTab: String, CaseIterable {
     case markets = "Markets"
     case dev = "Dev"
     case notes = "Notes"
+    case ai = "AI"
 
     var icon: String {
         switch self {
@@ -25,6 +26,7 @@ enum NotchTab: String, CaseIterable {
         case .markets: return "chart.line.uptrend.xyaxis"
         case .dev: return "terminal.fill"
         case .notes: return "note.text"
+        case .ai: return "sparkles"
         }
     }
 }
@@ -64,7 +66,7 @@ final class NotchViewModel: ObservableObject {
             height = min(max(settings.prompterHeight, 240), Self.maxOpenHeight)
         } else if tab == .dev {
             height = 230
-        } else if tab == .smarthome {
+        } else if tab == .smarthome || tab == .ai {
             height = 240
         } else {
             height = Self.defaultOpenHeight

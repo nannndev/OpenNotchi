@@ -58,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupPeeks()
         updateSystemMonitors()
         updateLyricsOverlay()
+        updateAI()
 
         NotificationCenter.default.addObserver(
             self,
@@ -154,6 +155,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Starts or stops agent polling, the hook listener and usage scans to match Settings › AI.
+    func updateAI() {
+        let accounts = settings.aiAccounts
+        AgentMonitor.shared.onPeek = { [weak self] banner in self?.screenManager.showPeek(.banner(banner)) }
+        AgentMonitor.shared.configure(enabled: settings.aiEnabled && settings.aiAgents, accounts: accounts)
+        AIUsageManager.shared.configure(enabled: settings.aiEnabled, accounts: accounts)
+    }
+
     /// Shows or hides the floating desktop lyrics widget to match Settings.
     func updateLyricsOverlay() {
         if settings.lyricsOverlayEnabled {
@@ -231,6 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .environmentObject(calendar)
                     .environmentObject(updater)
                     .environmentObject(lyrics)
+                    .environmentObject(AgentMonitor.shared)
             )
             let window = NSWindow(contentViewController: hosting)
             window.title = "OpenNotchi Settings"

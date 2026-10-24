@@ -8,15 +8,20 @@ struct NotchRootView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var airDrop: AirDropService
     @EnvironmentObject private var stats: SystemStatsManager
+    @EnvironmentObject private var aiUsage: AIUsageManager
 
     private var isNetworkSpeedVisible: Bool {
         settings.showLiveActivity && settings.networkLiveActivity && stats.isNetworkActive
     }
 
+    private var isAIMeterVisible: Bool {
+        settings.showLiveActivity && settings.aiEnabled && settings.aiClosedMeter && aiUsage.closedMeter != nil
+    }
+
     private var showActivity: Bool {
         guard !vm.isOpen else { return false }
         if vm.peek != nil || airDrop.isTransferring { return true }
-        return settings.showLiveActivity && (timer.isActive || (media.info?.isPlaying ?? false) || isNetworkSpeedVisible)
+        return settings.showLiveActivity && (timer.isActive || (media.info?.isPlaying ?? false) || isNetworkSpeedVisible || isAIMeterVisible)
     }
 
     private var bodySize: CGSize {
@@ -32,7 +37,7 @@ struct NotchRootView: View {
         }
         if showActivity {
             // HUD peeks need room for a level bar on the right. Network speed needs room for text.
-            let isNetOnly = isNetworkSpeedVisible && !timer.isActive && !(media.info?.isPlaying ?? false) && vm.peek == nil && !airDrop.isTransferring
+            let isNetOnly = (isNetworkSpeedVisible || isAIMeterVisible) && !timer.isActive && !(media.info?.isPlaying ?? false) && vm.peek == nil && !airDrop.isTransferring
             let extraForSleeve: CGFloat = (settings.artworkStyle == .vinylSleeve && (media.info?.isPlaying ?? false)) ? 6 : 0
             let side = vm.peek?.isHUD == true ? size.height + 76 : isNetOnly ? size.height + 44 : size.height + 8 + extraForSleeve
             size.width += 2 * side
@@ -249,6 +254,7 @@ struct ClosedActivityView: View {
     @EnvironmentObject private var timer: TimerManager
     @EnvironmentObject private var stats: SystemStatsManager
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var aiUsage: AIUsageManager
     @Environment(\.notchAccent) private var accent
     let height: CGFloat
 
@@ -317,6 +323,22 @@ struct ClosedActivityView: View {
                     Text(stats.formattedUp)
                         .font(.system(size: 10, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.white)
+                }
+                .frame(width: height + 36, alignment: .trailing)
+            } else if settings.aiEnabled && settings.aiClosedMeter && !(media.info?.isPlaying ?? false), let meter = aiUsage.closedMeter {
+                Image(systemName: "sparkles")
+                    .font(.system(size: height * 0.38, weight: .semibold))
+                    .foregroundStyle(meter.hot ? .orange : accent.highlight)
+                    .frame(width: height + 36, alignment: .leading)
+                Spacer()
+                HStack(spacing: 4) {
+                    Text(meter.label)
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(meter.hot ? .orange : .white)
+                    ProgressView(value: min(1, max(0, meter.fraction)))
+                        .progressViewStyle(.linear)
+                        .tint(meter.hot ? .orange : accent.highlight)
+                        .frame(width: 18)
                 }
                 .frame(width: height + 36, alignment: .trailing)
             } else {
@@ -883,6 +905,7 @@ struct ExpandedView: View {
                 case .dev: DevToolsView()
                 case .notes: NotesView()
                 case .smarthome: SmarthomeView()
+                case .ai: AIView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

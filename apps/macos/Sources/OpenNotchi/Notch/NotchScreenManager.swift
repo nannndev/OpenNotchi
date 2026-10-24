@@ -323,6 +323,10 @@ final class NotchScreenManager: ObservableObject {
             guard let ctrl = activeController else { return }
             ctrl.viewModel.tab = .markets
             ctrl.open()
+        case "ai":
+            guard let ctrl = activeController else { return }
+            ctrl.viewModel.tab = .ai
+            ctrl.open()
         case "dev", "tools":
             guard let ctrl = activeController else { return }
             ctrl.viewModel.tab = .dev

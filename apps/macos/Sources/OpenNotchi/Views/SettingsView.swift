@@ -8,6 +8,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case media = "Media"
     case mirror = "Mirror"
     case smarthome = "Smarthome"
+    case ai = "AI"
     case about = "About"
 
     var id: String { rawValue }
@@ -20,6 +21,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .media: return "music.note"
         case .mirror: return "camera.fill"
         case .smarthome: return "air.conditioner.horizontal.fill"
+        case .ai: return "sparkles"
         case .about: return "info.circle.fill"
         }
     }
@@ -32,6 +34,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .media: return .red
         case .mirror: return .teal
         case .smarthome: return .green
+        case .ai: return .purple
         case .about: return .indigo
         }
     }
@@ -68,6 +71,7 @@ struct SettingsView: View {
                 case .media: MediaPane()
                 case .mirror: MirrorPane()
                 case .smarthome: SmarthomePane()
+                case .ai: AISettingsPane()
                 case .about: AboutPane()
                 }
             }

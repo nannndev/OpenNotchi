@@ -532,6 +532,32 @@ final class AppSettings: ObservableObject {
     /// Extra heads-up this many minutes before each prayer; 0 turns it off.
     @Published var prayerReminderMinutes: Int { didSet { defaults.set(prayerReminderMinutes, forKey: "prayerReminderMinutes") } }
 
+    // AI (all off until "Enable AI features"; API keys live in the Keychain, never here)
+    @Published var aiEnabled: Bool {
+        didSet {
+            defaults.set(aiEnabled, forKey: "aiEnabled")
+            // First enable: add the default accounts whose folders exist.
+            if aiEnabled && aiAccounts.isEmpty { aiAccounts = AIAccount.defaults }
+            AppDelegate.shared?.updateAI()
+        }
+    }
+    @Published var aiAgents: Bool { didSet { defaults.set(aiAgents, forKey: "aiAgents"); AppDelegate.shared?.updateAI() } }
+    /// Peek when an agent finishes or needs you.
+    @Published var aiNotify: Bool { didSet { defaults.set(aiNotify, forKey: "aiNotify") } }
+    @Published var aiAccounts: [AIAccount] {
+        didSet {
+            defaults.set(try? JSONEncoder().encode(aiAccounts), forKey: "aiAccounts")
+            AppDelegate.shared?.updateAI()
+        }
+    }
+    @Published var aiClosedMeter: Bool { didSet { defaults.set(aiClosedMeter, forKey: "aiClosedMeter") } }
+    @Published var aiProvider: AIProvider { didSet { defaults.set(aiProvider.rawValue, forKey: "aiProvider") } }
+    @Published var aiOllamaURL: String { didSet { defaults.set(aiOllamaURL, forKey: "aiOllamaURL") } }
+    @Published var aiOllamaModel: String { didSet { defaults.set(aiOllamaModel, forKey: "aiOllamaModel") } }
+    @Published var aiAnthropicModel: String { didSet { defaults.set(aiAnthropicModel, forKey: "aiAnthropicModel") } }
+    @Published var aiOpenaiURL: String { didSet { defaults.set(aiOpenaiURL, forKey: "aiOpenaiURL") } }
+    @Published var aiOpenaiModel: String { didSet { defaults.set(aiOpenaiModel, forKey: "aiOpenaiModel") } }
+
     @Published var launchAtLogin: Bool {
         didSet {
             guard launchAtLogin != oldValue else { return }
@@ -629,6 +655,15 @@ final class AppSettings: ObservableObject {
             "prayerNotify": true,
             "prayerReminderMinutes": 0,
             "prompterTabEnabled": true,
+            "aiEnabled": false,
+            "aiAgents": true,
+            "aiNotify": true,
+            "aiClosedMeter": false,
+            "aiOllamaURL": "http://127.0.0.1:11434",
+            "aiOllamaModel": "llama3.2",
+            "aiAnthropicModel": "claude-haiku-5-5",
+            "aiOpenaiURL": "https://api.openai.com/v1",
+            "aiOpenaiModel": "gpt-4o-mini",
             "prompterHeight": 320.0,
             "prompterStaysOpen": true,
             "prompterScrollSpeed": 28.0,
@@ -742,6 +777,19 @@ final class AppSettings: ObservableObject {
         prompterShowCameraPreview = defaults.bool(forKey: "prompterShowCameraPreview")
         prompterMirrorText = defaults.bool(forKey: "prompterMirrorText")
         prompterScript = defaults.string(forKey: "prompterScript") ?? "Hello everyone! Welcome to today's meeting."
+        aiEnabled = defaults.bool(forKey: "aiEnabled")
+        aiAgents = defaults.bool(forKey: "aiAgents")
+        aiNotify = defaults.bool(forKey: "aiNotify")
+        aiAccounts = defaults.data(forKey: "aiAccounts").flatMap { try? JSONDecoder().decode([AIAccount].self, from: $0) } ?? []
+        aiClosedMeter = defaults.bool(forKey: "aiClosedMeter")
+        // Apple Intelligence is the default where the on-device model is available, Ollama elsewhere.
+        aiProvider = AIProvider(rawValue: defaults.string(forKey: "aiProvider") ?? "").flatMap { AIProvider.available.contains($0) ? $0 : nil }
+            ?? (AIAssistant.appleAvailable ? .apple : .ollama)
+        aiOllamaURL = defaults.string(forKey: "aiOllamaURL") ?? ""
+        aiOllamaModel = defaults.string(forKey: "aiOllamaModel") ?? ""
+        aiAnthropicModel = defaults.string(forKey: "aiAnthropicModel") ?? "claude-haiku-5-5"
+        aiOpenaiURL = defaults.string(forKey: "aiOpenaiURL") ?? ""
+        aiOpenaiModel = defaults.string(forKey: "aiOpenaiModel") ?? ""
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
@@ -776,6 +824,7 @@ final class AppSettings: ObservableObject {
             case .dev: return devToolsEnabled
             case .notes: return notesTabEnabled
             case .smarthome: return smarthomeEnabled
+            case .ai: return aiEnabled
             }
         }
     }
