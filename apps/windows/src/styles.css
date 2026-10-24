@@ -63,6 +63,7 @@ button:focus-visible {
   box-sizing: border-box;
   background: var(--bg);
   border-radius: 0 0 20px 20px;
+  translate: 0 0;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0);
   transform-origin: top center;
@@ -301,6 +302,12 @@ button:focus-visible {
   transform: scale(1) translateY(0);
   filter: none;
   transition-delay: 0.06s;
+}
+
+/* Springy overshoot only on open: closing with it shrank the pill below its resting size
+   (Bouncy/Pop dipped to ~2-5px tall), so it looked sunk into the top edge before settling. */
+.pill:not(.open) {
+  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* 7. 3D Trapdoor Flip (Visor hinge rotation from top edge) */
@@ -3807,4 +3814,28 @@ button:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   padding: 3px 6px;
+}
+
+/* ==========================================================================
+   Notch modes: floating pill and auto-hide
+   ========================================================================== */
+
+.stage.mode-floating {
+  padding-top: var(--float-gap);
+}
+.mode-floating .pill {
+  border-radius: 19px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.mode-floating .pill.open {
+  border-radius: 24px;
+}
+
+/* Slides up out of view; a thin strip at the top edge brings it back on hover. */
+.mode-autoHide .pill {
+  transition-property: width, height, border-radius, box-shadow, translate, opacity;
+}
+.mode-autoHide .pill.hidden {
+  translate: 0 -110%;
+  opacity: 0;
 }

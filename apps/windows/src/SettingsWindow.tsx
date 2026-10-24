@@ -419,6 +419,29 @@ export function SettingsWindow() {
 
               <div className="toggle-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
                 <div className="toggle-info">
+                  <div className="toggle-title">Notch Style</div>
+                  <div className="toggle-desc">Pin it to the top edge, float it as a pill, or hide it until you hover the top of the screen.</div>
+                </div>
+
+                <div className="monitor-select-group">
+                  {([
+                    ["pinned", "Pinned to top"],
+                    ["floating", "Floating pill"],
+                    ["autoHide", "Auto-hide"],
+                  ] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      className={`monitor-btn ${(settings.notchMode ?? "pinned") === id ? "active" : ""}`}
+                      onClick={() => setSettings({ notchMode: id })}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="toggle-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
+                <div className="toggle-info">
                   <div className="toggle-title">Target Monitor</div>
                   <div className="toggle-desc">Select which display should host the top-center notch pill.</div>
                 </div>

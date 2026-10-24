@@ -35,6 +35,8 @@ export type NotchAnimationStyle =
   | "depth3D"
   | "cube3D"
 
+export type NotchMode = "pinned" | "floating" | "autoHide"
+
 export interface AppSettings {
   theme: NotchTheme
   accentChoice: AccentChoice
@@ -45,6 +47,8 @@ export interface AppSettings {
   closeDelayMs: number
   autostart: boolean
   selectedMonitor: string
+  /** pinned: attached to the top edge; floating: a detached pill; autoHide: hidden until the top edge is hovered. */
+  notchMode: NotchMode
   // Enabled tabs in the open pill
   tabMusic: boolean
   tabClipboard: boolean
@@ -114,6 +118,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   closeDelayMs: 300,
   autostart: false,
   selectedMonitor: "primary",
+  notchMode: "pinned",
   tabMusic: true,
   tabClipboard: true,
   tabTimer: true,

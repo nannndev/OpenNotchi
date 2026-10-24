@@ -31,6 +31,10 @@ import { useUpdateChecker } from "./updater"
 const CLOSED = { width: 340, height: 38 }
 const PEEKING = { width: 380, height: 38 }
 const OPEN = { width: 600, height: 210 }
+/** Gap above the floating pill. */
+const FLOAT_GAP = 10
+/** Height of the invisible top-edge strip that reveals an auto-hidden pill. */
+const REVEAL_STRIP = 4
 const PEEK_MS = 3000
 
 type Privacy = { camera: boolean; mic: boolean }
@@ -54,9 +58,15 @@ export function Pill() {
   useTick(250)
 
   const size = open ? OPEN : peek ? PEEKING : CLOSED
+  const mode = settings.notchMode ?? "pinned"
+  const hidden = mode === "autoHide" && !open && !peek
+  // The hover zone Rust checks starts at the window's top edge, so it covers the floating gap too.
+  const hover = hidden
+    ? { width: size.width, height: REVEAL_STRIP }
+    : { width: size.width, height: size.height + (mode === "floating" ? FLOAT_GAP : 0) }
   useEffect(() => {
-    invoke("set_pill_size", size).catch(() => {})
-  }, [size.width, size.height])
+    invoke("set_pill_size", hover).catch(() => {})
+  }, [hover.width, hover.height])
 
   // Sync initial lyrics widget visibility and listen for changes (including tray clicks)
   useEffect(() => {
@@ -136,9 +146,12 @@ export function Pill() {
       : activeTab
 
   return (
-    <div className="stage" style={{ ["--accent" as string]: resolvedAccent } as CSSProperties}>
+    <div
+      className={`stage mode-${mode}`}
+      style={{ ["--accent" as string]: resolvedAccent, ["--float-gap" as string]: `${FLOAT_GAP}px` } as CSSProperties}
+    >
       <div
-        className={`pill ${open ? "open" : ""} theme-${settings.theme} border-${settings.borderStyle} anim-${settings.openAnimation}`}
+        className={`pill ${open ? "open" : ""} ${hidden ? "hidden" : ""} theme-${settings.theme} border-${settings.borderStyle} anim-${settings.openAnimation}`}
         style={{ width: size.width, height: size.height }}
       >
         {/* Album Art theme background */}
