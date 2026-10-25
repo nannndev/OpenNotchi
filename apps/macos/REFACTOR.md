@@ -26,7 +26,7 @@ Rules
       Target: `Features/PhotoStrip/` with Composer + DrawingHelpers + `Styles/<Style>.swift` (one style per file holding its background/photo/footer).
       Verified with `OpenNotchi --strip-snapshot <dir>`: 380 renders pixel-identical before/after.
 - [x] `Views/PrompterView.swift` (704): `controlToolbar` is 215 lines → subviews (`Views/Prompter/`)
-- [ ] `Views/PhotoboxStudioView.swift` (748): `canvasSection` and `controlsSection` → subviews
+- [x] `Views/PhotoboxStudioView.swift` (748): `canvasSection` and `controlsSection` → subviews (`Views/Photobox/`)
 - [ ] `Views/NotchiMascot.swift` (666): `drawRobot` is 174 lines → split per body part
 - [ ] `Views/Mirror/MirrorView.swift`: `body` is 214 lines → subviews
 - [ ] `Views/AI/AskSection.swift` (545): header / conversation / composer → subviews
