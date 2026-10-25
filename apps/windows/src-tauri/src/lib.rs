@@ -153,6 +153,42 @@ fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Opens the full-screen player on the pill's monitor (created on first use, reused after).
+#[tauri::command]
+fn open_now_playing(app: tauri::AppHandle) -> Result<(), String> {
+    let window = match app.get_webview_window("nowplaying") {
+        Some(w) => w,
+        None => tauri::WebviewWindowBuilder::new(&app, "nowplaying", tauri::WebviewUrl::App("index.html#nowplaying".into()))
+            .title("OpenNotchi Now Playing")
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .visible(false)
+            .build()
+            .map_err(|e| e.to_string())?,
+    };
+    let monitor = app.get_webview_window("pill").and_then(|p| p.current_monitor().ok().flatten()).or(window.primary_monitor().ok().flatten());
+    if let Some(m) = monitor {
+        let _ = window.set_position(*m.position());
+        let _ = window.set_size(*m.size());
+    }
+    let _ = window.set_fullscreen(true);
+    let _ = window.show();
+    let _ = window.set_focus();
+    // Keeps the display on while it shows; the window turns it off again on close.
+    let _ = system::set_keep_awake(app.clone(), true);
+    Ok(())
+}
+
+#[tauri::command]
+fn close_now_playing(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("nowplaying") {
+        let _ = w.set_fullscreen(false);
+        let _ = w.hide();
+    }
+    system::set_keep_awake(app, false)
+}
+
 /// Shows the lyric share card generator window.
 #[tauri::command]
 fn open_share_lyrics(app: tauri::AppHandle) -> Result<(), String> {
@@ -352,6 +388,9 @@ pub fn run() {
             media::media_control,
             system::set_keep_awake,
             system::privacy_state,
+            system::idle_seconds,
+            open_now_playing,
+            close_now_playing,
             system::get_autostart,
             system::set_autostart,
             ai::agent_sessions,
@@ -365,6 +404,9 @@ pub fn run() {
             ai::ask_ai,
             ai::set_9router_connection_active,
             ai::ninerouter_analytics,
+            ai::ai_chat,
+            ai::ninerouter_models,
+            ai::ninerouter_available,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

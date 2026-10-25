@@ -11,12 +11,13 @@ struct AIError: LocalizedError {
 }
 
 enum AIProvider: String, CaseIterable, Identifiable {
-    case apple, ollama, anthropic, openai
+    case ninerouter, apple, ollama, anthropic, openai
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
+        case .ninerouter: return "9router (your accounts)"
         case .apple: return "Apple Intelligence (on-device)"
         case .ollama: return "Ollama (local)"
         case .anthropic: return "Anthropic API"
@@ -26,8 +27,16 @@ enum AIProvider: String, CaseIterable, Identifiable {
 
     var needsKey: Bool { self == .anthropic || self == .openai }
 
-    /// Providers to offer: Apple Intelligence only when the on-device model is ready.
-    static var available: [AIProvider] { AIAssistant.appleAvailable ? allCases : allCases.filter { $0 != .apple } }
+    /// Providers to offer: 9router only when installed, Apple Intelligence only when the on-device model is ready.
+    static var available: [AIProvider] {
+        allCases.filter {
+            switch $0 {
+            case .ninerouter: return NineRouterService.shared.isAvailable
+            case .apple: return AIAssistant.appleAvailable
+            default: return true
+            }
+        }
+    }
 }
 
 /// API keys in the login Keychain, never in UserDefaults.
@@ -110,14 +119,90 @@ enum AIAssistant {
         return false
     }
 
+    struct Message: Codable, Equatable {
+        var role: String // "user" or "assistant"
+        var content: String
+        /// Attached clipboard / song / usage text: sent to the model before `content`, not shown in the bubble.
+        var context: String? = nil
+        /// Context labels shown as chips on the bubble.
+        var attachments: [String]? = nil
+        /// Base64 JPEGs sent with this message (vision models only).
+        var images: [String]? = nil
+
+        var full: String { (context.map { $0 + "\n\n" } ?? "") + content }
+
+        /// OpenAI-style content: a string, or text + image parts.
+        var openAIContent: Any {
+            guard let images, !images.isEmpty else { return full }
+            return [["type": "text", "text": full]] + images.map { ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\($0)"]] }
+        }
+
+        var anthropicContent: Any {
+            guard let images, !images.isEmpty else { return full }
+            return images.map { ["type": "image", "source": ["type": "base64", "media_type": "image/jpeg", "data": $0]] } + [["type": "text", "text": full]]
+        }
+    }
+
     static func ask(_ prompt: String, settings: AppSettings = .shared) async throws -> String {
+        try await chat([Message(role: "user", content: prompt)], settings: settings)
+    }
+
+    /// Sends a whole conversation. OpenAI-style providers (9router, OpenAI, Ollama) stream: `onDelta` gets
+    /// each new chunk of text as it arrives. The others answer in one go and call `onDelta` once.
+    @discardableResult
+    static func chat(_ history: [Message], system: String = systemPrompt, settings: AppSettings = .shared,
+                     onDelta: @escaping @MainActor (String) -> Void = { _ in }) async throws -> String {
         let provider = settings.aiProvider
+        if provider == .apple, history.contains(where: { !($0.images ?? []).isEmpty }) {
+            throw AIError("Apple Intelligence can't read images. Pick 9router or another provider for this chat.")
+        }
         switch provider {
+        case .ninerouter:
+            guard let key = NineRouterService.shared.apiKey() else { throw AIError("No active API key in 9router. Create one in its dashboard › Endpoint & Key.") }
+            let model = try await nineRouterModel(settings)
+            return try await stream(NineRouterService.baseURL + "/chat/completions", model: model, history: history, system: system,
+                                    headers: ["Authorization": "Bearer \(key)"], onDelta: onDelta)
+
+        case .openai:
+            let key = try apiKey(provider)
+            return try await stream(try base(settings.aiOpenaiURL) + "/chat/completions", model: settings.aiOpenaiModel, history: history, system: system,
+                                    headers: ["Authorization": "Bearer \(key)"], onDelta: onDelta)
+
+        case .ollama:
+            // Ollama serves the same OpenAI-compatible streaming API under /v1.
+            return try await stream(try base(settings.aiOllamaURL) + "/v1/chat/completions", model: settings.aiOllamaModel, history: history, system: system,
+                                    headers: [:], onDelta: onDelta)
+
+        case .apple, .anthropic:
+            let text = try await single(history, system: system, settings: settings)
+            await onDelta(text)
+            return text
+        }
+    }
+
+    /// Providers without streaming here: Apple Intelligence (history flattened into one prompt) and Anthropic.
+    private static func single(_ history: [Message], system: String, settings: AppSettings) async throws -> String {
+        let provider = settings.aiProvider
+        let prompt = history.last?.full ?? ""
+        switch provider {
+        case .ninerouter, .openai, .ollama:
+            throw AIError("Unreachable")
+
         case .apple:
             #if canImport(FoundationModels)
             if #available(macOS 26, *), appleAvailable {
-                let session = LanguageModelSession(instructions: systemPrompt)
-                return try await session.respond(to: prompt).content.trimmingCharacters(in: .whitespacesAndNewlines)
+                let session = LanguageModelSession(instructions: system)
+                let earlier = history.dropLast().map { "\($0.role == "user" ? "User" : "You"): \($0.full)" }.joined(separator: "\n\n")
+                let full = earlier.isEmpty ? prompt : "Conversation so far:\n\(earlier)\n\nUser: \(prompt)"
+                do {
+                    return try await session.respond(to: full).content.trimmingCharacters(in: .whitespacesAndNewlines)
+                } catch let error as LanguageModelSession.GenerationError {
+                    // Apple's on-device guardrails reject many harmless prompts; say so instead of "unsafe".
+                    if case .guardrailViolation = error {
+                        throw AIError("Apple Intelligence's safety filter blocked this prompt. Switch the model to 9router or another provider in Settings › AI.")
+                    }
+                    throw error
+                }
             }
             #endif
             throw AIError("Apple Intelligence isn't available on this Mac. Pick another provider in Settings › AI.")
@@ -126,9 +211,9 @@ enum AIAssistant {
             let key = try apiKey(provider)
             var body: [String: Any] = [
                 "model": settings.aiAnthropicModel,
-                "max_tokens": 1024,
-                "system": systemPrompt,
-                "messages": [["role": "user", "content": prompt]],
+                "max_tokens": 2048,
+                "system": system,
+                "messages": history.map { ["role": $0.role, "content": $0.anthropicContent] },
                 "output_config": ["effort": "low"],
             ]
             var headers = ["x-api-key": key, "anthropic-version": "2026-10-21"]
@@ -142,23 +227,63 @@ enum AIAssistant {
             let text = (v["content"] as? [[String: Any]] ?? []).filter { $0["type"] as? String == "text" }.compactMap { $0["text"] as? String }.joined()
             return try nonEmpty(text)
 
-        case .openai:
-            let key = try apiKey(provider)
-            let v = try await post(try base(settings.aiOpenaiURL) + "/chat/completions",
-                                   body: ["model": settings.aiOpenaiModel, "messages": messages(prompt)],
-                                   headers: ["Authorization": "Bearer \(key)"])
-            let choice = (v["choices"] as? [[String: Any]])?.first?["message"] as? [String: Any]
-            return try nonEmpty(choice?["content"] as? String ?? "")
-
-        case .ollama:
-            let v = try await post(try base(settings.aiOllamaURL) + "/api/chat",
-                                   body: ["model": settings.aiOllamaModel, "messages": messages(prompt), "stream": false], headers: [:])
-            return try nonEmpty((v["message"] as? [String: Any])?["content"] as? String ?? "")
         }
     }
 
-    private static func messages(_ prompt: String) -> [[String: String]] {
-        [["role": "system", "content": systemPrompt], ["role": "user", "content": prompt]]
+    /// The text in one `data:` line of an OpenAI-style SSE stream; nil for keep-alives, role-only chunks and [DONE].
+    static func sseDelta(_ line: String) -> String? {
+        guard line.hasPrefix("data:") else { return nil }
+        let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+        guard payload != "[DONE]", let data = payload.data(using: .utf8),
+              let v = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let delta = (v["choices"] as? [[String: Any]])?.first?["delta"] as? [String: Any],
+              let text = delta["content"] as? String, !text.isEmpty else { return nil }
+        return text
+    }
+
+    private static func stream(_ url: String, model: String, history: [Message], system: String, headers: [String: String],
+                               onDelta: @escaping @MainActor (String) -> Void) async throws -> String {
+        guard let u = URL(string: url) else { throw AIError("Invalid URL") }
+        var req = URLRequest(url: u, timeoutInterval: 120)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+        let msgs: [[String: Any]] = [["role": "system", "content": system]] + history.map { ["role": $0.role, "content": $0.openAIContent] }
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "messages": msgs, "stream": true])
+
+        let bytes: URLSession.AsyncBytes, resp: URLResponse
+        do {
+            (bytes, resp) = try await URLSession.shared.bytes(for: req)
+        } catch {
+            throw AIError("Couldn't reach the provider (\(error.localizedDescription))")
+        }
+        let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(status) else {
+            var body = ""
+            for try await line in bytes.lines { body += line }
+            let v = (try? JSONSerialization.jsonObject(with: Data(body.utf8))) as? [String: Any]
+            let err = v?["error"]
+            throw AIError((err as? [String: Any])?["message"] as? String ?? err as? String ?? "The provider answered HTTP \(status)")
+        }
+        var text = ""
+        for try await line in bytes.lines {
+            try Task.checkCancellation()
+            if let delta = sseDelta(line) {
+                text += delta
+                await onDelta(delta)
+            }
+        }
+        return try nonEmpty(text)
+    }
+
+    /// The chosen 9router model, or the first Haiku/Sonnet it offers so Ask works with no setup.
+    private static func nineRouterModel(_ settings: AppSettings) async throws -> String {
+        if !settings.aiNineRouterModel.isEmpty { return settings.aiNineRouterModel }
+        let models = await NineRouterService.shared.models()
+        guard let pick = models.first(where: { $0.contains("haiku") }) ?? models.first(where: { $0.contains("sonnet") }) ?? models.first else {
+            throw AIError("9router isn't running. Start it, then try again.")
+        }
+        return pick
     }
 
     private static func apiKey(_ provider: AIProvider) throws -> String {

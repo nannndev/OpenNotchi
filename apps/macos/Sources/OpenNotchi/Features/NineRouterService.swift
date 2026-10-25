@@ -391,6 +391,30 @@ final class NineRouterService {
         return rows
     }
 
+    /// The local OpenAI-compatible endpoint 9router serves.
+    static let baseURL = "http://127.0.0.1:20128/v1"
+
+    /// First active 9router API key, so Ask AI can call the local endpoint without the user pasting it.
+    func apiKey() -> String? {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbFile.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_close(db) }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT key FROM apiKeys WHERE isActive = 1 ORDER BY createdAt ASC LIMIT 1;", -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW, let c = sqlite3_column_text(stmt, 0) else { return nil }
+        return String(cString: c)
+    }
+
+    /// Model ids 9router can route to right now (e.g. "cc/claude-sonnet-5-5"), empty when the daemon is down.
+    func models() async -> [String] {
+        guard let url = URL(string: Self.baseURL + "/models"),
+              let (data, _) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 3)),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let list = json["data"] as? [[String: Any]] else { return [] }
+        return list.compactMap { $0["id"] as? String }
+    }
+
     // MARK: - Live Quota from 9router HTTP Daemon
 
     /// Pool quotas 9router reports alongside the per-model ones, with the labels its dashboard uses.

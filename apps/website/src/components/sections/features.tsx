@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import {
-  BellRing, Bot, Boxes, CalendarClock, Camera, CandlestickChart, CheckCircle2, Clipboard, CloudSun, Coffee, Disc3,
-  Headphones, Heart, Home, Inbox, Languages, MessageSquareQuote, Monitor, MoonStar, Palette, PictureInPicture2,
-  ScrollText, Search, Share2, ShieldCheck, Sliders, Smile, Smartphone, Sparkles, StickyNote, Terminal, Timer, Webcam,
+  BellRing, Bot, Boxes, CalendarClock, Camera, CandlestickChart, ChartLine, CheckCircle2, Clipboard, CloudSun, Coffee, Disc3,
+  Expand, Headphones, Heart, Home, Inbox, Languages, MessageSquareQuote, MessagesSquare, Monitor, MoonStar, Palette, Paperclip,
+  PictureInPicture2, ScrollText, Search, Share2, ShieldCheck, Sliders, Smile, Smartphone, Sparkles, StickyNote, Terminal, Timer,
+  Wand2, Webcam,
   type LucideIcon,
 } from "lucide-react"
 import { AppleIcon, WindowsIcon } from "@/components/icons"
@@ -24,8 +25,12 @@ const GROUPS: { id: string; label: string; features: Feature[] }[] = [
     id: "ai",
     label: "AI & Notchi",
     features: [
-      { icon: Sparkles, title: "AI Quotas & 9router", body: "Multi-account quota tracking for Claude Code, Codex, Antigravity, and 9router with rate-limit gauges and countdown resets.", os: "all" },
-      { icon: Bot, title: "Live agent sessions", body: "Monitor working, needs you, and done states for local AI coding agents directly in the notch.", os: "all" },
+      { icon: MessagesSquare, title: "Notchi chat", body: "Chat with your own 9router accounts (Claude, GPT, Gemini) right in the notch. Answers stream in, and every chat is saved as a session.", os: "all", badgeText: "New" },
+      { icon: Wand2, title: "Change settings by asking", body: "\"Make my notch look nicer\" or \"turn off the mascot\": Notchi knows every setting, changes it for you, and shows an Undo.", os: "all", badgeText: "New" },
+      { icon: Paperclip, title: "Images, files & context", body: "Attach screenshots, images, PDFs and code, or add your clipboard, the song playing, or your AI usage to the next message.", os: "all", badgeText: "New" },
+      { icon: Sparkles, title: "AI Quotas & 9router", body: "Multi-account quota tracking with real provider logos, in Cards, Compact or List layouts, plus today's top models.", os: "all" },
+      { icon: ChartLine, title: "Usage analytics", body: "Requests, input, cached and output tokens, and estimated cost from 9router, with a daily chart and recent requests.", os: "all", badgeText: "New" },
+      { icon: Bot, title: "Live agent sessions", body: "Claude Code, Codex, Antigravity and Command Code sessions sorted by who needs you first, with live state stripes.", os: "all" },
       { icon: Smile, title: "Notchi the mascot", body: "An animated 5-bar waveform companion living beside your idle notch. Follows your gaze and reacts to 8 moods.", os: "all" },
       { icon: Heart, title: "Interactive petting", body: "Squash/spring physics, WebAudio pop sounds, and floating hearts that level up with consecutive pets.", os: "all" },
       { icon: BellRing, title: "Notification banners", body: "Dynamic Island drop-down banners with WebAudio glass chimes, countdown tracks, and terminal jump button.", os: "all" },
@@ -38,10 +43,12 @@ const GROUPS: { id: string; label: string; features: Feature[] }[] = [
     id: "music",
     label: "Music & lyrics",
     features: [
+      { icon: Expand, title: "Full-screen player", body: "Opens when your computer sits idle while music plays: big cover, blurred, aurora or spinning-record backdrop, and synced lyrics with translation.", os: "all", badgeText: "New" },
+      { icon: Search, title: "Search & play", body: "Search Spotify or your Music library from the notch and start a song in one click, or just ask Notchi to play it.", os: "macos", badgeText: "New · macOS" },
       { icon: Disc3, title: "Now playing turntable", body: "Spotify, Apple Music and YouTube on a vinyl you can scratch, with ballistic VU meters and a spectrum.", os: "all" },
       { icon: MessageSquareQuote, title: "Synced lyrics", body: "Time-synchronized LRC lines light up as they're sung. Click any line to seek immediately.", os: "all" },
       { icon: PictureInPicture2, title: "Desktop karaoke lyrics", body: "A floating lyrics widget you can drag anywhere, resize and fade to transparent text.", os: "all" },
-      { icon: Languages, title: "Translated lyrics", body: "Every sung line translated on your computer, offline and free, directly beneath the original lyric.", os: "all" },
+      { icon: Languages, title: "Translated lyrics", body: "Every sung line translated beneath the original: on-device on macOS, through your AI provider on Windows.", os: "all" },
       { icon: Share2, title: "Lyric cards & videos", body: "Share standout lines as cards or export full lyric videos with your custom background video and music.", os: "all" },
       { icon: Sliders, title: "Hi-Fi analog decks", body: "Dual ballistic analog VU needle meters and a 9-band digital graphic equalizer for audiophiles.", os: "all" },
       { icon: Smartphone, title: "Windows Media Session (SMTC)", body: "Integrates directly with Windows SMTC to capture Spotify, Chrome, Edge, and media players.", os: "windows", badgeText: "SMTC Engine" },
@@ -58,7 +65,7 @@ const GROUPS: { id: string; label: string; features: Feature[] }[] = [
       { icon: Webcam, title: "Hardware camera alerts", body: "A glowing amber/green privacy pill lights up the moment any application activates your camera or microphone.", os: "macos", badgeText: "macOS Privacy" },
       { icon: Coffee, title: "Keep awake caffeine", body: "Prevent your Mac from sleeping for 15 minutes, 1 hour, or indefinitely with a single click from the menu bar.", os: "macos", badgeText: "macOS Only" },
       { icon: Boxes, title: "3D spatial animations", body: "3D Trapdoor Flip, Holographic Depth, and Cube Roll swinging down with top-hinged physics on both platforms.", os: "all" },
-      { icon: Palette, title: "Adaptive themes", body: "Liquid Glass, Frosted Dark, and album-reactive themes that extract dominant artwork palette colors.", os: "all" },
+      { icon: Palette, title: "Adaptive themes", body: "Real Liquid Glass on macOS 26, Frosted Dark, and album-reactive themes. The idle notch follows your theme too.", os: "all" },
       { icon: ShieldCheck, title: "100% Private by design", body: "Zero accounts, no tracking, and zero telemetry. All agent monitoring and lyrics run locally.", os: "all" },
     ],
   },
@@ -106,8 +113,8 @@ const PARITY_COMPARISON = [
   },
   {
     dimension: "AI Monitoring & 9router",
-    macos: "Claude Code, Codex, Antigravity logs + Apple Intelligence offline model support.",
-    windows: "Claude Code, Codex, Antigravity logs + Local Ollama support & 9router multi-account.",
+    macos: "Agent logs, 9router analytics and Notchi chat through 9router, Apple Intelligence, Anthropic, OpenAI or Ollama.",
+    windows: "Agent logs, 9router analytics and Notchi chat through 9router, Anthropic, OpenAI or Ollama.",
   },
   {
     dimension: "Security & Credential Vault",
@@ -121,8 +128,8 @@ const PARITY_COMPARISON = [
   },
   {
     dimension: "Feature Parity (100% Shared)",
-    macos: "Notchi Mascot & Petting, Synced Lyrics, Lyric Video Studio, Photobox, Pomodoro, Teleprompter, Settings Search.",
-    windows: "Notchi Mascot & Petting, Synced Lyrics, Lyric Video Studio, Photobox, Pomodoro, Teleprompter, Settings Search.",
+    macos: "Notchi chat & mascot, Full-screen player, Synced Lyrics, Lyric Video Studio, Photobox, Pomodoro, Teleprompter, Settings Search.",
+    windows: "Notchi chat & mascot, Full-screen player, Synced Lyrics, Lyric Video Studio, Photobox, Pomodoro, Teleprompter, Settings Search.",
   },
 ]
 
@@ -213,11 +220,16 @@ export function Features() {
                             {badgeText || "Windows"}
                           </span>
                         )}
-                        {os === "all" && (
-                          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
-                            Universal
-                          </span>
-                        )}
+                        {os === "all" &&
+                          (badgeText ? (
+                            <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+                              {badgeText}
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
+                              Universal
+                            </span>
+                          ))}
                       </div>
                       <h3 className="font-display mt-3.5 text-[17px] font-bold text-white">{title}</h3>
                       <p className="mt-1.5 text-sm leading-relaxed text-neutral-400">{body}</p>

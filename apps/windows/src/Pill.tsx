@@ -13,7 +13,7 @@ import {
   Play,
   Quote,
   Settings as SettingsIcon,
-  Share2,
+  Share2, Maximize2,
   SkipBack,
   SkipForward,
   Sparkles,
@@ -29,6 +29,7 @@ import { filterRecentAgentStates, notchiMood, playPetPopSound, type NotchiMood }
 import { useAccent } from "./palette"
 import { resolveAccentColor, useSettings } from "./settings"
 import { AITab, useAgents, useUsage } from "./tabs/AITab"
+import { useIdleNowPlaying } from "./NowPlayingScreen"
 import { ClipboardTab } from "./tabs/ClipboardTab"
 import { MirrorTab } from "./tabs/MirrorTab"
 import { NotesTab } from "./tabs/NotesTab"
@@ -54,6 +55,7 @@ type TabKey = "music" | "clipboard" | "timer" | "notes" | "prompter" | "mirror" 
 
 export function Pill() {
   const np = useNowPlaying()
+  useIdleNowPlaying(np?.isPlaying ?? false)
   const lyrics = useLyrics(np)
   const rawAccent = useAccent(np?.artwork)
   const [settings] = useSettings()
@@ -498,6 +500,14 @@ export function Pill() {
                 title="Share lyric card"
               >
                 <Share2 size={12} />
+              </button>
+              <button
+                className="header-action-btn"
+                onClick={() => invoke("open_now_playing").catch(() => {})}
+                title="Full-screen player"
+                aria-label="Full-screen player"
+              >
+                <Maximize2 size={12} />
               </button>
               <button
                 className="header-action-btn"

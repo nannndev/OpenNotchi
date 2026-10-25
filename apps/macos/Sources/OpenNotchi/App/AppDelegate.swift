@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let privacy = PrivacyMonitor()
     private let downloads = DownloadsMonitor()
     private var lyricsOverlay: LyricsOverlayWindow?
+    private(set) var nowPlayingScreen: NowPlayingScreenController?
     private var hudRetryTimer: Timer?
     private var hotKey: HotKey?
     private var cancellables: Set<AnyCancellable> = []
@@ -58,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupPeeks()
         updateSystemMonitors()
         updateLyricsOverlay()
+        nowPlayingScreen = NowPlayingScreenController(media: media, lyrics: lyrics, settings: settings)
         updateAI()
 
         if CommandLine.arguments.contains("--settings") || CommandLine.arguments.contains("-s") {

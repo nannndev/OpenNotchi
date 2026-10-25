@@ -1,6 +1,6 @@
 /** AI features: agent status, usage and Ask AI. Pure helpers here; the file reading is in Rust (src-tauri/src/ai.rs). */
 
-export type AiProvider = "ollama" | "anthropic" | "openai"
+export type AiProvider = "ninerouter" | "ollama" | "anthropic" | "openai"
 export type AgentTool = "claude" | "codex" | "antigravity" | "commandcode" | string
 export type AgentState = "working" | "needs_you" | "done" | "idle"
 export type AccountHealth = "healthy" | "warning" | "exhausted"
@@ -85,6 +85,7 @@ export const TOOL_NAMES: Record<string, string> = {
 export const STATE_LABELS: Record<AgentState, string> = { working: "working", needs_you: "needs you", done: "done", idle: "idle" }
 
 export const PROVIDERS: { id: AiProvider; name: string }[] = [
+  { id: "ninerouter", name: "9router (your accounts)" },
   { id: "ollama", name: "Ollama (local)" },
   { id: "anthropic", name: "Anthropic API" },
   { id: "openai", name: "OpenAI-compatible" },

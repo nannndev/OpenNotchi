@@ -146,6 +146,7 @@ private struct ProviderSettings: View {
     @State private var hasKey = false
     @State private var test: (ok: Bool, text: String)?
     @State private var testing = false
+    @State private var routerModels: [String] = []
 
     private var provider: AIProvider { settings.aiProvider }
 
@@ -154,8 +155,15 @@ private struct ProviderSettings: View {
             ForEach(AIProvider.available) { Text($0.displayName).tag($0) }
         }
         switch provider {
+        case .ninerouter:
+            Picker("Model", selection: $settings.aiNineRouterModel) {
+                Text("Automatic (Haiku or Sonnet)").tag("")
+                ForEach(routerModels, id: \.self) { Text($0).tag($0) }
+            }
+            .task { routerModels = await NineRouterService.shared.models() }
+            Text("Uses your 9router accounts through its local endpoint and API key. Requests show up in Analytics.").font(.caption).foregroundStyle(.secondary)
         case .apple:
-            Text("Runs on this Mac. Nothing leaves your computer.").font(.caption).foregroundStyle(.secondary)
+            Text("Runs on this Mac. Nothing leaves your computer. Its safety filter can block harmless prompts.").font(.caption).foregroundStyle(.secondary)
         case .ollama:
             TextField("Base URL", text: $settings.aiOllamaURL)
             TextField("Model", text: $settings.aiOllamaModel)

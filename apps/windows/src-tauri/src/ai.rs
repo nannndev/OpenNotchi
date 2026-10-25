@@ -1209,12 +1209,157 @@ pub async fn ask_ai(req: AskRequest) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || ask_blocking(&req)).await.map_err(|e| e.to_string())?
 }
 
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessage {
+    role: String,
+    content: String,
+    /// Attached clipboard / file text, sent ahead of `content`.
+    #[serde(default)]
+    context: Option<String>,
+    /// Base64 JPEG/PNG data URLs (vision models only).
+    #[serde(default)]
+    images: Vec<String>,
+}
+
+impl ChatMessage {
+    fn full(&self) -> String {
+        match &self.context { Some(c) if !c.is_empty() => format!("{c}\n\n{}", self.content), _ => self.content.clone() }
+    }
+
+    fn openai(&self) -> Value {
+        if self.images.is_empty() {
+            return json!({ "role": self.role, "content": self.full() });
+        }
+        let mut parts = vec![json!({ "type": "text", "text": self.full() })];
+        parts.extend(self.images.iter().map(|url| json!({ "type": "image_url", "image_url": { "url": url } })));
+        json!({ "role": self.role, "content": parts })
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatRequest {
+    provider: String,
+    base_url: String,
+    model: String,
+    system: String,
+    messages: Vec<ChatMessage>,
+    /// Event name the answer streams on: payload is each new chunk of text.
+    stream_event: String,
+}
+
+/// The text in one `data:` line of an OpenAI-style SSE stream; None for keep-alives, role-only chunks and [DONE].
+pub fn sse_delta(line: &str) -> Option<String> {
+    let payload = line.strip_prefix("data:")?.trim();
+    if payload == "[DONE]" {
+        return None;
+    }
+    let v: Value = serde_json::from_str(payload).ok()?;
+    let text = v["choices"][0]["delta"]["content"].as_str()?;
+    (!text.is_empty()).then(|| text.to_string())
+}
+
+/// The chosen 9router model, or the first Haiku/Sonnet it offers so chat works with no setup.
+fn ninerouter_model(chosen: &str) -> Result<String, String> {
+    if !chosen.is_empty() {
+        return Ok(chosen.to_string());
+    }
+    let models = crate::ninerouter::models();
+    models.iter().find(|m| m.contains("haiku")).or_else(|| models.iter().find(|m| m.contains("sonnet"))).or(models.first())
+        .cloned().ok_or_else(|| "9router isn't running. Start it, then try again.".to_string())
+}
+
+fn chat_blocking(app: &tauri::AppHandle, req: &ChatRequest) -> Result<String, String> {
+    use tauri::Emitter;
+    // Anthropic keeps the non-streaming path: send the conversation as one prompt.
+    if req.provider == "anthropic" {
+        let convo = req.messages.iter().map(|m| format!("{}: {}", if m.role == "user" { "User" } else { "Assistant" }, m.full())).collect::<Vec<_>>().join("\n\n");
+        let text = ask_blocking(&AskRequest { provider: req.provider.clone(), base_url: String::new(), model: req.model.clone(), prompt: convo })?;
+        let _ = app.emit(&req.stream_event, &text);
+        return Ok(text);
+    }
+    let (url, key, model) = match req.provider.as_str() {
+        "ninerouter" => {
+            let key = crate::ninerouter::api_key().ok_or("No active API key in 9router. Create one in its dashboard › Endpoint & Key.")?;
+            (format!("{}/chat/completions", crate::ninerouter::BASE_URL), Some(key), ninerouter_model(&req.model)?)
+        }
+        "openai" | "ollama" => {
+            let base = req.base_url.trim().trim_end_matches('/');
+            if !base.starts_with("http://") && !base.starts_with("https://") {
+                return Err("The base URL must start with http:// or https://".into());
+            }
+            let key = if req.provider == "openai" {
+                Some(key_entry("openai")?.get_password().map_err(|_| "Add an API key in Settings › AI first.".to_string())?)
+            } else {
+                None
+            };
+            // Ollama serves the same OpenAI-compatible API under /v1.
+            let path = if req.provider == "ollama" { "/v1/chat/completions" } else { "/chat/completions" };
+            (format!("{base}{path}"), key, req.model.clone())
+        }
+        _ => return Err("Unknown provider".into()),
+    };
+    let mut messages = vec![json!({ "role": "system", "content": req.system })];
+    messages.extend(req.messages.iter().map(ChatMessage::openai));
+
+    let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).timeout_global(Some(Duration::from_secs(180))).build().into();
+    let mut r = agent.post(&url);
+    if let Some(key) = &key {
+        r = r.header("Authorization", &format!("Bearer {key}"));
+    }
+    let mut resp = r.send_json(json!({ "model": model, "messages": messages, "stream": true })).map_err(|e| format!("Couldn't reach the provider ({e})"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let v: Value = resp.body_mut().read_json().unwrap_or_default();
+        return Err(error_message(&v).unwrap_or_else(|| format!("The provider answered HTTP {status}")));
+    }
+    let mut text = String::new();
+    for line in BufReader::new(resp.body_mut().as_reader()).lines() {
+        let Ok(line) = line else { break };
+        if let Some(delta) = sse_delta(&line) {
+            text.push_str(&delta);
+            let _ = app.emit(&req.stream_event, &delta);
+        }
+    }
+    let text = text.trim().to_string();
+    if text.is_empty() { Err("Empty answer".into()) } else { Ok(text) }
+}
+
+/// Multi-turn chat; chunks stream on `streamEvent` and the full answer is returned at the end.
+#[tauri::command]
+pub async fn ai_chat(app: tauri::AppHandle, req: ChatRequest) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || chat_blocking(&app, &req)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn ninerouter_models() -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(crate::ninerouter::models).await.unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn ninerouter_available() -> bool {
+    crate::ninerouter::is_available()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn entry(key: &str, ts: i64, out: u64) -> Entry {
         Entry { ts, model: "claude-opus-5-5".into(), key: key.into(), tokens: [1, out, 0, 0] }
+    }
+
+    #[test]
+    fn sse_lines_yield_only_text_deltas() {
+        assert_eq!(sse_delta(r#"data: {"choices":[{"delta":{"content":"Hi"}}]}"#).as_deref(), Some("Hi"));
+        assert_eq!(sse_delta(r#"data: {"choices":[{"delta":{"role":"assistant"}}]}"#), None);
+        assert_eq!(sse_delta("data: [DONE]"), None);
+        assert_eq!(sse_delta(": keep-alive"), None);
+        let m = ChatMessage { role: "user".into(), content: "q".into(), context: Some("ctx".into()), images: vec![] };
+        assert_eq!(m.full(), "ctx\n\nq");
+        let with_image = ChatMessage { images: vec!["data:image/jpeg;base64,AA".into()], ..m };
+        assert_eq!(with_image.openai()["content"][1]["image_url"]["url"], "data:image/jpeg;base64,AA");
     }
 
     #[test]

@@ -124,6 +124,7 @@ struct SettingItem: Identifiable {
         SettingItem(title: "Show the current lyric line under the title", subtitle: "Lyric line on the player", pane: .features, keywords: ["lyrics", "line", "title", "player", "lirik"], icon: "text.quote"),
         SettingItem(title: "Translate lyrics", subtitle: "Translate into your language, on your Mac", pane: .features, keywords: ["translate", "translation", "language", "lyrics", "terjemah", "lirik"], icon: "character.bubble"),
         SettingItem(title: "Floating lyrics widget on the desktop", subtitle: "Show the next line, lock widget, reset widget size and position", pane: .features, keywords: ["lyrics", "widget", "desktop", "floating", "next line", "lock", "reset", "lirik"], icon: "pip"),
+        SettingItem(title: "Full-screen player when idle", subtitle: "Big cover, blurred background and lyrics when the Mac sits idle while music plays", pane: .features, keywords: ["fullscreen", "full screen", "screensaver", "idle", "lock screen", "lyrics", "now playing", "layar penuh", "lirik"], icon: "play.rectangle.fill"),
         SettingItem(title: "Today's calendar widget next to the player", subtitle: "Your next events beside the music player", pane: .features, keywords: ["calendar", "events", "widget", "agenda"], icon: "calendar"),
         SettingItem(title: "Meeting reminders", subtitle: "Remind me before events, only video calls, play a sound, connect calendar", pane: .features, keywords: ["reminder", "meeting", "events", "calendar", "zoom", "meet", "sound"], icon: "bell.fill"),
         SettingItem(title: "Prayer time options", subtitle: "Calculation method, Asr, names, notify at each prayer time, heads-up before", pane: .features, keywords: ["prayer", "calculation", "method", "asr", "notify", "heads-up", "sholat", "adzan"], icon: "moon.stars"),
@@ -616,6 +617,46 @@ private struct FeaturesPane: View {
                     Toggle("Lock widget (clicks pass through)", isOn: $settings.lyricsOverlayLocked)
                     Button("Reset widget size and position") { AppDelegate.shared?.resetLyricsOverlay() }
                 }
+            }
+            Section {
+                Toggle("Show automatically when the Mac sits idle", isOn: $settings.nowPlayingScreenEnabled)
+                if settings.nowPlayingScreenEnabled {
+                    Picker("Show after", selection: $settings.nowPlayingScreenIdleMinutes) {
+                        ForEach([0.5, 1, 2, 5, 10, 15], id: \.self) { m in
+                            Text(m < 1 ? "30 seconds" : "\(Int(m)) minute\(m == 1 ? "" : "s")").tag(m)
+                        }
+                    }
+                    Toggle("Only while charging", isOn: $settings.nowPlayingScreenOnlyCharging)
+                }
+                Picker("Background", selection: $settings.nowPlayingScreenBackground) {
+                    ForEach(NowPlayingBackground.allCases) { Text($0.displayName).tag($0) }
+                }
+                Toggle("Lyrics", isOn: $settings.nowPlayingScreenLyrics)
+                    .disabled(!settings.lyricsEnabled)
+                if settings.nowPlayingScreenLyrics {
+                    Picker("Lyrics size", selection: $settings.nowPlayingScreenTextScale) {
+                        Text("Small").tag(0.8)
+                        Text("Medium").tag(1.0)
+                        Text("Large").tag(1.3)
+                    }
+                    .pickerStyle(.segmented)
+                    Toggle("Translate lyrics", isOn: $settings.lyricsTranslate)
+                }
+                Toggle("Clock and date", isOn: $settings.nowPlayingScreenClock)
+                if NSScreen.screens.count > 1 {
+                    Picker("Display", selection: $settings.nowPlayingScreenDisplay) {
+                        Text("Main display").tag("main")
+                        ForEach(NSScreen.screens, id: \.localizedName) { Text($0.localizedName).tag($0.localizedName) }
+                    }
+                }
+                HStack {
+                    Spacer()
+                    Button("Preview") { AppDelegate.shared?.nowPlayingScreen?.show() }
+                }
+            } header: {
+                Text("Full-screen player")
+            } footer: {
+                Text("Space plays or pauses, ← → skip, T translates, L shows lyrics, B switches the background, Esc closes. It also opens from the ⤢ button on the player. macOS doesn't let apps change the lock screen, so this shows on top of your desktop; keep it shorter than your screen saver.")
             }
             Section("Live activities") {
                 Toggle("Charger connected", isOn: $settings.chargingPeekEnabled)

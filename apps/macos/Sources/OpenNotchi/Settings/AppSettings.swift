@@ -468,6 +468,18 @@ final class AppSettings: ObservableObject {
     /// Desktop lyrics widget: background opacity (0 = text only) and click-through lock.
     @Published var lyricsOverlayOpacity: Double { didSet { defaults.set(lyricsOverlayOpacity, forKey: "lyricsOverlayOpacity") } }
     @Published var lyricsOverlayLocked: Bool { didSet { defaults.set(lyricsOverlayLocked, forKey: "lyricsOverlayLocked") } }
+    /// Full-screen now playing after the Mac sits idle while music plays.
+    @Published var nowPlayingScreenEnabled: Bool { didSet { defaults.set(nowPlayingScreenEnabled, forKey: "nowPlayingScreenEnabled") } }
+    @Published var nowPlayingScreenIdleMinutes: Double { didSet { defaults.set(nowPlayingScreenIdleMinutes, forKey: "nowPlayingScreenIdleMinutes") } }
+    @Published var nowPlayingScreenLyrics: Bool { didSet { defaults.set(nowPlayingScreenLyrics, forKey: "nowPlayingScreenLyrics") } }
+    @Published var nowPlayingScreenClock: Bool { didSet { defaults.set(nowPlayingScreenClock, forKey: "nowPlayingScreenClock") } }
+    @Published var nowPlayingScreenBackground: NowPlayingBackground { didSet { defaults.set(nowPlayingScreenBackground.rawValue, forKey: "nowPlayingScreenBackground") } }
+    /// Lyrics text scale, 0.8 (small) to 1.3 (large).
+    @Published var nowPlayingScreenTextScale: Double { didSet { defaults.set(nowPlayingScreenTextScale, forKey: "nowPlayingScreenTextScale") } }
+    /// Show automatically only on power, so a battery Mac isn't kept awake.
+    @Published var nowPlayingScreenOnlyCharging: Bool { didSet { defaults.set(nowPlayingScreenOnlyCharging, forKey: "nowPlayingScreenOnlyCharging") } }
+    /// Screen to use: "main" or an NSScreen localizedName.
+    @Published var nowPlayingScreenDisplay: String { didSet { defaults.set(nowPlayingScreenDisplay, forKey: "nowPlayingScreenDisplay") } }
     @Published var lyricsOverlayNextLine: Bool { didSet { defaults.set(lyricsOverlayNextLine, forKey: "lyricsOverlayNextLine") } }
     @Published var lyricsTranslate: Bool {
         didSet {
@@ -561,6 +573,8 @@ final class AppSettings: ObservableObject {
     @Published var aiAnthropicModel: String { didSet { defaults.set(aiAnthropicModel, forKey: "aiAnthropicModel") } }
     @Published var aiOpenaiURL: String { didSet { defaults.set(aiOpenaiURL, forKey: "aiOpenaiURL") } }
     @Published var aiOpenaiModel: String { didSet { defaults.set(aiOpenaiModel, forKey: "aiOpenaiModel") } }
+    /// Empty means "pick a Haiku/Sonnet model automatically".
+    @Published var aiNineRouterModel: String { didSet { defaults.set(aiNineRouterModel, forKey: "aiNineRouterModel") } }
 
     @Published var launchAtLogin: Bool {
         didSet {
@@ -625,6 +639,14 @@ final class AppSettings: ObservableObject {
             "notesTabEnabled": true,
             "notesText": "",
             "lyricsOverlayEnabled": false,
+            "nowPlayingScreenEnabled": true,
+            "nowPlayingScreenIdleMinutes": 2.0,
+            "nowPlayingScreenLyrics": true,
+            "nowPlayingScreenClock": true,
+            "nowPlayingScreenBackground": "blur",
+            "nowPlayingScreenTextScale": 1.0,
+            "nowPlayingScreenOnlyCharging": false,
+            "nowPlayingScreenDisplay": "main",
             "lyricsOverlayOpacity": 0.45,
             "lyricsOverlayLocked": false,
             "lyricsOverlayNextLine": true,
@@ -741,6 +763,14 @@ final class AppSettings: ObservableObject {
         notesTabEnabled = defaults.bool(forKey: "notesTabEnabled")
         notesText = defaults.string(forKey: "notesText") ?? ""
         lyricsOverlayEnabled = defaults.bool(forKey: "lyricsOverlayEnabled")
+        nowPlayingScreenEnabled = defaults.bool(forKey: "nowPlayingScreenEnabled")
+        nowPlayingScreenIdleMinutes = defaults.double(forKey: "nowPlayingScreenIdleMinutes")
+        nowPlayingScreenLyrics = defaults.bool(forKey: "nowPlayingScreenLyrics")
+        nowPlayingScreenClock = defaults.bool(forKey: "nowPlayingScreenClock")
+        nowPlayingScreenBackground = NowPlayingBackground(rawValue: defaults.string(forKey: "nowPlayingScreenBackground") ?? "") ?? .blur
+        nowPlayingScreenTextScale = defaults.double(forKey: "nowPlayingScreenTextScale")
+        nowPlayingScreenOnlyCharging = defaults.bool(forKey: "nowPlayingScreenOnlyCharging")
+        nowPlayingScreenDisplay = defaults.string(forKey: "nowPlayingScreenDisplay") ?? "main"
         lyricsOverlayOpacity = defaults.double(forKey: "lyricsOverlayOpacity")
         lyricsOverlayLocked = defaults.bool(forKey: "lyricsOverlayLocked")
         lyricsOverlayNextLine = defaults.bool(forKey: "lyricsOverlayNextLine")
@@ -791,14 +821,15 @@ final class AppSettings: ObservableObject {
         let loadedAccounts = defaults.data(forKey: "aiAccounts").flatMap { try? JSONDecoder().decode([AIAccount].self, from: $0) } ?? []
         aiAccounts = loadedAccounts.isEmpty ? AIAccount.defaults : loadedAccounts
         aiClosedMeter = defaults.bool(forKey: "aiClosedMeter")
-        // Apple Intelligence is the default where the on-device model is available, Ollama elsewhere.
+        // 9router is the default when installed (it uses the user's own accounts), then Apple Intelligence, then Ollama.
         aiProvider = AIProvider(rawValue: defaults.string(forKey: "aiProvider") ?? "").flatMap { AIProvider.available.contains($0) ? $0 : nil }
-            ?? (AIAssistant.appleAvailable ? .apple : .ollama)
+            ?? (NineRouterService.shared.isAvailable ? .ninerouter : AIAssistant.appleAvailable ? .apple : .ollama)
         aiOllamaURL = defaults.string(forKey: "aiOllamaURL") ?? ""
         aiOllamaModel = defaults.string(forKey: "aiOllamaModel") ?? ""
         aiAnthropicModel = defaults.string(forKey: "aiAnthropicModel") ?? "claude-haiku-5-5"
         aiOpenaiURL = defaults.string(forKey: "aiOpenaiURL") ?? ""
         aiOpenaiModel = defaults.string(forKey: "aiOpenaiModel") ?? ""
+        aiNineRouterModel = defaults.string(forKey: "aiNineRouterModel") ?? ""
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

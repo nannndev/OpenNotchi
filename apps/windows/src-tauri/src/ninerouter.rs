@@ -425,6 +425,23 @@ pub fn set_connection_active(id: &str, active: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// The local OpenAI-compatible endpoint 9router serves.
+pub const BASE_URL: &str = "http://127.0.0.1:20128/v1";
+
+/// First active 9router API key, so Ask AI can call the local endpoint without the user pasting it.
+pub fn api_key() -> Option<String> {
+    let conn = Connection::open_with_flags(db_path(), OpenFlags::SQLITE_OPEN_READ_ONLY).ok()?;
+    conn.query_row("SELECT key FROM apiKeys WHERE isActive = 1 ORDER BY createdAt ASC LIMIT 1;", [], |r| r.get(0)).ok()
+}
+
+/// Model ids 9router can route to right now (e.g. "cc/claude-sonnet-5-5"); empty when the daemon is down.
+pub fn models() -> Vec<String> {
+    let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).timeout_global(Some(Duration::from_secs(3))).build().into();
+    let Ok(mut resp) = agent.get(format!("{BASE_URL}/models")).call() else { return vec![] };
+    let v: Value = resp.body_mut().read_json().unwrap_or_default();
+    v["data"].as_array().into_iter().flatten().filter_map(|m| m["id"].as_str().map(String::from)).collect()
+}
+
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DayStat {

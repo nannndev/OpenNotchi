@@ -34,6 +34,7 @@ import {
   ANIMATION_OPTIONS,
   BORDER_OPTIONS,
   DEFAULT_SETTINGS,
+  NOW_PLAYING_BACKGROUNDS,
   THEME_OPTIONS,
   resolveAccentColor,
   useSettings,
@@ -568,6 +569,95 @@ export function SettingsWindow() {
                   checked={settings.tabMirror}
                   onChange={(e) => setSettings({ tabMirror: e.target.checked })}
                 />
+              </div>
+            </div>
+
+            <h2 className="section-title" style={{ marginTop: 28 }}>Full-screen Player</h2>
+            <p className="section-desc">
+              Big cover, an album-colored background and synced lyrics. Space plays or pauses, ← → skip, T translates, L shows lyrics,
+              B switches the background, Esc closes. It also opens from the ⤢ button in the pill header.
+            </p>
+            <div className="toggle-list">
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">Full-screen player when the PC sits idle</div>
+                  <div className="toggle-desc">Keep it shorter than your screen saver and display sleep.</div>
+                </div>
+                <input type="checkbox" className="switch" checked={settings.nowPlayingEnabled} onChange={(e) => setSettings({ nowPlayingEnabled: e.target.checked })} />
+              </div>
+              {settings.nowPlayingEnabled && (
+                <div className="toggle-row">
+                  <div className="toggle-info">
+                    <div className="toggle-title">Full-screen player delay</div>
+                  </div>
+                  <select className="settings-select" value={settings.nowPlayingIdleMinutes} onChange={(e) => setSettings({ nowPlayingIdleMinutes: Number(e.target.value) })}>
+                    {[0.5, 1, 2, 5, 10, 15].map((m) => (
+                      <option key={m} value={m}>
+                        {m < 1 ? "30 seconds" : `${m} minute${m === 1 ? "" : "s"}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">Full-screen player background</div>
+                </div>
+                <select className="settings-select" value={settings.nowPlayingBackground} onChange={(e) => setSettings({ nowPlayingBackground: e.target.value as typeof settings.nowPlayingBackground })}>
+                  {NOW_PLAYING_BACKGROUNDS.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">Full-screen player lyrics</div>
+                </div>
+                <input type="checkbox" className="switch" checked={settings.nowPlayingLyrics} onChange={(e) => setSettings({ nowPlayingLyrics: e.target.checked })} />
+              </div>
+              {settings.nowPlayingLyrics && (
+                <>
+                  <div className="toggle-row">
+                    <div className="toggle-info">
+                      <div className="toggle-title">Full-screen lyrics size</div>
+                    </div>
+                    <select className="settings-select" value={settings.nowPlayingTextScale} onChange={(e) => setSettings({ nowPlayingTextScale: Number(e.target.value) })}>
+                      <option value={0.8}>Small</option>
+                      <option value={1}>Medium</option>
+                      <option value={1.3}>Large</option>
+                    </select>
+                  </div>
+                  <div className="toggle-row">
+                    <div className="toggle-info">
+                      <div className="toggle-title">Translate lyrics into</div>
+                      <div className="toggle-desc">Uses your Ask AI provider (Settings › AI), once per song.</div>
+                    </div>
+                    <select className="settings-select" value={settings.lyricsTranslateTarget} onChange={(e) => setSettings({ lyricsTranslateTarget: e.target.value })}>
+                      <option value="">Off</option>
+                      {["id", "en", "ja", "ko", "zh", "es", "fr", "de", "ar", "pt", "it", "th", "vi"].map((c) => (
+                        <option key={c} value={c}>
+                          {new Intl.DisplayNames([navigator.language], { type: "language" }).of(c) ?? c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">Full-screen player clock</div>
+                </div>
+                <input type="checkbox" className="switch" checked={settings.nowPlayingClock} onChange={(e) => setSettings({ nowPlayingClock: e.target.checked })} />
+              </div>
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">Preview full-screen player</div>
+                </div>
+                <button className="ai-settings-btn" onClick={() => invoke("open_now_playing").catch(() => {})}>
+                  Open
+                </button>
               </div>
             </div>
           </div>

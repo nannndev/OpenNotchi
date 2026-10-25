@@ -26,7 +26,7 @@ function HeroCopy({ onScreen }: { onScreen?: boolean }) {
         <span className="text-neutral-500">but alive.</span>
       </h1>
       <p className={`text-neutral-300 ${s("mt-[1.6cqw] max-w-[48cqw] text-[1.55cqw] leading-snug", "mt-5 max-w-sm text-base leading-relaxed")}`}>
-        OpenNotchi turns your camera notch or screen edge into a home for your music, synced lyrics, clipboard, focus timers and notes. Hover it, and it opens.
+        OpenNotchi turns your camera notch or screen edge into a home for your music, synced lyrics, an AI that can change your settings, focus timers and notes. Hover it, and it opens.
       </p>
       <div className={`flex flex-wrap justify-center ${s("mt-[2.2cqw] gap-[0.8cqw]", "mt-7 gap-3")}`}>
         <a

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
-import { Bot, Check, ClipboardPaste, Copy, ExternalLink, LayoutGrid, List, Music2, Rows3, SendHorizontal, Sparkles, Terminal, X } from "lucide-react"
+import { Bot, ExternalLink, LayoutGrid, List, Rows3, Sparkles, Terminal } from "lucide-react"
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import {
   formatCost,
@@ -8,23 +8,21 @@ import {
   getAccountQuota,
   mergeSessions,
   transitionPeek,
-  QUICK_ACTIONS,
-  quickPrompt,
   resetsIn,
   STATE_LABELS,
   timeAgo,
   TOOL_NAMES,
-  userLanguage,
   windowLabel,
   type AgentSession,
   type AgentState,
   type HookEvent,
-  type QuickAction,
   type RateWindow,
   type UsageReport,
 } from "../ai"
 import type { NowPlaying } from "../media"
 import { useSettings } from "../settings"
+import { ChatPanel } from "./ChatPanel"
+export { askAi } from "./ChatPanel"
 import { transitionBanner, type Banner } from "../banner"
 
 type Section = "usage" | "analytics" | "agents" | "ask"
@@ -65,7 +63,7 @@ export function AITab({
   lyricLine: string | null
   np: NowPlaying | null
 }) {
-  const [settings] = useSettings()
+  const [settings, setSettings] = useSettings()
   const [section, setSection] = useState<Section>(
     (usage && usage.length > 0) || settings.aiAccounts.length > 0
       ? "usage"
@@ -73,7 +71,8 @@ export function AITab({
       ? "agents"
       : "usage"
   )
-  const [layout, setLayout] = useStored<UsageLayout>("usageLayout", "cards")
+  const layout: UsageLayout = settings.usageLayout
+  const setLayout = (l: UsageLayout) => setSettings({ usageLayout: l })
   const now = Date.now()
 
   const totalTokensToday = usage?.reduce((sum, r) => sum + r.today.tokens, 0) ?? 0
@@ -145,7 +144,7 @@ export function AITab({
             <AgentsPanel sessions={sessions} now={now} />
           ))}
 
-        {section === "ask" && <AskPanel lyricLine={lyricLine} np={np} />}
+        {section === "ask" && <ChatPanel lyricLine={lyricLine} np={np} usage={usage} />}
       </div>
     </div>
   )
@@ -560,111 +559,6 @@ function LimitBar({ w, now }: { w: RateWindow; now: number }) {
       </div>
       <div className={`ai-bar ${pct >= 80 ? "hot" : ""}`} style={{ "--p": `${pct}%` } as CSSProperties} />
       <div className="ai-card-note">{resetsIn(w.resetsAt * 1000, now)}</div>
-    </div>
-  )
-}
-
-function providerFields(s: ReturnType<typeof useSettings>[0]) {
-  if (s.aiProvider === "anthropic") return { provider: "anthropic", baseUrl: "", model: s.aiAnthropicModel }
-  if (s.aiProvider === "openai") return { provider: "openai", baseUrl: s.aiOpenaiUrl, model: s.aiOpenaiModel }
-  return { provider: "ollama", baseUrl: s.aiOllamaUrl, model: s.aiOllamaModel }
-}
-
-/** Sends a prompt with the provider from Settings; used by the Ask panel and the Settings "Test" button. */
-export function askAi(settings: ReturnType<typeof useSettings>[0], prompt: string): Promise<string> {
-  return invoke<string>("ask_ai", { req: { ...providerFields(settings), prompt } })
-}
-
-function AskPanel({ lyricLine, np }: { lyricLine: string | null; np: NowPlaying | null }) {
-  const [settings] = useSettings()
-  const [input, setInput] = useState("")
-  const [answer, setAnswer] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [clip, setClip] = useState("")
-
-  useEffect(() => {
-    navigator.clipboard?.readText().then(setClip).catch(() => {})
-  }, [])
-
-  const reset = () => {
-    setInput("")
-    setAnswer(null)
-    setError(null)
-  }
-
-  const run = async (prompt: string) => {
-    setBusy(true)
-    setError(null)
-    setAnswer(null)
-    try {
-      setAnswer(await askAi(settings, prompt))
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const quick = async (action: QuickAction) => {
-    const lyric = lyricLine && lyricLine !== "♪" ? lyricLine : null
-    const clipboard = action === "explain" ? "" : (await navigator.clipboard?.readText().catch(() => "")) || clip
-    const text = action === "explain" ? lyric : input.trim() || clipboard.trim() || lyric
-    if (!text) return setError(action === "explain" ? "No lyric line is showing right now." : "Copy some text first, or type it in the box.")
-    run(quickPrompt(action, text, userLanguage(navigator.language), action === "explain" && np ? np : undefined))
-  }
-
-  const copy = () =>
-    answer &&
-    navigator.clipboard.writeText(answer).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
-    })
-
-  return (
-    <div className="ai-ask" onKeyDown={(e) => e.key === "Escape" && reset()}>
-      <div className="ai-ask-row">
-        <input
-          className="ai-ask-input"
-          placeholder="Ask anything…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && input.trim() && !busy && run(input.trim())}
-        />
-        {(input || answer || error) && (
-          <button className="prompter-btn" onClick={reset} title="Clear (Esc)" aria-label="Clear">
-            <X size={12} />
-          </button>
-        )}
-        <button className="prompter-btn primary" disabled={!input.trim() || busy} onClick={() => run(input.trim())} aria-label="Send">
-          <SendHorizontal size={12} />
-        </button>
-      </div>
-      <div className="ai-quick">
-        {QUICK_ACTIONS.map((a) => (
-          <button key={a.id} className="prompter-btn" disabled={busy} onClick={() => quick(a.id)}>
-            {a.id === "explain" ? <Music2 size={11} /> : <ClipboardPaste size={11} />}
-            {a.label}
-          </button>
-        ))}
-      </div>
-      <div className="ai-answer">
-        {busy ? (
-          <span className="muted">Thinking…</span>
-        ) : error ? (
-          <span className="ai-error">{error}</span>
-        ) : answer ? (
-          <>
-            <button className="ai-copy" onClick={copy} title="Copy">
-              {copied ? <Check size={12} /> : <Copy size={12} />}
-            </button>
-            <p>{answer}</p>
-          </>
-        ) : (
-          <span className="muted">Quick actions use the text box, else your clipboard; Explain lyric uses the current line.</span>
-        )}
-      </div>
     </div>
   )
 }
