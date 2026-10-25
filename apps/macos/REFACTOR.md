@@ -22,9 +22,9 @@ Rules
 
 ## Phase 2: break up giant functions (real refactor, medium risk)
 
-- [ ] `Features/PhotoStrip.swift` (2301): the same `switch style` repeats in drawPhoto (353 lines), drawFooter (323), drawTrendFooter (263), drawBackground (169).
+- [x] `Features/PhotoStrip.swift` (2301): the same `switch style` repeats in drawPhoto (353 lines), drawFooter (323), drawTrendFooter (263), drawBackground (169).
       Target: `Features/PhotoStrip/` with Composer + DrawingHelpers + `Styles/<Style>.swift` (one style per file holding its background/photo/footer).
-      Compare exported strips before and after for every style.
+      Verified with `OpenNotchi --strip-snapshot <dir>`: 380 renders pixel-identical before/after.
 - [ ] `Views/PrompterView.swift` (704): `controlToolbar` is 215 lines → subviews
 - [ ] `Views/PhotoboxStudioView.swift` (748): `canvasSection` and `controlsSection` → subviews
 - [ ] `Views/NotchiMascot.swift` (666): `drawRobot` is 174 lines → split per body part
