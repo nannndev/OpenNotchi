@@ -1,40 +1,6 @@
-import Foundation
+import AppKit
 import CryptoKit
 import SQLite3
-
-struct NineRouterQuota: Equatable {
-    var name: String
-    var used: Double
-    var total: Double
-    var remaining: Double
-    var remainingPercentage: Double
-    var resetAt: Date?
-    var unlimited: Bool
-
-    var isExhausted: Bool {
-        if unlimited { return false }
-        if total > 0 && used >= total { return true }
-        return remainingPercentage <= 0.0
-    }
-}
-
-struct NineRouterConnection: Identifiable, Equatable {
-    var id: String
-    var provider: String
-    var name: String
-    var email: String?
-    var priority: Int
-    var isActive: Bool
-    var authType: String
-    var testStatus: String?
-    var lastError: String?
-    var errorCode: Int?
-    var plan: String?
-    var quotas: [NineRouterQuota] = []
-    var todayTokens: Int = 0
-    var todayCost: Double = 0.0
-    var days: [Int] = [Int](repeating: 0, count: 7)
-}
 
 /// Service to interact directly with 9router daemon (port 20128) and SQLite database (~/.9router/db/data.sqlite).
 final class NineRouterService {
@@ -56,9 +22,13 @@ final class NineRouterService {
     /// Computes the x-9r-cli-token required by 9router's local daemon API:
     /// SHA256(machineId + "9r-cli-auth" + cliSecret)[0..<16]
     func getAuthToken() -> String? {
-        guard let machineId = try? String(contentsOf: machineIdFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
-              let secret = try? String(contentsOf: cliSecretFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
-              !machineId.isEmpty, !secret.isEmpty else {
+        guard
+            let machineId = try? String(contentsOf: machineIdFile, encoding: .utf8).trimmingCharacters(
+                in: .whitespacesAndNewlines),
+            let secret = try? String(contentsOf: cliSecretFile, encoding: .utf8).trimmingCharacters(
+                in: .whitespacesAndNewlines),
+            !machineId.isEmpty, !secret.isEmpty
+        else {
             return nil
         }
         let raw = machineId + "9r-cli-auth" + secret
@@ -125,7 +95,8 @@ final class NineRouterService {
 
             // Set running 5h block if active
             if let sessionQuota = conn.quotas.first(where: { $0.name.contains("session") || $0.name.contains("5h") }),
-               let reset = sessionQuota.resetAt, reset > .now {
+                let reset = sessionQuota.resetAt, reset > .now
+            {
                 let start = reset.addingTimeInterval(-5 * 3600)
                 report.block = (start: start, tokens: UsageTotals(tokens: conn.todayTokens, cost: conn.todayCost))
             }
@@ -155,153 +126,111 @@ final class NineRouterService {
 
     // MARK: - SQLite Direct Access
 
-    private func readConnectionsFromDb() -> [NineRouterConnection] {
+    /// Runs `sql` read-only against 9router's database, calling `row` for each result row.
+    /// Returns false when the database can't be opened or the query is invalid.
+    @discardableResult
+    private func query(_ sql: String, _ args: [Any] = [], row: (Row) -> Void) -> Bool {
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbFile.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
-            return []
+            sqlite3_close(db)
+            return false
         }
         defer { sqlite3_close(db) }
-
-        var result: [NineRouterConnection] = []
-        let query = "SELECT id, provider, authType, name, email, priority, isActive, data FROM providerConnections ORDER BY priority ASC, id ASC;"
         var stmt: OpaquePointer?
-
-        if sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK {
-            defer { sqlite3_finalize(stmt) }
-            while sqlite3_step(stmt) == SQLITE_ROW {
-                guard let idC = sqlite3_column_text(stmt, 0),
-                      let provC = sqlite3_column_text(stmt, 1),
-                      let authC = sqlite3_column_text(stmt, 2) else { continue }
-
-                let id = String(cString: idC)
-                let provider = String(cString: provC)
-                let authType = String(cString: authC)
-                let name = sqlite3_column_text(stmt, 3).map { String(cString: $0) } ?? ""
-                let email = sqlite3_column_text(stmt, 4).map { String(cString: $0) }
-                let priority = Int(sqlite3_column_int(stmt, 5))
-                let isActive = sqlite3_column_int(stmt, 6) == 1
-
-                var testStatus: String? = nil
-                var lastError: String? = nil
-                var errorCode: Int? = nil
-
-                if let dataC = sqlite3_column_text(stmt, 7) {
-                    let jsonStr = String(cString: dataC)
-                    if let d = jsonStr.data(using: .utf8),
-                       let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
-                        testStatus = obj["testStatus"] as? String
-                        lastError = obj["lastError"] as? String
-                        errorCode = obj["errorCode"] as? Int
-                    }
-                }
-
-                result.append(NineRouterConnection(
-                    id: id,
-                    provider: provider,
-                    name: name,
-                    email: email,
-                    priority: priority,
-                    isActive: isActive,
-                    authType: authType,
-                    testStatus: testStatus,
-                    lastError: lastError,
-                    errorCode: errorCode
-                ))
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return false }
+        defer { sqlite3_finalize(stmt) }
+        for (i, arg) in args.enumerated() {
+            switch arg {
+            case let n as Int: sqlite3_bind_int64(stmt, Int32(i + 1), Int64(n))
+            default: sqlite3_bind_text(stmt, Int32(i + 1), "\(arg)", -1, Self.transient)
             }
         }
+        while sqlite3_step(stmt) == SQLITE_ROW { row(Row(stmt: stmt)) }
+        return true
+    }
 
+    /// One result row; NULL columns read as nil / 0 instead of crashing.
+    /// SQLite's SQLITE_TRANSIENT (copy the bound text now); the C macro doesn't import into Swift.
+    private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+    private struct Row {
+        let stmt: OpaquePointer?
+        func text(_ i: Int32) -> String? { sqlite3_column_text(stmt, i).map { String(cString: $0) } }
+        func int(_ i: Int32) -> Int { Int(sqlite3_column_int64(stmt, i)) }
+        func double(_ i: Int32) -> Double { sqlite3_column_double(stmt, i) }
+    }
+
+    private func readConnectionsFromDb() -> [NineRouterConnection] {
+        var result: [NineRouterConnection] = []
+        query(
+            "SELECT id, provider, authType, name, email, priority, isActive, data FROM providerConnections ORDER BY priority ASC, id ASC;"
+        ) { r in
+            guard let id = r.text(0), let provider = r.text(1), let authType = r.text(2) else { return }
+            let data = r.text(7).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] }
+            result.append(
+                NineRouterConnection(
+                    id: id,
+                    provider: provider,
+                    name: r.text(3) ?? "",
+                    email: r.text(4),
+                    priority: r.int(5),
+                    isActive: r.int(6) == 1,
+                    authType: authType,
+                    testStatus: data?["testStatus"] as? String,
+                    lastError: data?["lastError"] as? String,
+                    errorCode: data?["errorCode"] as? Int
+                ))
+        }
         return result
     }
 
     private func enrichWithUsageHistory(connections: inout [NineRouterConnection]) {
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbFile.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return }
-        defer { sqlite3_close(db) }
+        // Last 7 local dates, oldest first, as YYYY-MM-DD to match SQLite's date().
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let dateKeys = (0..<7).reversed().compactMap { Calendar.current.date(byAdding: .day, value: -$0, to: Date()) }
+            .map(df.string)
 
-        // Today's usage
-        let todaySql = """
-        SELECT coalesce(sum(promptTokens + completionTokens), 0), coalesce(sum(cost), 0.0)
-        FROM usageHistory
-        WHERE connectionId = ? AND date(timestamp, 'localtime') = date('now', 'localtime');
-        """
-
-        var todayStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, todaySql, -1, &todayStmt, nil) == SQLITE_OK {
-            defer { sqlite3_finalize(todayStmt) }
-            for i in connections.indices {
-                sqlite3_reset(todayStmt)
-                sqlite3_bind_text(todayStmt, 1, (connections[i].id as NSString).utf8String, -1, nil)
-                if sqlite3_step(todayStmt) == SQLITE_ROW {
-                    connections[i].todayTokens = Int(sqlite3_column_int64(todayStmt, 0))
-                    connections[i].todayCost = sqlite3_column_double(todayStmt, 1)
-                }
-            }
-        }
-
-        // 7-day sparkline
-        let daysSql = """
-        SELECT date(timestamp, 'localtime') as d, coalesce(sum(promptTokens + completionTokens), 0)
-        FROM usageHistory
-        WHERE connectionId = ? AND date(timestamp, 'localtime') >= date('now', 'localtime', '-6 days')
-        GROUP BY d ORDER BY d ASC;
-        """
-
-        var daysStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, daysSql, -1, &daysStmt, nil) == SQLITE_OK {
-            defer { sqlite3_finalize(daysStmt) }
-
-            // Build array of last 7 date keys in YYYY-MM-DD
-            let cal = Calendar.current
-            let now = Date()
-            let df = DateFormatter()
-            df.dateFormat = "yyyy-MM-dd"
-            var dateKeys: [String] = []
-            for d in (0..<7).reversed() {
-                if let dt = cal.date(byAdding: .day, value: -d, to: now) {
-                    dateKeys.append(df.string(from: dt))
-                }
+        for i in connections.indices {
+            let id = connections[i].id
+            query(
+                """
+                SELECT coalesce(sum(promptTokens + completionTokens), 0), coalesce(sum(cost), 0.0)
+                FROM usageHistory
+                WHERE connectionId = ? AND date(timestamp, 'localtime') = date('now', 'localtime');
+                """, [id]
+            ) { r in
+                connections[i].todayTokens = r.int(0)
+                connections[i].todayCost = r.double(1)
             }
 
-            for i in connections.indices {
-                sqlite3_reset(daysStmt)
-                sqlite3_bind_text(daysStmt, 1, (connections[i].id as NSString).utf8String, -1, nil)
-                var map: [String: Int] = [:]
-                while sqlite3_step(daysStmt) == SQLITE_ROW {
-                    if let dC = sqlite3_column_text(daysStmt, 0) {
-                        let dateStr = String(cString: dC)
-                        let tokens = Int(sqlite3_column_int64(daysStmt, 1))
-                        map[dateStr] = tokens
-                    }
-                }
-                var counts = [Int](repeating: 0, count: 7)
-                for (idx, key) in dateKeys.enumerated() {
-                    counts[idx] = map[key] ?? 0
-                }
-                connections[i].days = counts
+            var tokensByDay: [String: Int] = [:]
+            let ok = query(
+                """
+                SELECT date(timestamp, 'localtime') as d, coalesce(sum(promptTokens + completionTokens), 0)
+                FROM usageHistory
+                WHERE connectionId = ? AND date(timestamp, 'localtime') >= date('now', 'localtime', '-6 days')
+                GROUP BY d ORDER BY d ASC;
+                """, [id]
+            ) { r in
+                if let d = r.text(0) { tokensByDay[d] = r.int(1) }
             }
+            if ok { connections[i].days = dateKeys.map { tokensByDay[$0] ?? 0 } }
         }
     }
 
     /// Today's tokens and cost per model across every 9router account, biggest first.
     func todayModels(limit: Int = 5) -> [(model: String, tokens: Int, cost: Double)] {
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbFile.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_close(db) }
-
-        let sql = """
-        SELECT coalesce(model, '?'), coalesce(sum(promptTokens + completionTokens), 0), coalesce(sum(cost), 0.0)
-        FROM usageHistory
-        WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-        GROUP BY model ORDER BY 2 DESC LIMIT ?;
-        """
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int(stmt, 1, Int32(limit))
-
         var rows: [(model: String, tokens: Int, cost: Double)] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            rows.append((String(cString: sqlite3_column_text(stmt, 0)), Int(sqlite3_column_int64(stmt, 1)), sqlite3_column_double(stmt, 2)))
+        query(
+            """
+            SELECT coalesce(model, '?'), coalesce(sum(promptTokens + completionTokens), 0), coalesce(sum(cost), 0.0)
+            FROM usageHistory
+            WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+            GROUP BY model ORDER BY 2 DESC LIMIT ?;
+            """, [limit]
+        ) { r in
+            rows.append((r.text(0) ?? "?", r.int(1), r.double(2)))
         }
         return rows
     }
@@ -328,65 +257,48 @@ final class NineRouterService {
 
     /// Daily totals from 9router's `usageDaily` rollup, oldest first. `days` nil means all history.
     func dailyStats(days: Int?) -> [DayStat] {
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbFile.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_close(db) }
-
-        let sql = """
-        SELECT dateKey,
-               coalesce(json_extract(data, '$.requests'), 0),
-               coalesce(json_extract(data, '$.promptTokens'), 0),
-               coalesce((SELECT sum(json_extract(value, '$.cachedTokens')) FROM json_each(data, '$.byProvider')), 0),
-               coalesce(json_extract(data, '$.completionTokens'), 0),
-               coalesce(json_extract(data, '$.cost'), 0.0)
-        FROM usageDaily
-        WHERE dateKey >= date('now', 'localtime', ?)
-        ORDER BY dateKey ASC;
-        """
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, ("-\((days ?? 100_000) - 1) days" as NSString).utf8String, -1, nil)
-
         var rows: [DayStat] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            rows.append(DayStat(
-                date: String(cString: sqlite3_column_text(stmt, 0)),
-                requests: Int(sqlite3_column_int64(stmt, 1)),
-                input: Int(sqlite3_column_int64(stmt, 2)),
-                cached: Int(sqlite3_column_int64(stmt, 3)),
-                output: Int(sqlite3_column_int64(stmt, 4)),
-                cost: sqlite3_column_double(stmt, 5)
-            ))
+        query(
+            """
+            SELECT dateKey,
+                   coalesce(json_extract(data, '$.requests'), 0),
+                   coalesce(json_extract(data, '$.promptTokens'), 0),
+                   coalesce((SELECT sum(json_extract(value, '$.cachedTokens')) FROM json_each(data, '$.byProvider')), 0),
+                   coalesce(json_extract(data, '$.completionTokens'), 0),
+                   coalesce(json_extract(data, '$.cost'), 0.0)
+            FROM usageDaily
+            WHERE dateKey >= date('now', 'localtime', ?)
+            ORDER BY dateKey ASC;
+            """, ["-\((days ?? 100_000) - 1) days"]
+        ) { r in
+            guard let date = r.text(0) else { return }
+            rows.append(
+                DayStat(
+                    date: date, requests: r.int(1), input: r.int(2), cached: r.int(3), output: r.int(4),
+                    cost: r.double(5)))
         }
         return rows
     }
 
     /// Latest routed requests, newest first.
     func recentRequests(limit: Int = 20) -> [RecentRequest] {
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbFile.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_close(db) }
-
-        let sql = "SELECT id, timestamp, coalesce(model, '?'), coalesce(provider, ''), promptTokens, completionTokens, coalesce(status, '') FROM usageHistory ORDER BY id DESC LIMIT ?;"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int(stmt, 1, Int32(limit))
-
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         var rows: [RecentRequest] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            rows.append(RecentRequest(
-                id: sqlite3_column_int64(stmt, 0),
-                date: iso.date(from: String(cString: sqlite3_column_text(stmt, 1))) ?? .distantPast,
-                model: String(cString: sqlite3_column_text(stmt, 2)),
-                provider: String(cString: sqlite3_column_text(stmt, 3)),
-                input: Int(sqlite3_column_int64(stmt, 4)),
-                output: Int(sqlite3_column_int64(stmt, 5)),
-                ok: String(cString: sqlite3_column_text(stmt, 6)) == "ok"
-            ))
+        query(
+            "SELECT id, timestamp, coalesce(model, '?'), coalesce(provider, ''), promptTokens, completionTokens, coalesce(status, '') FROM usageHistory ORDER BY id DESC LIMIT ?;",
+            [limit]
+        ) { r in
+            rows.append(
+                RecentRequest(
+                    id: Int64(r.int(0)),
+                    date: r.text(1).flatMap(iso.date) ?? .distantPast,
+                    model: r.text(2) ?? "?",
+                    provider: r.text(3) ?? "",
+                    input: r.int(4),
+                    output: r.int(5),
+                    ok: r.text(6) == "ok"
+                ))
         }
         return rows
     }
@@ -396,22 +308,18 @@ final class NineRouterService {
 
     /// First active 9router API key, so Ask AI can call the local endpoint without the user pasting it.
     func apiKey() -> String? {
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbFile.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return nil }
-        defer { sqlite3_close(db) }
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, "SELECT key FROM apiKeys WHERE isActive = 1 ORDER BY createdAt ASC LIMIT 1;", -1, &stmt, nil) == SQLITE_OK else { return nil }
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_step(stmt) == SQLITE_ROW, let c = sqlite3_column_text(stmt, 0) else { return nil }
-        return String(cString: c)
+        var key: String?
+        query("SELECT key FROM apiKeys WHERE isActive = 1 ORDER BY createdAt ASC LIMIT 1;") { key = $0.text(0) }
+        return key
     }
 
     /// Model ids 9router can route to right now (e.g. "cc/claude-sonnet-5-5"), empty when the daemon is down.
     func models() async -> [String] {
         guard let url = URL(string: Self.baseURL + "/models"),
-              let (data, _) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 3)),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let list = json["data"] as? [[String: Any]] else { return [] }
+            let (data, _) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 3)),
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let list = json["data"] as? [[String: Any]]
+        else { return [] }
         return list.compactMap { $0["id"] as? String }
     }
 
@@ -458,7 +366,8 @@ final class NineRouterService {
             let task = URLSession.shared.dataTask(with: request) { data, response, error in
                 defer { group.leave() }
                 guard let data, let http = response as? HTTPURLResponse, http.statusCode == 200,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                else {
                     return
                 }
 
@@ -471,7 +380,9 @@ final class NineRouterService {
                         let used = (qDict["used"] as? NSNumber)?.doubleValue ?? 0.0
                         let total = (qDict["total"] as? NSNumber)?.doubleValue ?? 0.0
                         let remaining = (qDict["remaining"] as? NSNumber)?.doubleValue ?? 0.0
-                        let remainingPct = (qDict["remainingPercentage"] as? NSNumber)?.doubleValue ?? (total > 0 ? max(0, 100.0 - (used / total * 100.0)) : 100.0)
+                        let remainingPct =
+                            (qDict["remainingPercentage"] as? NSNumber)?.doubleValue
+                            ?? (total > 0 ? max(0, 100.0 - (used / total * 100.0)) : 100.0)
                         let unlimited = (qDict["unlimited"] as? Bool) ?? false
 
                         var resetAt: Date? = nil
@@ -479,15 +390,16 @@ final class NineRouterService {
                             resetAt = isoFractional.date(from: resetStr) ?? isoPlain.date(from: resetStr)
                         }
 
-                        parsedQuotas.append(NineRouterQuota(
-                            name: qName,
-                            used: used,
-                            total: total,
-                            remaining: remaining,
-                            remainingPercentage: remainingPct,
-                            resetAt: resetAt,
-                            unlimited: unlimited
-                        ))
+                        parsedQuotas.append(
+                            NineRouterQuota(
+                                name: qName,
+                                used: used,
+                                total: total,
+                                remaining: remaining,
+                                remainingPercentage: remainingPct,
+                                resetAt: resetAt,
+                                unlimited: unlimited
+                            ))
                     }
                 }
 
@@ -531,7 +443,8 @@ final class NineRouterService {
 
         // 2. Notify 9router daemon via HTTP PUT
         guard let token = getAuthToken(),
-              let url = URL(string: "http://127.0.0.1:20128/api/providers/\(id)") else {
+            let url = URL(string: "http://127.0.0.1:20128/api/providers/\(id)")
+        else {
             completion?(true)
             return
         }
