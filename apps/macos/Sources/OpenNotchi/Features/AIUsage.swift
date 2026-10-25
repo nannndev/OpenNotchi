@@ -318,6 +318,8 @@ final class AIUsageManager: ObservableObject {
     @Published private(set) var reports: [UsageReport] = []
     @Published private(set) var is9RouterConnected: Bool = false
     @Published private(set) var scanning = false
+    /// Today's top models across 9router accounts (empty without 9router).
+    @Published private(set) var topModels: [(model: String, tokens: Int, cost: Double)] = []
     private var timer: Timer?
     private var accounts: [AIAccount] = []
     private var lastScan = Date.distantPast
@@ -347,6 +349,7 @@ final class AIUsageManager: ObservableObject {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             var allReports: [UsageReport] = []
             var from9Router = false
+            var models: [(model: String, tokens: Int, cost: Double)] = []
 
             // 1. Prioritize 9router if available: fetches all multi-accounts per provider
             if NineRouterService.shared.isAvailable {
@@ -354,6 +357,7 @@ final class AIUsageManager: ObservableObject {
                 if !nineReports.isEmpty {
                     allReports = nineReports
                     from9Router = true
+                    models = NineRouterService.shared.todayModels()
                 }
             }
 
@@ -376,6 +380,7 @@ final class AIUsageManager: ObservableObject {
             DispatchQueue.main.async {
                 self?.reports = allReports
                 self?.is9RouterConnected = from9Router
+                self?.topModels = models
                 self?.scanning = false
             }
         }

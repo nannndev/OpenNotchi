@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
-import { Bot, Check, ClipboardPaste, Copy, Music2, SendHorizontal, Sparkles, Terminal, X } from "lucide-react"
+import { Bot, ExternalLink, LayoutGrid, List, Rows3, Sparkles, Terminal } from "lucide-react"
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import {
   formatCost,
@@ -8,26 +8,47 @@ import {
   getAccountQuota,
   mergeSessions,
   transitionPeek,
-  QUICK_ACTIONS,
-  quickPrompt,
   resetsIn,
   STATE_LABELS,
   timeAgo,
   TOOL_NAMES,
-  userLanguage,
   windowLabel,
   type AgentSession,
   type AgentState,
   type HookEvent,
-  type QuickAction,
   type RateWindow,
   type UsageReport,
 } from "../ai"
 import type { NowPlaying } from "../media"
 import { useSettings } from "../settings"
+import { ChatPanel } from "./ChatPanel"
+export { askAi } from "./ChatPanel"
 import { transitionBanner, type Banner } from "../banner"
 
-type Section = "usage" | "agents" | "ask"
+type Section = "usage" | "analytics" | "agents" | "ask"
+type UsageLayout = "cards" | "compact" | "list"
+
+const SECTION_LABELS: Record<Section, string> = { usage: "Quota & Accounts", analytics: "Analytics", agents: "Agents", ask: "Ask" }
+
+/** Per-viewer UI choice; storage can be unavailable, so fall back silently. */
+function useStored<T extends string>(key: string, fallback: T): [T, (v: T) => void] {
+  const [v, setV] = useState<T>(() => {
+    try {
+      return (localStorage.getItem(key) as T) || fallback
+    } catch {
+      return fallback
+    }
+  })
+  return [
+    v,
+    (next: T) => {
+      setV(next)
+      try {
+        localStorage.setItem(key, next)
+      } catch {}
+    },
+  ]
+}
 
 export function AITab({
   sessions,
@@ -42,7 +63,7 @@ export function AITab({
   lyricLine: string | null
   np: NowPlaying | null
 }) {
-  const [settings] = useSettings()
+  const [settings, setSettings] = useSettings()
   const [section, setSection] = useState<Section>(
     (usage && usage.length > 0) || settings.aiAccounts.length > 0
       ? "usage"
@@ -50,6 +71,8 @@ export function AITab({
       ? "agents"
       : "usage"
   )
+  const layout: UsageLayout = settings.usageLayout
+  const setLayout = (l: UsageLayout) => setSettings({ usageLayout: l })
   const now = Date.now()
 
   const totalTokensToday = usage?.reduce((sum, r) => sum + r.today.tokens, 0) ?? 0
@@ -59,9 +82,9 @@ export function AITab({
   return (
     <div className="tab-ai">
       <div className="segmented ai-segments">
-        {(["usage", "agents", "ask"] as const).map((s) => (
+        {(Object.keys(SECTION_LABELS) as Section[]).map((s) => (
           <button key={s} className={section === s ? "active" : ""} onClick={() => setSection(s)}>
-            {s === "usage" ? "Quota & Accounts" : s === "agents" ? "Agents" : "Ask"}
+            {SECTION_LABELS[s]}
           </button>
         ))}
       </div>
@@ -84,6 +107,13 @@ export function AITab({
                   <span className="ai-summary-label">Accounts</span>
                   <b className="ai-summary-val">{activeCount} active</b>
                 </div>
+                <div className="ai-layout-picker" role="group" aria-label="Layout">
+                  {([["cards", LayoutGrid], ["compact", Rows3], ["list", List]] as const).map(([l, Icon]) => (
+                    <button key={l} className={layout === l ? "active" : ""} onClick={() => setLayout(l)} title={`${l} layout`} aria-label={`${l} layout`}>
+                      <Icon size={11} />
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -92,47 +122,40 @@ export function AITab({
             ) : !usage ? (
               <div className="ai-empty">Reading usage & quotas…</div>
             ) : (
-              <div className="ai-usage">
-                {usage.map((r, i) => (
-                  <UsageCard
-                    key={r.id || r.connectionId || i}
-                    r={r}
-                    now={now}
-                    onToggleActive={onToggleActive}
-                  />
-                ))}
+              <div className={layout === "cards" ? "ai-usage" : layout === "compact" ? "ai-usage-compact" : "ai-usage-list"}>
+                {usage.map((r, i) =>
+                  layout === "cards" ? (
+                    <UsageCard key={r.id || r.connectionId || i} r={r} now={now} onToggleActive={onToggleActive} />
+                  ) : (
+                    <UsageRow key={r.id || r.connectionId || i} r={r} now={now} compact={layout === "compact"} onToggleActive={onToggleActive} />
+                  ),
+                )}
               </div>
             )}
           </div>
         )}
 
+        {section === "analytics" && <AnalyticsPanel />}
+
         {section === "agents" &&
           (!settings.aiAgents ? (
             <div className="ai-empty">Agent status is off in Settings › AI.</div>
-          ) : sessions.length === 0 ? (
-            <div className="ai-empty">No Claude Code, Codex, or Antigravity sessions in the last 30 minutes.</div>
           ) : (
-            <div className="ai-agents">
-              {sessions.map((s) => (
-                <div key={s.sessionId} className="ai-agent-row" title={s.message ?? undefined}>
-                  <AgentToolIcon tool={s.tool} />
-                  <span className="ai-agent-project">{s.project || TOOL_NAMES[s.tool] || s.tool}</span>
-                  <span className="ai-agent-msg">{s.state === "needs_you" ? s.message : TOOL_NAMES[s.tool] || s.tool}</span>
-                  <span className={`ai-chip ${s.state}`}>{STATE_LABELS[s.state]}</span>
-                  <span className="ai-agent-time">{timeAgo(s.updatedAt, now)}</span>
-                </div>
-              ))}
-            </div>
+            <AgentsPanel sessions={sessions} now={now} />
           ))}
 
-        {section === "ask" && <AskPanel lyricLine={lyricLine} np={np} />}
+        {section === "ask" && <ChatPanel lyricLine={lyricLine} np={np} usage={usage} />}
       </div>
     </div>
   )
 }
 
-function AgentToolIcon({ tool }: { tool: string }) {
+const LOGOS = ["claude", "codex", "antigravity", "commandcode"]
+
+/** The provider's real logo (public/providers, from 9router), falling back to a generic icon. */
+function AgentToolIcon({ tool, size = 16 }: { tool: string; size?: number }) {
   const t = tool.toLowerCase()
+  if (LOGOS.includes(t)) return <img src={`/providers/${t}.png`} width={size} height={size} className="ai-logo" alt={TOOL_NAMES[t] || t} />
   if (t === "claude") return <Terminal size={13} className="ai-icon-tool ai-icon-claude" />
   if (t === "antigravity") return <Sparkles size={13} className="ai-icon-tool ai-icon-antigravity" />
   if (t === "commandcode") return <Terminal size={13} className="ai-icon-tool ai-icon-commandcode" />
@@ -170,7 +193,7 @@ function UsageCard({
         <AgentToolIcon tool={r.tool} />
         <div className="ai-card-title-group">
           <strong className="ai-card-title">{r.name}</strong>
-          {r.email && <span className="ai-card-email">{r.email}</span>}
+          <span className="ai-card-email">{TOOL_NAMES[r.tool] || r.tool}</span>
         </div>
 
         {r.isFrom9Router && (
@@ -293,6 +316,239 @@ function UsageCard({
   )
 }
 
+/** The quota closest to running out decides whether an account is usable. */
+function tightestQuota(r: UsageReport) {
+  return (r.quotas ?? []).filter((q) => !q.unlimited).sort((a, b) => a.remainingPercentage - b.remainingPercentage)[0]
+}
+
+const quotaLevel = (remaining: number) => (remaining <= 10 ? "hot" : remaining <= 30 ? "warn" : "ok")
+
+/** Compact tile (ring + tightest quota) or a one-line list row with every quota. */
+function UsageRow({
+  r,
+  now,
+  compact,
+  onToggleActive,
+}: {
+  r: UsageReport
+  now: number
+  compact: boolean
+  onToggleActive?: (id: string, active: boolean) => void
+}) {
+  const isActive = r.isActive !== false
+  const tight = tightestQuota(r)
+  const remaining = tight?.remainingPercentage ?? 100
+  const toggle = r.isFrom9Router && (
+    <button
+      type="button"
+      className={`ai-switch ${isActive ? "on" : ""}`}
+      onClick={() => onToggleActive?.(r.connectionId || r.id || "", !isActive)}
+      title={isActive ? "Active in 9router. Click to turn off." : "Inactive. Click to turn on."}
+      aria-label={`${r.name} ${isActive ? "on" : "off"}`}
+    />
+  )
+
+  if (compact) {
+    return (
+      <div className={`ai-tile ${isActive ? "" : "ai-card-inactive"}`} title={tight?.resetAt ? resetsIn(tight.resetAt, now) : undefined}>
+        <div className={`ai-ring ${tight ? quotaLevel(remaining) : ""}`} style={{ "--p": `${Math.max(0, Math.min(100, remaining))}%` } as CSSProperties}>
+          <AgentToolIcon tool={r.tool} size={18} />
+        </div>
+        <div className="ai-tile-text">
+          <strong>{r.name}</strong>
+          <span className={tight ? `ai-q-${quotaLevel(remaining)}` : "muted"}>
+            {tight ? `${Math.round(remaining)}% · ${tight.name}` : r.quotas?.length ? "Unlimited" : TOOL_NAMES[r.tool] || r.tool}
+          </span>
+          <span className="muted">
+            {TOOL_NAMES[r.tool] || r.tool} · {formatTokens(r.today.tokens)} today
+          </span>
+        </div>
+        {toggle}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`ai-list-row ${isActive ? "" : "ai-card-inactive"}`}>
+      <AgentToolIcon tool={r.tool} size={20} />
+      <div className="ai-list-name">
+        <strong>{r.name}</strong>
+        <span className="muted">{TOOL_NAMES[r.tool] || r.tool}</span>
+      </div>
+      <div className="ai-list-quotas">
+        {(r.quotas ?? []).slice(0, 4).map((q) => (
+          <div key={q.name} title={q.resetAt ? resetsIn(q.resetAt, now) : q.name}>
+            <span>{q.unlimited ? `${q.name} ∞` : `${q.name} ${Math.round(q.remainingPercentage)}%`}</span>
+            <i className={`ai-q-bar ai-q-${q.unlimited ? "ok" : quotaLevel(q.remainingPercentage)}`} style={{ "--p": `${q.unlimited ? 100 : Math.max(0, Math.min(100, q.remainingPercentage))}%` } as CSSProperties} />
+          </div>
+        ))}
+      </div>
+      <b className="ai-list-tokens">{formatTokens(r.today.tokens)}</b>
+      {toggle}
+    </div>
+  )
+}
+
+const STATE_ORDER: Record<string, number> = { needs_you: 0, working: 1, done: 2, idle: 3 }
+
+function AgentsPanel({ sessions, now }: { sessions: AgentSession[]; now: number }) {
+  const count = (st: AgentState) => sessions.filter((s) => s.state === st).length
+  const sorted = [...sessions].sort((a, b) => (STATE_ORDER[a.state] ?? 9) - (STATE_ORDER[b.state] ?? 9) || b.updatedAt - a.updatedAt)
+
+  return (
+    <div className="ai-agents">
+      <div className="ai-agent-stats">
+        {(["needs_you", "working", "done"] as const).map((st) => (
+          <span key={st} className={`ai-stat-pill ${st} ${count(st) ? "has" : ""}`}>
+            <b>{count(st)}</b> {STATE_LABELS[st]}
+          </span>
+        ))}
+      </div>
+      {sessions.length === 0 ? (
+        <div className="ai-empty">
+          <div className="ai-empty-logos">
+            {LOGOS.map((t) => (
+              <AgentToolIcon key={t} tool={t} size={30} />
+            ))}
+          </div>
+          <b>No agents running</b>
+          <span>Start Claude Code, Codex, Antigravity or Command Code. Progress and approval prompts show up here.</span>
+        </div>
+      ) : (
+        <div className="ai-agent-grid">
+          {sorted.map((s) => (
+            <div key={s.sessionId} className={`ai-agent-card ${s.state}`} title={s.message ?? undefined}>
+              <AgentToolIcon tool={s.tool} size={26} />
+              <div className="ai-agent-text">
+                <div className="ai-agent-top">
+                  <strong>{s.project || TOOL_NAMES[s.tool] || s.tool}</strong>
+                  <span className="ai-agent-time">{timeAgo(s.updatedAt, now)}</span>
+                </div>
+                <div className="ai-agent-state">
+                  <i className="ai-dot" />
+                  <b>{STATE_LABELS[s.state]}</b>
+                  <span className="muted">· {TOOL_NAMES[s.tool] || s.tool}</span>
+                </div>
+                {s.message && <div className="ai-agent-msg">{s.message}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface DayStat {
+  date: string
+  requests: number
+  input: number
+  cached: number
+  output: number
+  cost: number
+}
+interface Analytics {
+  days: DayStat[]
+  recent: { id: number; timestamp: string; model: string; provider: string; input: number; output: number; ok: boolean }[]
+  topModels: { model: string; tokens: number; cost: number }[]
+}
+
+const RANGES = { Today: 1, "7D": 7, "30D": 30, All: null } as const
+type Range = keyof typeof RANGES
+type Metric = "Tokens" | "Requests" | "Cost"
+
+/** 9router usage history: totals, a chart, recent requests and today's top models. */
+function AnalyticsPanel() {
+  const [range, setRange] = useStored<Range>("analyticsRange", "7D")
+  const [metric, setMetric] = useState<Metric>("Tokens")
+  const [data, setData] = useState<Analytics | null>(null)
+  const now = Date.now()
+
+  useEffect(() => {
+    const load = () => invoke<Analytics>("ninerouter_analytics", { days: RANGES[range] }).then(setData).catch(() => setData(null))
+    load()
+    const id = setInterval(load, 10_000)
+    return () => clearInterval(id)
+  }, [range])
+
+  if (!data) return <div className="ai-empty">Reading 9router…</div>
+  if (data.days.length === 0 && data.recent.length === 0) return <div className="ai-empty">Install 9router to see request history and analytics.</div>
+
+  const total = data.days.reduce(
+    (t, d) => ({ requests: t.requests + d.requests, input: t.input + d.input, cached: t.cached + d.cached, output: t.output + d.output, cost: t.cost + d.cost }),
+    { requests: 0, input: 0, cached: 0, output: 0, cost: 0 },
+  )
+  const value = (d: DayStat) => (metric === "Tokens" ? d.input + d.output : metric === "Requests" ? d.requests : d.cost)
+  const values = data.days.map(value)
+  const peak = Math.max(1, ...values)
+  const pts = values.map((v, i) => `${values.length === 1 ? 50 : (i / (values.length - 1)) * 100},${100 - (v / peak) * 92}`)
+
+  return (
+    <div className="ai-analytics">
+      <div className="ai-an-stats">
+        <div><span>Requests</span><b>{total.requests.toLocaleString()}</b></div>
+        <div><span>Input</span><b className="ai-c-orange">{formatTokens(total.input)}</b></div>
+        <div><span>Cached</span><b className="ai-c-cyan">{formatTokens(total.cached)}</b></div>
+        <div><span>Output</span><b className="ai-c-green">{formatTokens(total.output)}</b></div>
+        <div><span>Est. cost</span><b className="ai-c-yellow">{formatCost(total.cost)}</b></div>
+      </div>
+      <div className="ai-an-body">
+        <div className="ai-an-chart">
+          <div className="ai-an-controls">
+            <div className="segmented">
+              {(["Tokens", "Requests", "Cost"] as const).map((m) => (
+                <button key={m} className={metric === m ? "active" : ""} onClick={() => setMetric(m)}>{m}</button>
+              ))}
+            </div>
+            <div className="segmented">
+              {(Object.keys(RANGES) as Range[]).map((r) => (
+                <button key={r} className={range === r ? "active" : ""} onClick={() => setRange(r)}>{r}</button>
+              ))}
+            </div>
+          </div>
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="ai-an-svg" role="img" aria-label={`${metric} per day`}>
+            <defs>
+              <linearGradient id="an-fill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stopColor="var(--accent)" stopOpacity="0.35" />
+                <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {pts.length > 1 && <polygon points={`0,100 ${pts.join(" ")} 100,100`} fill="url(#an-fill)" />}
+            {pts.length > 1 && <polyline points={pts.join(" ")} fill="none" stroke="var(--accent)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
+            {pts.length === 1 && <circle cx="50" cy={pts[0].split(",")[1]} r="1.5" fill="var(--accent)" />}
+          </svg>
+          <div className="ai-an-axis">
+            <span>{data.days[0]?.date.slice(5)}</span>
+            <span>peak {metric === "Cost" ? formatCost(peak) : formatTokens(peak)}</span>
+            <span>{data.days[data.days.length - 1]?.date.slice(5)}</span>
+          </div>
+        </div>
+        <div className="ai-an-recent">
+          <span className="ai-an-title">Recent requests</span>
+          {data.recent.map((r) => (
+            <div key={r.id} className={`ai-an-req ${r.ok ? "" : "fail"}`}>
+              <AgentToolIcon tool={r.provider} size={12} />
+              <span className="ai-an-model">{r.model}</span>
+              <span className="muted">{formatTokens(r.input)}↑ {formatTokens(r.output)}↓</span>
+              <span className="ai-agent-time">{timeAgo(Date.parse(r.timestamp), now)}</span>
+            </div>
+          ))}
+          {data.topModels.length > 0 && <span className="ai-an-title">Top models today</span>}
+          {data.topModels.map((m) => (
+            <div key={m.model} className="ai-an-req">
+              <span className="ai-an-model">{m.model}</span>
+              <b>{formatTokens(m.tokens)}</b>
+            </div>
+          ))}
+          <button className="ai-an-open" onClick={() => invoke("open_external_url", { url: "http://127.0.0.1:20128" }).catch(() => {})}>
+            <ExternalLink size={10} /> Open 9router
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LimitBar({ w, now }: { w: RateWindow; now: number }) {
   const pct = Math.min(100, Math.max(0, w.usedPercent))
   return (
@@ -303,111 +559,6 @@ function LimitBar({ w, now }: { w: RateWindow; now: number }) {
       </div>
       <div className={`ai-bar ${pct >= 80 ? "hot" : ""}`} style={{ "--p": `${pct}%` } as CSSProperties} />
       <div className="ai-card-note">{resetsIn(w.resetsAt * 1000, now)}</div>
-    </div>
-  )
-}
-
-function providerFields(s: ReturnType<typeof useSettings>[0]) {
-  if (s.aiProvider === "anthropic") return { provider: "anthropic", baseUrl: "", model: s.aiAnthropicModel }
-  if (s.aiProvider === "openai") return { provider: "openai", baseUrl: s.aiOpenaiUrl, model: s.aiOpenaiModel }
-  return { provider: "ollama", baseUrl: s.aiOllamaUrl, model: s.aiOllamaModel }
-}
-
-/** Sends a prompt with the provider from Settings; used by the Ask panel and the Settings "Test" button. */
-export function askAi(settings: ReturnType<typeof useSettings>[0], prompt: string): Promise<string> {
-  return invoke<string>("ask_ai", { req: { ...providerFields(settings), prompt } })
-}
-
-function AskPanel({ lyricLine, np }: { lyricLine: string | null; np: NowPlaying | null }) {
-  const [settings] = useSettings()
-  const [input, setInput] = useState("")
-  const [answer, setAnswer] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [clip, setClip] = useState("")
-
-  useEffect(() => {
-    navigator.clipboard?.readText().then(setClip).catch(() => {})
-  }, [])
-
-  const reset = () => {
-    setInput("")
-    setAnswer(null)
-    setError(null)
-  }
-
-  const run = async (prompt: string) => {
-    setBusy(true)
-    setError(null)
-    setAnswer(null)
-    try {
-      setAnswer(await askAi(settings, prompt))
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const quick = async (action: QuickAction) => {
-    const lyric = lyricLine && lyricLine !== "♪" ? lyricLine : null
-    const clipboard = action === "explain" ? "" : (await navigator.clipboard?.readText().catch(() => "")) || clip
-    const text = action === "explain" ? lyric : input.trim() || clipboard.trim() || lyric
-    if (!text) return setError(action === "explain" ? "No lyric line is showing right now." : "Copy some text first, or type it in the box.")
-    run(quickPrompt(action, text, userLanguage(navigator.language), action === "explain" && np ? np : undefined))
-  }
-
-  const copy = () =>
-    answer &&
-    navigator.clipboard.writeText(answer).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
-    })
-
-  return (
-    <div className="ai-ask" onKeyDown={(e) => e.key === "Escape" && reset()}>
-      <div className="ai-ask-row">
-        <input
-          className="ai-ask-input"
-          placeholder="Ask anything…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && input.trim() && !busy && run(input.trim())}
-        />
-        {(input || answer || error) && (
-          <button className="prompter-btn" onClick={reset} title="Clear (Esc)" aria-label="Clear">
-            <X size={12} />
-          </button>
-        )}
-        <button className="prompter-btn primary" disabled={!input.trim() || busy} onClick={() => run(input.trim())} aria-label="Send">
-          <SendHorizontal size={12} />
-        </button>
-      </div>
-      <div className="ai-quick">
-        {QUICK_ACTIONS.map((a) => (
-          <button key={a.id} className="prompter-btn" disabled={busy} onClick={() => quick(a.id)}>
-            {a.id === "explain" ? <Music2 size={11} /> : <ClipboardPaste size={11} />}
-            {a.label}
-          </button>
-        ))}
-      </div>
-      <div className="ai-answer">
-        {busy ? (
-          <span className="muted">Thinking…</span>
-        ) : error ? (
-          <span className="ai-error">{error}</span>
-        ) : answer ? (
-          <>
-            <button className="ai-copy" onClick={copy} title="Copy">
-              {copied ? <Check size={12} /> : <Copy size={12} />}
-            </button>
-            <p>{answer}</p>
-          </>
-        ) : (
-          <span className="muted">Quick actions use the text box, else your clipboard; Explain lyric uses the current line.</span>
-        )}
-      </div>
     </div>
   )
 }

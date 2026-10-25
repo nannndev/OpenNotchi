@@ -6,7 +6,8 @@
     "pill",
     "lyrics",
     "settings",
-    "share"
+    "share",
+    "nowplaying"
   ],
   "permissions": [
     "core:default",

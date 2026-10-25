@@ -43,6 +43,15 @@ export const MIRROR_MAX_HEIGHT = 440
 
 export type NotchMode = "pinned" | "floating" | "autoHide"
 
+export type NowPlayingBackground = "blur" | "aurora" | "gradient" | "vinyl" | "black"
+export const NOW_PLAYING_BACKGROUNDS: { id: NowPlayingBackground; name: string }[] = [
+  { id: "blur", name: "Blurred cover" },
+  { id: "aurora", name: "Aurora (moving album colors)" },
+  { id: "gradient", name: "Album color gradient" },
+  { id: "vinyl", name: "Spinning record" },
+  { id: "black", name: "Black" },
+]
+
 export interface AppSettings {
   theme: NotchTheme
   accentChoice: AccentChoice
@@ -100,6 +109,19 @@ export interface AppSettings {
   aiAnthropicModel: string
   aiOpenaiUrl: string
   aiOpenaiModel: string
+  /** Empty means "pick a Haiku/Sonnet model automatically". */
+  aiNineRouterModel: string
+  /** Quota & Accounts layout. */
+  usageLayout: "cards" | "compact" | "list"
+  /** Full-screen player: opens after this many idle minutes while music plays (0 = never automatically). */
+  nowPlayingEnabled: boolean
+  nowPlayingIdleMinutes: number
+  nowPlayingBackground: NowPlayingBackground
+  nowPlayingLyrics: boolean
+  nowPlayingClock: boolean
+  nowPlayingTextScale: number
+  /** Lyrics translation target ("" = off); Windows translates with the Ask AI provider. */
+  lyricsTranslateTarget: string
   showMascot: boolean
   notificationSounds: boolean
 }
@@ -201,6 +223,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   aiAnthropicModel: "claude-haiku-5-5",
   aiOpenaiUrl: "https://api.openai.com/v1",
   aiOpenaiModel: "gpt-4o-mini",
+  aiNineRouterModel: "",
+  usageLayout: "cards",
+  nowPlayingEnabled: true,
+  nowPlayingIdleMinutes: 2,
+  nowPlayingBackground: "blur",
+  nowPlayingLyrics: true,
+  nowPlayingClock: true,
+  nowPlayingTextScale: 1,
+  lyricsTranslateTarget: "",
   showMascot: true,
   notificationSounds: true,
 }

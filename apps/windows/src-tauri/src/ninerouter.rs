@@ -425,6 +425,128 @@ pub fn set_connection_active(id: &str, active: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// The local OpenAI-compatible endpoint 9router serves.
+pub const BASE_URL: &str = "http://127.0.0.1:20128/v1";
+
+/// First active 9router API key, so Ask AI can call the local endpoint without the user pasting it.
+pub fn api_key() -> Option<String> {
+    let conn = Connection::open_with_flags(db_path(), OpenFlags::SQLITE_OPEN_READ_ONLY).ok()?;
+    conn.query_row("SELECT key FROM apiKeys WHERE isActive = 1 ORDER BY createdAt ASC LIMIT 1;", [], |r| r.get(0)).ok()
+}
+
+/// Model ids 9router can route to right now (e.g. "cc/claude-sonnet-5-5"); empty when the daemon is down.
+pub fn models() -> Vec<String> {
+    let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).timeout_global(Some(Duration::from_secs(3))).build().into();
+    let Ok(mut resp) = agent.get(format!("{BASE_URL}/models")).call() else { return vec![] };
+    let v: Value = resp.body_mut().read_json().unwrap_or_default();
+    v["data"].as_array().into_iter().flatten().filter_map(|m| m["id"].as_str().map(String::from)).collect()
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DayStat {
+    pub date: String,
+    pub requests: u64,
+    pub input: u64,
+    pub cached: u64,
+    pub output: u64,
+    pub cost: f64,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentRequest {
+    pub id: i64,
+    pub timestamp: String,
+    pub model: String,
+    pub provider: String,
+    pub input: u64,
+    pub output: u64,
+    pub ok: bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelUsage {
+    pub model: String,
+    pub tokens: u64,
+    pub cost: f64,
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Analytics {
+    pub days: Vec<DayStat>,
+    pub recent: Vec<RecentRequest>,
+    pub top_models: Vec<ModelUsage>,
+}
+
+/// Daily totals (from 9router's `usageDaily` rollup), latest requests and today's top models.
+/// `days` None means all history.
+pub fn analytics(days: Option<u32>) -> Analytics {
+    let Ok(conn) = Connection::open_with_flags(db_path(), OpenFlags::SQLITE_OPEN_READ_ONLY) else {
+        return Analytics::default();
+    };
+    let offset = format!("-{} days", days.unwrap_or(100_000).saturating_sub(1));
+
+    let days = conn
+        .prepare(
+            "SELECT dateKey,
+                    coalesce(json_extract(data, '$.requests'), 0),
+                    coalesce(json_extract(data, '$.promptTokens'), 0),
+                    coalesce((SELECT sum(json_extract(value, '$.cachedTokens')) FROM json_each(data, '$.byProvider')), 0),
+                    coalesce(json_extract(data, '$.completionTokens'), 0),
+                    coalesce(json_extract(data, '$.cost'), 0.0)
+             FROM usageDaily WHERE dateKey >= date('now', 'localtime', ?1) ORDER BY dateKey ASC;",
+        )
+        .and_then(|mut st| {
+            st.query_map([&offset], |r| {
+                Ok(DayStat {
+                    date: r.get(0)?,
+                    requests: r.get::<_, i64>(1)?.max(0) as u64,
+                    input: r.get::<_, i64>(2)?.max(0) as u64,
+                    cached: r.get::<_, i64>(3)?.max(0) as u64,
+                    output: r.get::<_, i64>(4)?.max(0) as u64,
+                    cost: r.get(5)?,
+                })
+            })
+            .map(|rows| rows.flatten().collect())
+        })
+        .unwrap_or_default();
+
+    let recent = conn
+        .prepare("SELECT id, timestamp, coalesce(model, '?'), coalesce(provider, ''), promptTokens, completionTokens, coalesce(status, '') FROM usageHistory ORDER BY id DESC LIMIT 20;")
+        .and_then(|mut st| {
+            st.query_map([], |r| {
+                Ok(RecentRequest {
+                    id: r.get(0)?,
+                    timestamp: r.get(1)?,
+                    model: r.get(2)?,
+                    provider: r.get(3)?,
+                    input: r.get::<_, i64>(4)?.max(0) as u64,
+                    output: r.get::<_, i64>(5)?.max(0) as u64,
+                    ok: r.get::<_, String>(6)? == "ok",
+                })
+            })
+            .map(|rows| rows.flatten().collect())
+        })
+        .unwrap_or_default();
+
+    let top_models = conn
+        .prepare(
+            "SELECT coalesce(model, '?'), coalesce(sum(promptTokens + completionTokens), 0), coalesce(sum(cost), 0.0)
+             FROM usageHistory WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+             GROUP BY model ORDER BY 2 DESC LIMIT 5;",
+        )
+        .and_then(|mut st| {
+            st.query_map([], |r| Ok(ModelUsage { model: r.get(0)?, tokens: r.get::<_, i64>(1)?.max(0) as u64, cost: r.get(2)? }))
+                .map(|rows| rows.flatten().collect())
+        })
+        .unwrap_or_default();
+
+    Analytics { days, recent, top_models }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -508,5 +630,18 @@ mod tests {
             assert!(r.found);
             assert_eq!(r.days.len(), 7);
         }
+    }
+
+    #[test]
+    fn real_9router_analytics() {
+        if !is_available() {
+            return;
+        }
+        let week = analytics(Some(7));
+        assert!(week.days.len() <= 7);
+        assert!(week.days.windows(2).all(|w| w[0].date < w[1].date), "days oldest first");
+        assert!(week.recent.len() <= 20);
+        let all = analytics(None);
+        assert!(all.days.len() >= week.days.len());
     }
 }

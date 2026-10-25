@@ -2,6 +2,7 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { LyricsShareWindow } from "./LyricsShareWindow"
 import { LyricsWidget } from "./LyricsWidget"
+import { NowPlayingScreen } from "./NowPlayingScreen"
 import { Pill } from "./Pill"
 import { SettingsWindow } from "./SettingsWindow"
 import "./styles.css"
@@ -10,8 +11,11 @@ const hash = location.hash
 const isLyrics = hash === "#lyrics"
 const isSettings = hash === "#settings"
 const isShare = hash === "#share"
+const isNowPlaying = hash === "#nowplaying"
 
-document.documentElement.dataset.window = isLyrics
+document.documentElement.dataset.window = isNowPlaying
+  ? "nowplaying"
+  : isLyrics
   ? "lyrics"
   : isSettings
   ? "settings"
@@ -21,7 +25,9 @@ document.documentElement.dataset.window = isLyrics
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {isLyrics ? (
+    {isNowPlaying ? (
+      <NowPlayingScreen />
+    ) : isLyrics ? (
       <LyricsWidget />
     ) : isSettings ? (
       <SettingsWindow />

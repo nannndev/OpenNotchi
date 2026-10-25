@@ -3,9 +3,21 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var media: MediaManager
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var vm: NotchViewModel
     @Environment(\.notchAccent) private var accent
 
     var body: some View {
+        if vm.musicSearchOpen {
+            MusicSearchView { withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { vm.musicSearchOpen = false } }
+                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+        } else {
+            player
+                .transition(.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private var player: some View {
         // YouTube videos get a landscape preview and no lyrics button (videos rarely have lyrics).
         let isVideo = media.info?.videoID != nil
         let lyricsAvailable = settings.lyricsEnabled && media.info != nil && !isVideo
@@ -132,6 +144,7 @@ extension HomeView {
 }
 
 private struct PlayerView: View {
+    @EnvironmentObject private var vm: NotchViewModel
     @EnvironmentObject private var media: MediaManager
     @EnvironmentObject private var lyrics: LyricsManager
     @EnvironmentObject private var settings: AppSettings
@@ -195,6 +208,17 @@ private struct PlayerView: View {
                 PlayerChip(icon: "heart", isOn: info.isLoved ?? false, onColor: .pink,
                            help: (info.isLoved ?? false) ? "Favorited" : "Favorite") {
                     media.toggleLove()
+                }
+
+                PlayerChip(icon: "arrow.up.left.and.arrow.down.right", help: "Full-screen player") {
+                    vm.close()
+                    AppDelegate.shared?.nowPlayingScreen?.show()
+                }
+
+                if MusicSearchView.isAvailable(settings) {
+                    PlayerChip(icon: "magnifyingglass", help: "Search music") {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { vm.musicSearchOpen = true }
+                    }
                 }
 
                 if settings.lyricsEnabled && info.videoID == nil {
@@ -261,11 +285,27 @@ private struct ProgressBar: View {
 
 private struct StoppedView: View {
     @EnvironmentObject private var media: MediaManager
+    @EnvironmentObject private var vm: NotchViewModel
+    @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             Text("Music stopped.")
                 .font(.system(size: 15, weight: .semibold))
+
+            if MusicSearchView.isAvailable(settings) {
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { vm.musicSearchOpen = true }
+                } label: {
+                    Label("Search a song to play", systemImage: "magnifyingglass")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
+                        .frame(height: 28)
+                        .background(Capsule().fill(.white.opacity(0.08)))
+                }
+                .buttonStyle(.plain)
+            }
 
             HStack(spacing: 18) {
                 ForEach(media.installedProviders, id: \.id) { provider in

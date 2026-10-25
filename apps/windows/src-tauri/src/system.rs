@@ -45,6 +45,18 @@ mod imp {
         PrivacyState { camera: in_use("webcam"), mic: in_use("microphone") }
     }
 
+    /// Seconds since the last keyboard or mouse input anywhere in the session.
+    pub fn idle_seconds() -> f64 {
+        use windows::Win32::System::SystemInformation::GetTickCount;
+        use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+        let mut info = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+        if !unsafe { GetLastInputInfo(&mut info) }.as_bool() {
+            return 0.0;
+        }
+        // Both are 32-bit millisecond tick counts; wrapping_sub stays right across the 49-day rollover.
+        unsafe { GetTickCount() }.wrapping_sub(info.dwTime) as f64 / 1000.0
+    }
+
     pub fn is_autostart() -> bool {
         let Ok(key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run") else { return false };
         key.get_value::<String, _>("OpenNotchi").is_ok()
@@ -72,12 +84,18 @@ mod imp {
         PrivacyState::default()
     }
     pub fn is_autostart() -> bool { false }
+    pub fn idle_seconds() -> f64 { 0.0 }
     pub fn set_autostart(_enable: bool) -> Result<(), String> { Ok(()) }
 }
 
 #[tauri::command]
 pub fn set_keep_awake(app: tauri::AppHandle, on: bool) -> Result<(), String> {
     app.run_on_main_thread(move || imp::keep_awake(on)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn idle_seconds() -> f64 {
+    imp::idle_seconds()
 }
 
 #[tauri::command]

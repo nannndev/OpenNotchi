@@ -51,6 +51,8 @@ final class NotchViewModel: ObservableObject {
 
     @Published var isStudioOpen = false
     @Published var isAiExpanded = false
+    /// Home shows music search instead of the player.
+    @Published var musicSearchOpen = false
 
     static let openWidth: CGFloat = 680
     static let defaultOpenHeight: CGFloat = 200
@@ -194,6 +196,7 @@ final class NotchViewModel: ObservableObject {
         pending?.cancel()
         guard isOpen else { return }
         isOpen = false
+        musicSearchOpen = false
         if let deferred = deferredBanner {
             deferredBanner = nil
             if Date.now.timeIntervalSince(deferred.at) < 5 * 60 {

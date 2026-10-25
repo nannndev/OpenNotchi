@@ -21,6 +21,13 @@ enum AgentTool: String, Codable, CaseIterable, Identifiable {
         case .commandcode: return "bolt.fill"
         }
     }
+
+    /// The provider's real logo, bundled from 9router's provider icons (Resources/ProviderIcons).
+    var logo: NSImage? { Self.logos[self] ?? nil }
+
+    private static let logos: [AgentTool: NSImage?] = Dictionary(uniqueKeysWithValues: allCases.map { tool in
+        (tool, Bundle.main.url(forResource: tool.rawValue, withExtension: "png", subdirectory: "ProviderIcons").flatMap(NSImage.init(contentsOf:)))
+    })
 }
 
 enum AgentState: String {

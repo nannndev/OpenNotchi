@@ -49,6 +49,62 @@ export const SETTING_ITEMS: SettingItem[] = [
 
   // --- Pill Tabs & Features ---
   {
+    id: "np-idle",
+    title: "Full-screen player when the PC sits idle",
+    subtitle: "Big cover, album-colored background and lyrics when the PC sits idle while music plays",
+    section: "tabs",
+    keywords: ["fullscreen", "full screen", "screensaver", "idle", "now playing", "layar penuh", "lock screen", "lyrics"],
+  },
+  {
+    id: "np-delay",
+    title: "Full-screen player delay",
+    subtitle: "Idle time before the full-screen player opens",
+    section: "tabs",
+    keywords: ["fullscreen", "full screen", "screensaver", "idle", "now playing", "layar penuh", "delay", "minutes", "waktu"],
+  },
+  {
+    id: "np-background",
+    title: "Full-screen player background",
+    subtitle: "Blurred cover, aurora, album gradient, spinning record or black",
+    section: "tabs",
+    keywords: ["fullscreen", "full screen", "screensaver", "idle", "now playing", "layar penuh", "background", "aurora", "vinyl", "gradient", "latar"],
+  },
+  {
+    id: "np-lyrics",
+    title: "Full-screen player lyrics",
+    subtitle: "Show synced lyrics on the full-screen player",
+    section: "tabs",
+    keywords: ["fullscreen", "full screen", "screensaver", "idle", "now playing", "layar penuh", "lyrics", "lirik"],
+  },
+  {
+    id: "np-lyrics-size",
+    title: "Full-screen lyrics size",
+    subtitle: "Small, medium or large lyrics",
+    section: "tabs",
+    keywords: ["fullscreen", "full screen", "screensaver", "idle", "now playing", "layar penuh", "lyrics", "size", "font", "ukuran"],
+  },
+  {
+    id: "np-translate",
+    title: "Translate lyrics into",
+    subtitle: "Translate lyrics with your Ask AI provider",
+    section: "tabs",
+    keywords: ["fullscreen", "full screen", "screensaver", "idle", "now playing", "layar penuh", "translate", "translation", "language", "terjemah", "bahasa"],
+  },
+  {
+    id: "np-clock",
+    title: "Full-screen player clock",
+    subtitle: "Clock and date on the full-screen player",
+    section: "tabs",
+    keywords: ["fullscreen", "full screen", "screensaver", "idle", "now playing", "layar penuh", "clock", "time", "date", "jam"],
+  },
+  {
+    id: "np-preview",
+    title: "Preview full-screen player",
+    subtitle: "Open the full-screen player now",
+    section: "tabs",
+    keywords: ["fullscreen", "full screen", "screensaver", "idle", "now playing", "layar penuh", "preview", "open", "test"],
+  },
+  {
     id: "tab-music",
     title: "Music Player & Synced Lyrics",
     subtitle: "Turntable vinyl, transport controls, and synced lyrics mode",

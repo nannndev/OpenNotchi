@@ -4,6 +4,28 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] - 2026-10-25
+
+### Added
+- **Notchi chat (macOS & Windows)**:
+  - Ask AI is now a real chat: answers stream in word by word, chats are saved as sessions, with stop, retry, regenerate and copy.
+  - New **9router** provider uses your own accounts and its API key automatically; pick any model it offers.
+  - Attach images, screenshots (macOS), PDFs and text files, or add your clipboard, the song playing, or your AI usage to a message.
+  - Notchi knows OpenNotchi: ask it to change themes, accents, animations, tabs and more. Every change shows with an Undo.
+- **Full-screen player (macOS & Windows)**: opens when the computer sits idle while music plays, or from the player. Big cover, five backgrounds (blurred cover, aurora, album gradient, spinning record, black), synced lyrics with translation, clock, and keyboard controls.
+- **Music search (macOS)**: search Spotify or your Music library from the notch and play in one click, add to the queue, or ask Notchi to play a song.
+- **9router analytics (macOS & Windows)**: requests, input, cached and output tokens, cost, a daily chart, recent requests and today's top models.
+- **Quota layouts**: Cards, Compact and List, with real provider logos everywhere in the AI tab.
+- **Agents tab**: redesigned with a state summary, needs-you first, and live state stripes.
+
+### Changed
+- **Real Liquid Glass on macOS 26**, a lighter glass on Windows, and the closed notch now follows your theme.
+- Windows lyrics translation uses your Ask AI provider (Windows has no on-device translator).
+
+### Fixed
+- Spotify search on apps in development mode (result limit), with Spotify's reason shown when it fails.
+- Apple Intelligence's safety filter now explains itself instead of "unsafe".
+
 ## [0.13.0] - 2026-10-25
 
 ### Added

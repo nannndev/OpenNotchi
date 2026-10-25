@@ -25,6 +25,33 @@ enum AISelfTest {
         check(AIUsage.parseClaudeLine(#"{"type":"user","message":{"id":"m","usage":{}}}"#) == nil, "user lines ignored")
         check(AIUsage.cost(.init(ts: .now, model: "gpt-9", key: "", tokens: [1, 1, 0, 0])) == 0, "unknown model: tokens only")
 
+        print("Chat stream parsing")
+        check(AIAssistant.sseDelta(#"data: {"choices":[{"delta":{"content":"Hi"}}]}"#) == "Hi", "content delta")
+        check(AIAssistant.sseDelta(#"data: {"choices":[{"delta":{"role":"assistant"}}]}"#) == nil, "role-only chunk ignored")
+        check(AIAssistant.sseDelta("data: [DONE]") == nil, "done marker ignored")
+        check(AIAssistant.sseDelta(": keep-alive") == nil, "comment line ignored")
+        check(AIAssistant.Message(role: "user", content: "q", context: "ctx").full == "ctx\n\nq", "context goes before the prompt")
+
+        print("Notchi action block")
+        let reply = "Switching you to Aurora.\n```notchi\n{\"set\": {\"theme\": \"aurora\", \"lyrics\": true, \"hoverDelay\": 0.2}, \"tab\": \"Timer\"}\n```"
+        let parsed = NotchiBrain.split(reply)
+        check(parsed.text == "Switching you to Aurora.", "block hidden from the chat text")
+        check(parsed.actions?.set?["theme"]?.text == "aurora", "string value")
+        check(parsed.actions?.set?["lyrics"]?.text == "true", "bool value")
+        check(parsed.actions?.set?["hoverDelay"]?.text == "0.2", "number value")
+        check(parsed.actions?.tab == "Timer", "tab")
+        check(NotchiBrain.split("Half done ```notchi {\"set\":").text == "Half done", "partial block hidden while streaming")
+        check(NotchiBrain.split("No changes.").actions == nil, "plain reply has no actions")
+        check(NotchiBrain.split("Okay.\n```notchi\n{\"play\": \"Hindia Evaluasi\"}\n```").actions?.play == "Hindia Evaluasi", "play query")
+
+        print("Spotify search parsing")
+        let search = #"{"tracks":{"items":[{"uri":"spotify:track:1","name":"Evaluasi","duration_ms":201000,"artists":[{"name":"Hindia"}],"album":{"name":"Menari","images":[{"url":"https://i/640"},{"url":"https://i/64"}]}},{"name":"no uri"}]}}"#
+        let tracks = MusicSearch.parseSpotify(Data(search.utf8))
+        check(tracks.count == 1, "items without a uri are skipped")
+        check(tracks.first?.artist == "Hindia" && tracks.first?.duration == 201, "artist and duration")
+        check(tracks.first?.artworkURL?.absoluteString == "https://i/64", "smallest artwork for rows")
+        check(NotchiBrain.split("```notchi\nnot json\n```").actions == nil, "bad JSON ignored")
+
         print("5-hour block")
         let t = { (h: Double, m: Double) in Date(timeIntervalSince1970: h * 3600 + m * 60) }
         let ts = [t(1, 10), t(2, 0), t(7, 30), t(8, 15)]
