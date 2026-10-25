@@ -282,6 +282,115 @@ final class NineRouterService {
         }
     }
 
+    /// Today's tokens and cost per model across every 9router account, biggest first.
+    func todayModels(limit: Int = 5) -> [(model: String, tokens: Int, cost: Double)] {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbFile.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_close(db) }
+
+        let sql = """
+        SELECT coalesce(model, '?'), coalesce(sum(promptTokens + completionTokens), 0), coalesce(sum(cost), 0.0)
+        FROM usageHistory
+        WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+        GROUP BY model ORDER BY 2 DESC LIMIT ?;
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int(stmt, 1, Int32(limit))
+
+        var rows: [(model: String, tokens: Int, cost: Double)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            rows.append((String(cString: sqlite3_column_text(stmt, 0)), Int(sqlite3_column_int64(stmt, 1)), sqlite3_column_double(stmt, 2)))
+        }
+        return rows
+    }
+
+    struct DayStat: Identifiable {
+        var date: String
+        var requests: Int
+        var input: Int
+        var cached: Int
+        var output: Int
+        var cost: Double
+        var id: String { date }
+    }
+
+    struct RecentRequest: Identifiable {
+        var id: Int64
+        var date: Date
+        var model: String
+        var provider: String
+        var input: Int
+        var output: Int
+        var ok: Bool
+    }
+
+    /// Daily totals from 9router's `usageDaily` rollup, oldest first. `days` nil means all history.
+    func dailyStats(days: Int?) -> [DayStat] {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbFile.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_close(db) }
+
+        let sql = """
+        SELECT dateKey,
+               coalesce(json_extract(data, '$.requests'), 0),
+               coalesce(json_extract(data, '$.promptTokens'), 0),
+               coalesce((SELECT sum(json_extract(value, '$.cachedTokens')) FROM json_each(data, '$.byProvider')), 0),
+               coalesce(json_extract(data, '$.completionTokens'), 0),
+               coalesce(json_extract(data, '$.cost'), 0.0)
+        FROM usageDaily
+        WHERE dateKey >= date('now', 'localtime', ?)
+        ORDER BY dateKey ASC;
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, ("-\((days ?? 100_000) - 1) days" as NSString).utf8String, -1, nil)
+
+        var rows: [DayStat] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            rows.append(DayStat(
+                date: String(cString: sqlite3_column_text(stmt, 0)),
+                requests: Int(sqlite3_column_int64(stmt, 1)),
+                input: Int(sqlite3_column_int64(stmt, 2)),
+                cached: Int(sqlite3_column_int64(stmt, 3)),
+                output: Int(sqlite3_column_int64(stmt, 4)),
+                cost: sqlite3_column_double(stmt, 5)
+            ))
+        }
+        return rows
+    }
+
+    /// Latest routed requests, newest first.
+    func recentRequests(limit: Int = 20) -> [RecentRequest] {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbFile.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_close(db) }
+
+        let sql = "SELECT id, timestamp, coalesce(model, '?'), coalesce(provider, ''), promptTokens, completionTokens, coalesce(status, '') FROM usageHistory ORDER BY id DESC LIMIT ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int(stmt, 1, Int32(limit))
+
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var rows: [RecentRequest] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            rows.append(RecentRequest(
+                id: sqlite3_column_int64(stmt, 0),
+                date: iso.date(from: String(cString: sqlite3_column_text(stmt, 1))) ?? .distantPast,
+                model: String(cString: sqlite3_column_text(stmt, 2)),
+                provider: String(cString: sqlite3_column_text(stmt, 3)),
+                input: Int(sqlite3_column_int64(stmt, 4)),
+                output: Int(sqlite3_column_int64(stmt, 5)),
+                ok: String(cString: sqlite3_column_text(stmt, 6)) == "ok"
+            ))
+        }
+        return rows
+    }
+
     // MARK: - Live Quota from 9router HTTP Daemon
 
     /// Pool quotas 9router reports alongside the per-model ones, with the labels its dashboard uses.

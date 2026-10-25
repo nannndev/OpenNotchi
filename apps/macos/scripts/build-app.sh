@@ -22,6 +22,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Framewor
 cp "$BIN_DIR/OpenNotchi" "$APP/Contents/MacOS/OpenNotchi"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp -R Resources/ProviderIcons "$APP/Contents/Resources/ProviderIcons"
 
 # Embed Sparkle (auto-update). The binary finds it via @executable_path/../Frameworks.
 SPARKLE="Vendor/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"

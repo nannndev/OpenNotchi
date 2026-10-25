@@ -364,6 +364,7 @@ pub fn run() {
             ai::ai_key_exists,
             ai::ask_ai,
             ai::set_9router_connection_active,
+            ai::ninerouter_analytics,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

@@ -138,9 +138,7 @@ struct NotchBorder: View {
     }
 }
 
-/// Paints the notch body for the chosen theme. While closed the notch is always
-/// solid black so it blends into the camera housing; the theme fades in on open.
-/// Callers pass isOpen: true for the island (no hardware notch), which has nothing to blend into.
+/// Paints the notch body for the chosen theme, open or closed. `isOpen` only adds the glass rim.
 struct NotchBackground<S: Shape>: View {
     let theme: NotchTheme
     let isOpen: Bool
@@ -149,10 +147,7 @@ struct NotchBackground<S: Shape>: View {
     var palette: ArtworkPalette?
 
     var body: some View {
-        ZStack {
-            themed
-            Color.black.opacity(isOpen ? 0 : 1)
-        }
+        themed
         .clipShape(shape)
         .overlay(glassStroke)
     }

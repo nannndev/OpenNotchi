@@ -1,16 +1,19 @@
 import AppKit
+import Charts
 import SwiftUI
 
 /// The AI tab: agent status, usage per account, and Ask AI.
 struct AIView: View {
     enum Section: String, CaseIterable {
         case usage = "Quota & Accounts"
+        case analytics = "Analytics"
         case agents = "Agents"
         case ask = "Ask"
 
         var icon: String {
             switch self {
             case .usage: return "chart.bar.xaxis"
+            case .analytics: return "chart.xyaxis.line"
             case .agents: return "cpu"
             case .ask: return "sparkles"
             }
@@ -106,6 +109,7 @@ struct AIView: View {
             Group {
                 switch section {
                 case .usage: UsageSection()
+                case .analytics: AnalyticsSection()
                 case .agents: AgentsSection()
                 case .ask: AskSection()
                 }
@@ -130,94 +134,127 @@ private func emptyState(_ text: String, icon: String) -> some View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
 }
 
+private extension AgentTool {
+    var tint: Color {
+        switch self {
+        case .claude: return .orange
+        case .antigravity: return Color(red: 0.65, green: 0.45, blue: 0.98)
+        case .codex: return .green
+        case .commandcode: return .cyan
+        }
+    }
+}
+
+/// Provider logo, falling back to the SF Symbol when the bundled PNG is missing (e.g. `swift run`).
+private struct ToolLogo: View {
+    let tool: AgentTool
+    var size: CGFloat = 20
+
+    var body: some View {
+        if let logo = tool.logo {
+            Image(nsImage: logo)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous))
+        } else {
+            Image(systemName: tool.icon)
+                .font(.system(size: size * 0.5, weight: .bold))
+                .foregroundStyle(tool.tint)
+                .frame(width: size, height: size)
+                .background(RoundedRectangle(cornerRadius: size * 0.24).fill(tool.tint.opacity(0.18)))
+        }
+    }
+}
+
 // MARK: - Agents
 
 private struct AgentsSection: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var agents: AgentMonitor
 
+    /// Needs-you first, then working, done, idle; newest first inside each group.
+    private var sorted: [AgentSession] {
+        let rank: [AgentState: Int] = [.needsYou: 0, .working: 1, .done: 2, .idle: 3]
+        return agents.sessions.sorted {
+            (rank[$0.state] ?? 9, $1.updatedAt) < (rank[$1.state] ?? 9, $0.updatedAt)
+        }
+    }
+
+    private func count(_ state: AgentState) -> Int {
+        agents.sessions.filter { $0.state == state }.count
+    }
+
     var body: some View {
         if !settings.aiAgents {
             emptyState("Agent status is off in Settings › AI.", icon: "terminal")
         } else {
             VStack(spacing: 8) {
-                // Quick Launch Bar
-                HStack(spacing: 8) {
-                    Text("Agents:")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-
-                    quickAgentButton(tool: .claude, name: "Claude Code", tint: .orange)
-                    quickAgentButton(tool: .codex, name: "Codex", tint: .green)
-                    quickAgentButton(tool: .antigravity, name: "Antigravity", tint: Color(red: 0.65, green: 0.45, blue: 0.98))
-                    quickAgentButton(tool: .commandcode, name: "Command Code", tint: .cyan)
-
+                HStack(spacing: 6) {
+                    statPill(count(.needsYou), "needs you", .orange)
+                    statPill(count(.working), "working", .cyan)
+                    statPill(count(.done), "done", .green)
                     Spacer()
+                    ForEach([AgentTool.claude, .codex, .antigravity, .commandcode], id: \.self) { launchButton($0) }
                 }
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 2)
 
                 if agents.sessions.isEmpty {
-                    VStack(spacing: 10) {
-                        Image(systemName: "cpu")
-                            .font(.system(size: 28, weight: .light))
-                            .foregroundStyle(.secondary)
-
-                        VStack(spacing: 3) {
-                            Text("Agent Monitor Active")
-                                .font(.system(size: 12.5, weight: .bold))
-                            Text("Run `claude`, `codex`, or Antigravity in your terminal or IDE. Real-time token usage, tool invocations, and approval prompts will appear here automatically.")
-                                .font(.system(size: 10.5))
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 28)
-                        }
-
-                        Button {
-                            AgentMonitor.activateTerminal(for: .claude)
-                        } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: "terminal.fill")
-                                Text("Open Terminal")
-                            }
-                            .font(.system(size: 10.5, weight: .semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Capsule().fill(Color.white.opacity(0.1)))
-                            .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.8))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    emptyAgents
                 } else {
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 6) {
-                            ForEach(agents.sessions) { AgentRow(session: $0) }
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 6)], spacing: 6) {
+                            ForEach(sorted) { AgentRow(session: $0) }
                         }
                         .padding(.horizontal, 2)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: sorted.map(\.id))
                     }
                 }
             }
         }
     }
 
-    private func quickAgentButton(tool: AgentTool, name: String, tint: Color) -> some View {
+    private func statPill(_ n: Int, _ label: String, _ tint: Color) -> some View {
+        HStack(spacing: 4) {
+            Text("\(n)").font(.system(size: 11, weight: .bold).monospacedDigit())
+            Text(label).font(.system(size: 9.5, weight: .medium))
+        }
+        .foregroundStyle(n > 0 ? tint : Color.secondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill((n > 0 ? tint : .white).opacity(n > 0 ? 0.15 : 0.05)))
+    }
+
+    private func launchButton(_ tool: AgentTool) -> some View {
         Button {
             AgentMonitor.activateTerminal(for: tool)
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: tool.icon)
-                    .font(.system(size: 9, weight: .bold))
-                Text(name)
-                    .font(.system(size: 9.5, weight: .semibold))
-            }
-            .foregroundStyle(tint)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3.5)
-            .background(Capsule().fill(tint.opacity(0.14)).overlay(Capsule().stroke(tint.opacity(0.3), lineWidth: 0.8)))
+            ToolLogo(tool: tool, size: 20)
         }
         .buttonStyle(.plain)
-        .help("Open terminal or app for \(name)")
+        .help("Open \(tool.displayName)")
+        .accessibilityLabel("Open \(tool.displayName)")
+    }
+
+    private var emptyAgents: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: -6) {
+                ForEach([AgentTool.claude, .codex, .antigravity, .commandcode], id: \.self) { tool in
+                    ToolLogo(tool: tool, size: 34)
+                        .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
+                }
+            }
+            VStack(spacing: 3) {
+                Text("No agents running")
+                    .font(.system(size: 12.5, weight: .bold))
+                Text("Start Claude Code, Codex, Antigravity or Command Code. Progress and approval prompts show up here.")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -225,22 +262,14 @@ private struct AgentRow: View {
     let session: AgentSession
     @Environment(\.notchAccent) private var accent
     @State private var hovering = false
+    @State private var pulse = false
 
-    private var chipColor: Color {
+    private var stateColor: Color {
         switch session.state {
-        case .working: return accent.highlight
+        case .working: return .cyan
         case .needsYou: return .orange
         case .done: return .green
         case .idle: return .gray
-        }
-    }
-
-    private var toolTint: Color {
-        switch session.tool {
-        case .claude: return .orange
-        case .antigravity: return Color(red: 0.65, green: 0.45, blue: 0.98)
-        case .codex: return .green
-        case .commandcode: return .cyan
         }
     }
 
@@ -250,70 +279,71 @@ private struct AgentRow: View {
         } label: {
             HStack(spacing: 9) {
                 toolIcon
-                sessionInfo
-                Spacer(minLength: 4)
-                statusBadge
-                timeBadge
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 5) {
+                        Text(session.project.isEmpty ? session.tool.displayName : session.project)
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            Text(timeAgo(session.updatedAt, now: context.date))
+                                .font(.system(size: 9.5, weight: .medium).monospacedDigit())
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(stateColor)
+                            .frame(width: 6, height: 6)
+                            .opacity(session.state == .working && pulse ? 0.3 : 1)
+                        Text(session.state.label.capitalized)
+                            .font(.system(size: 9.5, weight: .bold))
+                            .foregroundStyle(stateColor)
+                        Text("· \(session.tool.displayName)")
+                            .font(.system(size: 9.5))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                    if let msg = session.message, !msg.isEmpty {
+                        Text(msg)
+                            .font(.system(size: 10))
+                            .foregroundStyle(session.state == .needsYou ? Color.orange.opacity(0.9) : Color.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                if hovering {
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .transition(.opacity)
+                }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.leading, 12)
+            .padding(.trailing, 9)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(rowBackground)
+            .overlay(alignment: .leading) {
+                // State stripe along the leading edge.
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(stateColor)
+                    .frame(width: 3)
+                    .padding(.vertical, 8)
+                    .padding(.leading, 3)
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hovering = h } }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true }
+        }
         .help(session.message ?? "Open the session")
         .accessibilityLabel("\(session.tool.displayName), \(session.project), \(session.state.label)")
     }
 
     private var toolIcon: some View {
-        Image(systemName: session.tool.icon)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(toolTint)
-            .frame(width: 24, height: 24)
-            .background(RoundedRectangle(cornerRadius: 6).fill(toolTint.opacity(0.18)))
-    }
-
-    private var sessionInfo: some View {
-        VStack(alignment: .leading, spacing: 1.5) {
-            HStack(spacing: 6) {
-                Text(session.project.isEmpty ? session.tool.displayName : session.project)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                Text("· \(session.tool.displayName)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-            }
-            if let msg = session.message, !msg.isEmpty {
-                Text(msg)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(session.state == .needsYou ? Color.orange : Color.secondary)
-                    .lineLimit(1)
-            }
-        }
-    }
-
-    private var statusBadge: some View {
-        HStack(spacing: 5) {
-            if session.state == .working {
-                ProgressView().controlSize(.mini).tint(chipColor)
-            }
-            Text(session.state.label)
-        }
-        .font(.system(size: 10, weight: .bold))
-        .foregroundStyle(chipColor)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(Capsule().fill(chipColor.opacity(0.18)).overlay(Capsule().stroke(chipColor.opacity(0.35), lineWidth: 0.8)))
-    }
-
-    private var timeBadge: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            Text(timeAgo(session.updatedAt, now: context.date))
-                .font(.system(size: 10, weight: .medium).monospacedDigit())
-                .foregroundStyle(.tertiary)
-                .frame(width: 28, alignment: .trailing)
-        }
+        ToolLogo(tool: session.tool, size: 28)
     }
 
     private var rowBackground: some View {
@@ -321,7 +351,7 @@ private struct AgentRow: View {
             .fill(session.state == .needsYou ? Color.orange.opacity(0.12) : Color.white.opacity(hovering ? 0.08 : 0.04))
             .overlay(
                 RoundedRectangle(cornerRadius: 11)
-                    .stroke(session.state == .needsYou ? Color.orange.opacity(0.4) : Color.white.opacity(0.06), lineWidth: 1)
+                    .stroke(session.state == .needsYou ? Color.orange.opacity(0.45) : Color.white.opacity(0.06), lineWidth: 1)
             )
     }
 
@@ -339,6 +369,18 @@ private struct UsageSection: View {
     @EnvironmentObject private var usage: AIUsageManager
     @EnvironmentObject private var vm: NotchViewModel
     @State private var selectedFilter: String = "ALL"
+    @AppStorage("usageLayout") private var layout: UsageLayout = .cards
+
+    enum UsageLayout: String, CaseIterable {
+        case cards, compact, list
+        var icon: String {
+            switch self {
+            case .cards: return "rectangle.grid.3x2"
+            case .compact: return "square.grid.4x3.fill"
+            case .list: return "list.bullet"
+            }
+        }
+    }
 
     private var totalTokens: Int {
         usage.reports.reduce(0) { $0 + $1.today.tokens }
@@ -445,8 +487,8 @@ private struct UsageSection: View {
                 )
 
                 // Provider Filter Pills (e.g. ALL (7), CLAUDE (4), ANTIGRAVITY (1), CODEX (1))
-                if providerFilters.count > 2 {
-                    HStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    if providerFilters.count > 2 {
                         ForEach(providerFilters, id: \.self) { filter in
                             let count = filter == "ALL" ? usage.reports.count : usage.reports.filter { $0.account.tool.rawValue.uppercased() == filter }.count
                             Button {
@@ -469,21 +511,63 @@ private struct UsageSection: View {
                             }
                             .buttonStyle(.plain)
                         }
-                        Spacer()
                     }
-                    .padding(.horizontal, 2)
+                    Spacer()
+                    layoutPicker
                 }
+                .padding(.horizontal, 2)
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 10) {
-                        ForEach(filteredReports) { UsageCard(report: $0) }
+                switch layout {
+                case .cards:
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 10) {
+                            ForEach(filteredReports) { UsageCard(report: $0) }
+                        }
+                        .padding(.horizontal, 2)
+                        .padding(.vertical, 2)
                     }
-                    .padding(.horizontal, 2)
-                    .padding(.vertical, 2)
+                case .compact:
+                    HStack(alignment: .top, spacing: 8) {
+                        ScrollView(.vertical, showsIndicators: false) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 6)], spacing: 6) {
+                                ForEach(filteredReports) { CompactUsageTile(report: $0) }
+                            }
+                            .padding(2)
+                        }
+                        if !usage.topModels.isEmpty { TopModelsPanel(models: usage.topModels) }
+                    }
+                case .list:
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 4) {
+                            ForEach(filteredReports) { UsageListRow(report: $0) }
+                        }
+                        .padding(2)
+                    }
                 }
             }
             .onAppear { usage.refresh() }
         }
+    }
+
+    private var layoutPicker: some View {
+        HStack(spacing: 2) {
+            ForEach(UsageLayout.allCases, id: \.self) { l in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { layout = l }
+                } label: {
+                    Image(systemName: l.icon)
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .foregroundStyle(layout == l ? Color.primary : Color.secondary)
+                        .frame(width: 22, height: 18)
+                        .background(Capsule().fill(Color.white.opacity(layout == l ? 0.18 : 0)))
+                }
+                .buttonStyle(.plain)
+                .help("\(l.rawValue.capitalized) layout")
+                .accessibilityLabel("\(l.rawValue.capitalized) layout")
+            }
+        }
+        .padding(2)
+        .background(Capsule().fill(Color.white.opacity(0.06)))
     }
 
     private func summaryItem(label: String, val: String, tint: Color? = nil) -> some View {
@@ -501,14 +585,7 @@ private struct UsageCard: View {
     @EnvironmentObject private var vm: NotchViewModel
     @State private var isHovering = false
 
-    private var toolTint: Color {
-        switch report.account.tool {
-        case .claude: return .orange
-        case .antigravity: return Color(red: 0.65, green: 0.45, blue: 0.98)
-        case .codex: return .green
-        case .commandcode: return .cyan
-        }
-    }
+    private var toolTint: Color { report.account.tool.tint }
 
     private var healthColor: Color {
         if !report.account.isActive { return .gray }
@@ -534,11 +611,7 @@ private struct UsageCard: View {
         VStack(alignment: .leading, spacing: 6) {
             // Header: Tool Icon, Name, Provider & Priority, Interactive ON/OFF Toggle & Health Pill
             HStack(spacing: 6) {
-                Image(systemName: report.account.tool.icon)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(toolTint)
-                    .frame(width: 20, height: 20)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(toolTint.opacity(0.18)))
+                ToolLogo(tool: report.account.tool, size: 20)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(report.account.name)
@@ -789,6 +862,372 @@ private struct LimitBar: View {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Compact & list layouts
+
+/// The quota closest to running out, which is what decides whether an account is usable.
+private func tightestQuota(_ report: UsageReport) -> NineRouterQuota? {
+    report.quotas.filter { !$0.unlimited }.min { $0.remainingPercentage < $1.remainingPercentage }
+}
+
+private func quotaColor(_ remaining: Double) -> Color {
+    remaining <= 10 ? .red : remaining <= 30 ? .orange : .green
+}
+
+/// ON/OFF switch shared by the compact and list layouts.
+private struct AccountToggle: View {
+    let report: UsageReport
+    @EnvironmentObject private var usage: AIUsageManager
+
+    var body: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                usage.toggleAccountActive(id: report.account.id, connectionId: report.account.connectionId, active: !report.account.isActive)
+            }
+        } label: {
+            Capsule()
+                .fill(report.account.isActive ? Color.green.opacity(0.8) : Color.white.opacity(0.15))
+                .frame(width: 22, height: 13)
+                .overlay(alignment: report.account.isActive ? .trailing : .leading) {
+                    Circle().fill(.white).frame(width: 9, height: 9).padding(2)
+                }
+        }
+        .buttonStyle(.plain)
+        .help(report.account.isActive ? "Active in 9router. Click to turn off." : "Inactive. Click to turn on.")
+        .accessibilityLabel("\(report.account.name) \(report.account.isActive ? "on" : "off")")
+    }
+}
+
+/// Small tile: ring for the tightest quota, name, today's tokens.
+private struct CompactUsageTile: View {
+    let report: UsageReport
+    @State private var hovering = false
+
+    var body: some View {
+        let tight = tightestQuota(report)
+        let remaining = tight?.remainingPercentage ?? 100
+        let tint = report.account.tool.tint
+
+        HStack(spacing: 8) {
+            ZStack {
+                Circle().stroke(.white.opacity(0.1), lineWidth: 3.5)
+                Circle()
+                    .trim(from: 0, to: CGFloat(min(100, max(0, remaining)) / 100))
+                    .stroke(tight == nil ? tint : quotaColor(remaining), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                ToolLogo(tool: report.account.tool, size: 18)
+            }
+            .frame(width: 32, height: 32)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(report.account.name)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                Text(tight.map { "\(Int($0.remainingPercentage.rounded()))% · \($0.name)" } ?? (report.quotas.isEmpty ? report.account.tool.displayName : "Unlimited"))
+                    .font(.system(size: 9, weight: .medium).monospacedDigit())
+                    .foregroundStyle(tight.map { quotaColor($0.remainingPercentage) } ?? .secondary)
+                    .lineLimit(1)
+                Text("\(report.account.tool.displayName) · \(formatTokens(report.today.tokens)) today")
+                    .font(.system(size: 9).monospacedDigit())
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 0)
+            AccountToggle(report: report)
+        }
+        .padding(7)
+        .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(hovering ? 0.08 : 0.04)))
+        .opacity(report.account.isActive ? 1 : 0.5)
+        .onHover { hovering = $0 }
+        .help(tight.flatMap { $0.resetAt }.map { formatResetDetail($0) } ?? report.account.tool.displayName)
+    }
+}
+
+/// One line per account with a thin bar for every quota.
+private struct UsageListRow: View {
+    let report: UsageReport
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ToolLogo(tool: report.account.tool, size: 20)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(report.account.name)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                Text(report.account.tool.displayName)
+                    .font(.system(size: 8.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 120, alignment: .leading)
+
+            HStack(spacing: 6) {
+                ForEach(report.quotas.prefix(4), id: \.name) { q in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(q.unlimited ? "\(q.name) ∞" : "\(q.name) \(Int(q.remainingPercentage.rounded()))%")
+                            .font(.system(size: 8, weight: .medium).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(.white.opacity(0.1))
+                                Capsule()
+                                    .fill(q.unlimited ? Color.green : quotaColor(q.remainingPercentage))
+                                    .frame(width: geo.size.width * CGFloat(q.unlimited ? 1 : min(100, max(0, q.remainingPercentage)) / 100))
+                            }
+                        }
+                        .frame(height: 3)
+                    }
+                    .help(q.resetAt.map { formatResetDetail($0) } ?? q.name)
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            Text(formatTokens(report.today.tokens))
+                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                .frame(width: 44, alignment: .trailing)
+            AccountToggle(report: report)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: 8).fill(.white.opacity(0.04)))
+        .opacity(report.account.isActive ? 1 : 0.5)
+    }
+}
+
+/// Today's busiest models across all 9router accounts, plus a shortcut to its dashboard.
+private struct TopModelsPanel: View {
+    let models: [(model: String, tokens: Int, cost: Double)]
+    @Environment(\.notchAccent) private var accent
+
+    var body: some View {
+        let peak = max(1, models.first?.tokens ?? 1)
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Top models today")
+                .font(.system(size: 8.5, weight: .bold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            ForEach(models, id: \.model) { m in
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text(m.model).lineLimit(1).truncationMode(.middle)
+                        Spacer(minLength: 4)
+                        Text(formatTokens(m.tokens)).fontWeight(.semibold).monospacedDigit()
+                    }
+                    .font(.system(size: 9.5))
+                    Capsule()
+                        .fill(accent.highlight.opacity(0.8))
+                        .frame(width: max(3, 150 * CGFloat(m.tokens) / CGFloat(peak)), height: 3)
+                }
+            }
+            Spacer(minLength: 0)
+            Button {
+                if let url = URL(string: "http://127.0.0.1:20128") { NSWorkspace.shared.open(url) }
+            } label: {
+                Label("Open 9router", systemImage: "arrow.up.right.square")
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Open the 9router dashboard in your browser")
+        }
+        .padding(8)
+        .frame(width: 170)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(0.04)))
+    }
+}
+
+// MARK: - Analytics (9router usage history)
+
+private struct AnalyticsSection: View {
+    enum Range: String, CaseIterable {
+        case today = "Today", week = "7D", month = "30D", all = "All"
+        var days: Int? {
+            switch self {
+            case .today: return 1
+            case .week: return 7
+            case .month: return 30
+            case .all: return nil
+            }
+        }
+    }
+
+    enum Metric: String, CaseIterable { case tokens = "Tokens", requests = "Requests", cost = "Cost" }
+
+    @Environment(\.notchAccent) private var accent
+    @AppStorage("analyticsRange") private var range: Range = .week
+    @State private var metric: Metric = .tokens
+    @State private var days: [NineRouterService.DayStat] = []
+    @State private var recent: [NineRouterService.RecentRequest] = []
+
+    private var total: NineRouterService.DayStat {
+        days.reduce(into: NineRouterService.DayStat(date: "", requests: 0, input: 0, cached: 0, output: 0, cost: 0)) {
+            $0.requests += $1.requests; $0.input += $1.input; $0.cached += $1.cached; $0.output += $1.output; $0.cost += $1.cost
+        }
+    }
+
+    var body: some View {
+        if !NineRouterService.shared.isAvailable {
+            emptyState("Install 9router to see request history and analytics.", icon: "chart.xyaxis.line")
+        } else {
+            VStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    stat("Requests", total.requests.formatted(), .primary)
+                    stat("Input", formatTokens(total.input), .orange)
+                    stat("Cached", formatTokens(total.cached), .cyan)
+                    stat("Output", formatTokens(total.output), .green)
+                    stat("Est. cost", formatCost(total.cost), .yellow)
+                }
+
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            segmented(Metric.allCases, selection: $metric)
+                            Spacer()
+                            segmented(Range.allCases, selection: $range)
+                        }
+                        chart
+                    }
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(0.04)))
+
+                    recentList
+                }
+            }
+            .task(id: range) {
+                // Re-read every 10 s while visible; SQLite reads are cheap but stay off the main thread.
+                while !Task.isCancelled {
+                    let range = range
+                    let (d, r) = await Task.detached(priority: .utility) {
+                        (NineRouterService.shared.dailyStats(days: range.days), NineRouterService.shared.recentRequests(limit: 20))
+                    }.value
+                    days = d
+                    recent = r
+                    try? await Task.sleep(for: .seconds(10))
+                }
+            }
+        }
+    }
+
+    private func value(_ d: NineRouterService.DayStat) -> Double {
+        switch metric {
+        case .tokens: return Double(d.input + d.output)
+        case .requests: return Double(d.requests)
+        case .cost: return d.cost
+        }
+    }
+
+    private var chart: some View {
+        Chart(days) { d in
+            AreaMark(x: .value("Day", d.date), y: .value(metric.rawValue, value(d)))
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(LinearGradient(colors: [accent.highlight.opacity(0.35), .clear], startPoint: .top, endPoint: .bottom))
+            LineMark(x: .value("Day", d.date), y: .value(metric.rawValue, value(d)))
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(accent.highlight)
+            if days.count <= 1 {
+                PointMark(x: .value("Day", d.date), y: .value(metric.rawValue, value(d)))
+                    .foregroundStyle(accent.highlight)
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 5)) { v in
+                AxisValueLabel {
+                    if let s = v.as(String.self) { Text(String(s.suffix(5))).font(.system(size: 8)) }
+                }
+            }
+        }
+        .chartYAxis {
+            AxisMarks(values: .automatic(desiredCount: 3)) { v in
+                AxisGridLine().foregroundStyle(.white.opacity(0.08))
+                AxisValueLabel {
+                    if let n = v.as(Double.self) {
+                        Text(metric == .cost ? formatCost(n) : formatTokens(Int(n))).font(.system(size: 8))
+                    }
+                }
+            }
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    private var recentList: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Recent requests")
+                .font(.system(size: 8.5, weight: .bold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 3) {
+                    ForEach(recent) { r in
+                        HStack(spacing: 5) {
+                            if let tool = AgentTool(rawValue: r.provider) {
+                                ToolLogo(tool: tool, size: 12)
+                            } else {
+                                Circle().fill(r.ok ? Color.green : .red).frame(width: 5, height: 5)
+                            }
+                            Text(r.model)
+                                .font(.system(size: 9.5, design: .monospaced))
+                                .foregroundStyle(r.ok ? Color.primary : .red)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer(minLength: 4)
+                            Text("\(formatTokens(r.input))↑ \(formatTokens(r.output))↓")
+                                .font(.system(size: 9).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                            TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                                Text(ago(r.date, now: ctx.date))
+                                    .font(.system(size: 9).monospacedDigit())
+                                    .foregroundStyle(.tertiary)
+                                    .frame(width: 26, alignment: .trailing)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(8)
+        .frame(width: 250)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(0.04)))
+    }
+
+    private func stat(_ label: String, _ value: String, _ tint: Color) -> some View {
+        VStack(spacing: 2) {
+            Text(label).font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary).textCase(.uppercase)
+            Text(value).font(.system(size: 13, weight: .bold).monospacedDigit()).foregroundStyle(tint).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 9).fill(.white.opacity(0.04)))
+    }
+
+    private func segmented<T: RawRepresentable & Hashable>(_ items: [T], selection: Binding<T>) -> some View where T.RawValue == String {
+        HStack(spacing: 2) {
+            ForEach(items, id: \.self) { item in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { selection.wrappedValue = item }
+                } label: {
+                    Text(item.rawValue)
+                        .font(.system(size: 9.5, weight: selection.wrappedValue == item ? .bold : .medium))
+                        .foregroundStyle(selection.wrappedValue == item ? Color.primary : .secondary)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2.5)
+                        .background(Capsule().fill(.white.opacity(selection.wrappedValue == item ? 0.18 : 0)))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(2)
+        .background(Capsule().fill(.white.opacity(0.06)))
+    }
+
+    private func ago(_ date: Date, now: Date) -> String {
+        let s = max(0, Int(now.timeIntervalSince(date)))
+        if s < 60 { return "\(s)s" }
+        if s < 3600 { return "\(s / 60)m" }
+        return s < 86400 ? "\(s / 3600)h" : "\(s / 86400)d"
     }
 }
 

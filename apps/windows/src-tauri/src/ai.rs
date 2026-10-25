@@ -851,6 +851,11 @@ pub async fn ai_usage(accounts: Vec<Account>, tz_offset_min: i64) -> Vec<UsageRe
 }
 
 #[tauri::command]
+pub async fn ninerouter_analytics(days: Option<u32>) -> crate::ninerouter::Analytics {
+    tauri::async_runtime::spawn_blocking(move || crate::ninerouter::analytics(days)).await.unwrap_or_default()
+}
+
+#[tauri::command]
 pub fn set_9router_connection_active(id: String, active: bool) -> Result<(), String> {
     crate::ninerouter::set_connection_active(&id, active)
 }
