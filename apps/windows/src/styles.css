@@ -81,30 +81,36 @@ button:focus-visible {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
 }
 
-/* 2. Liquid Glass (macOS Control Center Dark Frosted Glass) */
+/* 2. Liquid Glass: light tint so the blurred desktop shows through, plus specular rim + top sheen */
 .theme-liquidGlass {
   background:
-    linear-gradient(180deg, rgba(32, 34, 42, 0.82) 0%, rgba(16, 17, 22, 0.90) 100%) !important;
-  backdrop-filter: blur(36px) saturate(190%) contrast(102%) brightness(0.96);
-  -webkit-backdrop-filter: blur(36px) saturate(190%) contrast(102%) brightness(0.96);
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.14), transparent 60%),
+    linear-gradient(180deg, rgba(40, 42, 50, 0.38) 0%, rgba(14, 15, 20, 0.52) 100%) !important;
+  backdrop-filter: blur(24px) saturate(180%) brightness(1.05);
+  -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.05);
   box-shadow:
-    0 20px 48px rgba(0, 0, 0, 0.6),
-    0 4px 14px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.10) !important;
+    0 18px 40px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.10),
+    inset 1px 0 0 rgba(255, 255, 255, 0.16),
+    inset -1px 0 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 24px rgba(255, 255, 255, 0.06) !important;
 }
 
-/* 3. Liquid Glass Clear (Crystal Control Center Glass) */
+/* 3. Liquid Glass Clear: barely tinted, lighter blur */
 .theme-liquidGlassClear {
   background:
-    linear-gradient(180deg, rgba(38, 40, 52, 0.68) 0%, rgba(20, 22, 28, 0.80) 100%) !important;
-  backdrop-filter: blur(40px) saturate(200%) contrast(102%) brightness(0.98);
-  -webkit-backdrop-filter: blur(40px) saturate(200%) contrast(102%) brightness(0.98);
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.18), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(10, 12, 18, 0.28) 100%) !important;
+  backdrop-filter: blur(12px) saturate(200%) brightness(1.08);
+  -webkit-backdrop-filter: blur(12px) saturate(200%) brightness(1.08);
   box-shadow:
-    0 20px 48px rgba(0, 0, 0, 0.55),
-    0 4px 14px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.28),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.14) !important;
+    0 18px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.14),
+    inset 1px 0 0 rgba(255, 255, 255, 0.22),
+    inset -1px 0 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 28px rgba(255, 255, 255, 0.08) !important;
 }
 
 /* 4. Frosted */

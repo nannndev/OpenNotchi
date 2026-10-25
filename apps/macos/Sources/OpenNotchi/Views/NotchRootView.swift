@@ -146,7 +146,7 @@ struct NotchRootView: View {
                 }
                 .frame(width: bodySize.width + (isIsland ? 0 : 2 * topRadius), height: bodySize.height, alignment: .top)
                 .background {
-                    NotchBackground(theme: settings.theme, isOpen: vm.isOpen, shape: shape, artwork: media.artwork, palette: media.palette)
+                    NotchBackground(theme: settings.theme, isOpen: vm.isOpen || isIsland, shape: shape, artwork: media.artwork, palette: media.palette)
                 }
                 .clipShape(shape)
                 .overlay {
@@ -247,7 +247,7 @@ struct NotchRootView: View {
         }
         .frame(width: bodySize.width + (isIsland ? 0 : 2 * topRadius), height: bodySize.height, alignment: .top)
         .background {
-            NotchBackground(theme: settings.theme, isOpen: false, shape: shape, artwork: media.artwork, palette: media.palette)
+            NotchBackground(theme: settings.theme, isOpen: isIsland, shape: shape, artwork: media.artwork, palette: media.palette)
         }
         .clipShape(shape)
         .overlay {

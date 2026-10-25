@@ -140,6 +140,7 @@ struct NotchBorder: View {
 
 /// Paints the notch body for the chosen theme. While closed the notch is always
 /// solid black so it blends into the camera housing; the theme fades in on open.
+/// Callers pass isOpen: true for the island (no hardware notch), which has nothing to blend into.
 struct NotchBackground<S: Shape>: View {
     let theme: NotchTheme
     let isOpen: Bool
@@ -238,34 +239,29 @@ struct NotchBackground<S: Shape>: View {
         }
     }
 
+    @ViewBuilder
     private func liquidGlass(clear: Bool) -> some View {
-        ZStack {
-            // 1. Native macOS HUD / Control Center dark smoke frosted blur
-            VisualEffectBlur(material: .hudWindow)
+        #if compiler(>=6.2)
+        if #available(macOS 26, *) {
+            // Real Liquid Glass: refraction + specular edges, not a dark blur.
+            Color.clear.glassEffect(clear ? .clear.tint(.black.opacity(0.18)) : .regular.tint(.black.opacity(0.12)), in: shape)
+        } else {
+            legacyGlass(clear: clear)
+        }
+        #else
+        legacyGlass(clear: clear)
+        #endif
+    }
 
-            // 2. Control Center dark smoke substrate (deep translucent charcoal)
+    /// Pre-Tahoe approximation: light tint so the desktop blur stays visible.
+    private func legacyGlass(clear: Bool) -> some View {
+        ZStack {
+            VisualEffectBlur(material: clear ? .underWindowBackground : .hudWindow)
             LinearGradient(
-                colors: clear
-                    ? [Color(white: 0.14).opacity(0.60), Color(white: 0.08).opacity(0.72)]
-                    : [Color(white: 0.12).opacity(0.76), Color(white: 0.05).opacity(0.86)],
+                colors: [Color.white.opacity(clear ? 0.10 : 0.06), Color.black.opacity(clear ? 0.18 : 0.30)],
                 startPoint: .top,
                 endPoint: .bottom
             )
-
-            // 3. Ultra-subtle hairline specular top edge highlight (1px)
-            VStack {
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(clear ? 0.20 : 0.14),
-                        Color.white.opacity(0.04),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 1.5)
-                Spacer()
-            }
         }
     }
 
