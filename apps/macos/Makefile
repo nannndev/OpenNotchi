@@ -1,4 +1,4 @@
-.PHONY: build debug run clean install release dist
+.PHONY: build debug run clean install release dist format
 
 build:
 	./scripts/build-app.sh release
@@ -25,3 +25,7 @@ dist:
 # make release VERSION=1.2.3
 release:
 	./scripts/release.sh $(VERSION)
+
+# make format FILES="Sources/OpenNotchi/Views/Foo.swift"  (default: whole app)
+format:
+	xcrun swift-format format -i -r $(or $(FILES),Sources)

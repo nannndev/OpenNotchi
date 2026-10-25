@@ -147,7 +147,7 @@ enum StickerPresets {
         StampItem(text: "VINTAGE", color: "gold"),
         StampItem(text: "『極上』", color: "red"),
         StampItem(text: "『最高』", color: "red"),
-        StampItem(text: "XOXO", color: "pink")
+        StampItem(text: "XOXO", color: "pink"),
     ]
 }
 
@@ -181,7 +181,10 @@ struct StripInfo {
         }
     }
 
-    init(caption: String? = nil, date: Date = .now, songTitle: String? = nil, artist: String? = nil, artwork: NSImage? = nil) {
+    init(
+        caption: String? = nil, date: Date = .now, songTitle: String? = nil, artist: String? = nil,
+        artwork: NSImage? = nil
+    ) {
         self.caption = caption
         self.date = date
         self.songTitle = songTitle
@@ -196,18 +199,23 @@ enum PhotoStripComposer {
 
     /// Placeholder portraits for previews: soft silhouettes on colorful backdrops.
     static let samplePhotos: [CGImage] = [(0.02, 0.08), (0.55, 0.62), (0.9, 0.97), (0.33, 0.42)].compactMap { hues in
-        let w = 800, h = 600
+        let w = 800
+        let h = 600
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
-              let gradient = CGGradient(colorsSpace: space, colors: [
-                  NSColor(hue: hues.0, saturation: 0.45, brightness: 0.95, alpha: 1).cgColor,
-                  NSColor(hue: hues.1, saturation: 0.6, brightness: 0.55, alpha: 1).cgColor,
-              ] as CFArray, locations: nil) else { return nil }
+            let ctx = CGContext(
+                data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+            let gradient = CGGradient(
+                colorsSpace: space,
+                colors: [
+                    NSColor(hue: hues.0, saturation: 0.45, brightness: 0.95, alpha: 1).cgColor,
+                    NSColor(hue: hues.1, saturation: 0.6, brightness: 0.55, alpha: 1).cgColor,
+                ] as CFArray, locations: nil)
+        else { return nil }
         ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: h), end: CGPoint(x: w, y: 0), options: [])
         ctx.setFillColor(NSColor(white: 1, alpha: 0.85).cgColor)
         ctx.fillEllipse(in: CGRect(x: 310, y: 230, width: 180, height: 210))  // head
-        ctx.fillEllipse(in: CGRect(x: 200, y: -170, width: 400, height: 380)) // shoulders
+        ctx.fillEllipse(in: CGRect(x: 200, y: -170, width: 400, height: 380))  // shoulders
         return ctx.makeImage()
     }
 
@@ -264,10 +272,14 @@ enum PhotoStripComposer {
             let fit = min(1, height * 0.3 / footer)
             footer *= fit
             footerScale *= fit
-            let area = CGRect(x: side, y: header + side, width: width - 2 * side, height: height - header - footer - side - (style == .social ? 0 : 10))
-            let columns = (1...min(3, count)).filter { count % $0 == 0 }.min { a, b in
-                abs(log(cellAspect(area, count: count, columns: a, gap: gap) / (4 / 3))) < abs(log(cellAspect(area, count: count, columns: b, gap: gap) / (4 / 3)))
-            } ?? 1
+            let area = CGRect(
+                x: side, y: header + side, width: width - 2 * side,
+                height: height - header - footer - side - (style == .social ? 0 : 10))
+            let columns =
+                (1...min(3, count)).filter { count % $0 == 0 }.min { a, b in
+                    abs(log(cellAspect(area, count: count, columns: a, gap: gap) / (4 / 3)))
+                        < abs(log(cellAspect(area, count: count, columns: b, gap: gap) / (4 / 3)))
+                } ?? 1
             cells = grid(area, count: count, columns: columns, gap: gap)
         } else {
             // Classic strip: 4:3 photos, one column (two for grid styles), as tall as it needs to be.
@@ -275,7 +287,9 @@ enum PhotoStripComposer {
             let rows = count / columns
             let cellW = (width - 2 * side - CGFloat(columns - 1) * gap) / CGFloat(columns)
             let cellH = cellW * 3 / 4
-            let area = CGRect(x: side, y: header + side, width: width - 2 * side, height: CGFloat(rows) * cellH + CGFloat(rows - 1) * gap)
+            let area = CGRect(
+                x: side, y: header + side, width: width - 2 * side,
+                height: CGFloat(rows) * cellH + CGFloat(rows - 1) * gap)
             cells = grid(area, count: count, columns: columns, gap: gap)
             height = area.maxY + footer
         }
@@ -283,8 +297,10 @@ enum PhotoStripComposer {
         let footerRect = CGRect(x: 0, y: height - footer, width: width, height: footer)
 
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let cg = CGContext(data: nil, width: Int(width), height: Int(height), bitsPerComponent: 8, bytesPerRow: 0,
-                                 space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+            let cg = CGContext(
+                data: nil, width: Int(width), height: Int(height), bitsPerComponent: 8, bytesPerRow: 0,
+                space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
         // Top-left origin, like the layout above.
         cg.translateBy(x: 0, y: height)
         cg.scaleBy(x: 1, y: -1)
@@ -341,16 +357,18 @@ enum PhotoStripComposer {
                 drawStampBadge(sticker)
             } else {
                 let font = NSFont.systemFont(ofSize: 64)
-                let str = NSAttributedString(string: sticker.content, attributes: [
-                    .font: font,
-                    .shadow: {
-                        let sh = NSShadow()
-                        sh.shadowColor = NSColor.black.withAlphaComponent(0.35)
-                        sh.shadowOffset = NSSize(width: 0, height: -3)
-                        sh.shadowBlurRadius = 8
-                        return sh
-                    }()
-                ])
+                let str = NSAttributedString(
+                    string: sticker.content,
+                    attributes: [
+                        .font: font,
+                        .shadow: {
+                            let sh = NSShadow()
+                            sh.shadowColor = NSColor.black.withAlphaComponent(0.35)
+                            sh.shadowOffset = NSSize(width: 0, height: -3)
+                            sh.shadowBlurRadius = 8
+                            return sh
+                        }(),
+                    ])
                 let size = str.size()
                 str.draw(at: CGPoint(x: -size.width / 2, y: -size.height / 2))
             }
@@ -369,18 +387,22 @@ enum PhotoStripComposer {
         case "gold": color = NSColor(red: 0.90, green: 0.60, blue: 0.12, alpha: 1)
         case "blue": color = NSColor(red: 0.18, green: 0.55, blue: 0.92, alpha: 1)
         case "purple": color = NSColor(red: 0.65, green: 0.32, blue: 0.88, alpha: 1)
-        default: color = NSColor(red: 0.88, green: 0.18, blue: 0.18, alpha: 1) // red
+        default: color = NSColor(red: 0.88, green: 0.18, blue: 0.18, alpha: 1)  // red
         }
 
-        let str = NSAttributedString(string: sticker.content.uppercased(), attributes: [
-            .font: font,
-            .foregroundColor: color,
-            .kern: 1.8
-        ])
+        let str = NSAttributedString(
+            string: sticker.content.uppercased(),
+            attributes: [
+                .font: font,
+                .foregroundColor: color,
+                .kern: 1.8,
+            ])
         let textSize = str.size()
         let padX: CGFloat = 16
         let padY: CGFloat = 8
-        let badgeRect = CGRect(x: -textSize.width / 2 - padX, y: -textSize.height / 2 - padY, width: textSize.width + 2 * padX, height: textSize.height + 2 * padY)
+        let badgeRect = CGRect(
+            x: -textSize.width / 2 - padX, y: -textSize.height / 2 - padY, width: textSize.width + 2 * padX,
+            height: textSize.height + 2 * padY)
 
         // Drop shadow for realistic physical stamp feel
         withShadow(color: NSColor.black.withAlphaComponent(0.2), blur: 6, offset: CGSize(width: 0, height: 2)) {
@@ -410,7 +432,9 @@ enum PhotoStripComposer {
         let w = (area.width - CGFloat(columns - 1) * gap) / CGFloat(columns)
         let h = (area.height - CGFloat(rows - 1) * gap) / CGFloat(rows)
         return (0..<count).map { i in
-            CGRect(x: area.minX + CGFloat(i % columns) * (w + gap), y: area.minY + CGFloat(i / columns) * (h + gap), width: w, height: h)
+            CGRect(
+                x: area.minX + CGFloat(i % columns) * (w + gap), y: area.minY + CGFloat(i / columns) * (h + gap),
+                width: w, height: h)
         }
     }
 
@@ -433,28 +457,38 @@ enum PhotoStripComposer {
         case .receipt:
             // Thermal-print look: grayscale, punchy, a little faded.
             output = image.applyingFilter("CIPhotoEffectMono")
-                .applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.35, kCIInputBrightnessKey: 0.06])
+                .applyingFilter(
+                    "CIColorControls", parameters: [kCIInputContrastKey: 1.35, kCIInputBrightnessKey: 0.06])
         case .retro:
             output = image.applyingFilter("CIPhotoEffectTransfer")
-                .applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.08, kCIInputSaturationKey: 1.15])
+                .applyingFilter(
+                    "CIColorControls", parameters: [kCIInputContrastKey: 1.08, kCIInputSaturationKey: 1.15])
         case .postcard:
             output = image.applyingFilter("CIPhotoEffectInstant")
                 .applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.08, kCIInputSaturationKey: 1.1])
         case .polaroid:
             output = image.applyingFilter("CIPhotoEffectInstant")
-                .applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.1, kCIInputSaturationKey: 1.05, kCIInputBrightnessKey: 0.02])
+                .applyingFilter(
+                    "CIColorControls",
+                    parameters: [kCIInputContrastKey: 1.1, kCIInputSaturationKey: 1.05, kCIInputBrightnessKey: 0.02])
         case .film:
             output = image.applyingFilter("CIPhotoEffectChrome")
                 .applyingFilter("CIVignette", parameters: [kCIInputIntensityKey: 0.55, kCIInputRadiusKey: 1.8])
         case .midnight:
-            output = image.applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.15, kCIInputSaturationKey: 0.95])
-                .applyingFilter("CIVignette", parameters: [kCIInputIntensityKey: 0.4, kCIInputRadiusKey: 1.9])
+            output = image.applyingFilter(
+                "CIColorControls", parameters: [kCIInputContrastKey: 1.15, kCIInputSaturationKey: 0.95]
+            )
+            .applyingFilter("CIVignette", parameters: [kCIInputIntensityKey: 0.4, kCIInputRadiusKey: 1.9])
         case .sakura:
-            output = image.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.12, kCIInputBrightnessKey: 0.03, kCIInputContrastKey: 1.02])
+            output = image.applyingFilter(
+                "CIColorControls",
+                parameters: [kCIInputSaturationKey: 1.12, kCIInputBrightnessKey: 0.03, kCIInputContrastKey: 1.02])
         case .y2k:
-            output = image.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.25, kCIInputContrastKey: 1.12])
+            output = image.applyingFilter(
+                "CIColorControls", parameters: [kCIInputSaturationKey: 1.25, kCIInputContrastKey: 1.12])
         case .classic:
-            output = image.applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.05, kCIInputSaturationKey: 1.02])
+            output = image.applyingFilter(
+                "CIColorControls", parameters: [kCIInputContrastKey: 1.05, kCIInputSaturationKey: 1.02])
         default:
             return photo
         }
@@ -490,7 +524,7 @@ enum PhotoStripComposer {
                 CGPoint(x: card.minX + 6, y: card.minY + 6),
                 CGPoint(x: card.maxX - 6, y: card.minY + 6),
                 CGPoint(x: card.minX + 6, y: card.maxY - 6),
-                CGPoint(x: card.maxX - 6, y: card.maxY - 6)
+                CGPoint(x: card.maxX - 6, y: card.maxY - 6),
             ] {
                 let p = NSBezierPath()
                 p.move(to: CGPoint(x: pt.x - crossSize, y: pt.y))
@@ -508,7 +542,8 @@ enum PhotoStripComposer {
                 NSColor(red: 0.99, green: 0.985, blue: 0.97, alpha: 1).setFill()
                 NSBezierPath(roundedRect: card, xRadius: 8, yRadius: 8).fill()
             }
-            let photoArea = CGRect(x: card.minX + 16, y: card.minY + 16, width: card.width - 32, height: card.height - 32 - bottomExtra)
+            let photoArea = CGRect(
+                x: card.minX + 16, y: card.minY + 16, width: card.width - 32, height: card.height - 32 - bottomExtra)
             NSGraphicsContext.saveGraphicsState()
             NSBezierPath(roundedRect: photoArea, xRadius: 4, yRadius: 4).addClip()
             drawAspectFill(photo, in: photoArea)
@@ -541,9 +576,12 @@ enum PhotoStripComposer {
             let rainbowY = card.maxY - 32
             for (ci, c) in rainbowColors.enumerated() {
                 c.setFill()
-                NSBezierPath(rect: CGRect(x: rainbowX + CGFloat(ci) * barW, y: rainbowY, width: barW, height: barH)).fill()
+                NSBezierPath(rect: CGRect(x: rainbowX + CGFloat(ci) * barW, y: rainbowY, width: barW, height: barH))
+                    .fill()
             }
-            draw("SX-70 COLOR", font: .systemFont(ofSize: 13, weight: .bold), color: NSColor(white: 0.45, alpha: 0.65), at: CGPoint(x: card.minX + 20, y: card.maxY - 32))
+            draw(
+                "SX-70 COLOR", font: .systemFont(ofSize: 13, weight: .bold), color: NSColor(white: 0.45, alpha: 0.65),
+                at: CGPoint(x: card.minX + 20, y: card.maxY - 32))
 
         case .film:
             NSColor.black.setFill()
@@ -565,7 +603,7 @@ enum PhotoStripComposer {
                 CGPoint(x: cell.minX - 6, y: cell.minY - 6),
                 CGPoint(x: cell.maxX + 6, y: cell.minY - 6),
                 CGPoint(x: cell.minX - 6, y: cell.maxY + 6),
-                CGPoint(x: cell.maxX + 6, y: cell.maxY + 6)
+                CGPoint(x: cell.maxX + 6, y: cell.maxY + 6),
             ] {
                 let signX: CGFloat = pt.x < cell.midX ? 1 : -1
                 let signY: CGFloat = pt.y < cell.midY ? 1 : -1
@@ -593,13 +631,20 @@ enum PhotoStripComposer {
             nBorder.lineWidth = 2.5
             nBorder.stroke()
 
-            let capFont = NSFont(name: "Times-Italic", size: 16) ?? NSFont(name: "Times New Roman Italic", size: 16) ?? .systemFont(ofSize: 16)
+            let capFont =
+                NSFont(name: "Times-Italic", size: 16) ?? NSFont(name: "Times New Roman Italic", size: 16)
+                ?? .systemFont(ofSize: 16)
             let figStr = "Fig. \(index + 1) — Special dispatch from the scene"
-            draw(figStr, font: capFont, color: NSColor(white: 0.2, alpha: 0.9), at: CGPoint(x: cell.minX + 4, y: cell.maxY + 8))
+            draw(
+                figStr, font: capFont, color: NSColor(white: 0.2, alpha: 0.9),
+                at: CGPoint(x: cell.minX + 4, y: cell.maxY + 8))
 
         case .retro:
             let r: CGFloat = 26
-            withShadow(color: NSColor(red: 0.4, green: 0.2, blue: 0.1, alpha: 0.22), blur: 14, offset: CGSize(width: 0, height: 5)) {
+            withShadow(
+                color: NSColor(red: 0.4, green: 0.2, blue: 0.1, alpha: 0.22), blur: 14,
+                offset: CGSize(width: 0, height: 5)
+            ) {
                 NSColor(red: 0.99, green: 0.96, blue: 0.9, alpha: 1).setFill()
                 NSBezierPath(roundedRect: cell, xRadius: r, yRadius: r).fill()
             }
@@ -631,11 +676,16 @@ enum PhotoStripComposer {
             rim.lineWidth = 1.5
             rim.stroke()
 
-            draw("[ ARCHIVE // 0\(index + 1) ]", font: .monospacedSystemFont(ofSize: 12, weight: .bold), color: NSColor(white: 1, alpha: 0.65), at: CGPoint(x: cell.minX + 16, y: cell.minY + 12))
+            draw(
+                "[ ARCHIVE // 0\(index + 1) ]", font: .monospacedSystemFont(ofSize: 12, weight: .bold),
+                color: NSColor(white: 1, alpha: 0.65), at: CGPoint(x: cell.minX + 16, y: cell.minY + 12))
 
         case .y2k:
             let r: CGFloat = 28
-            withShadow(color: NSColor(red: 0.6, green: 0.3, blue: 0.9, alpha: 0.3), blur: 16, offset: CGSize(width: 0, height: 5)) {
+            withShadow(
+                color: NSColor(red: 0.6, green: 0.3, blue: 0.9, alpha: 0.3), blur: 16,
+                offset: CGSize(width: 0, height: 5)
+            ) {
                 NSColor.white.setFill()
                 NSBezierPath(roundedRect: cell, xRadius: r, yRadius: r).fill()
             }
@@ -647,10 +697,16 @@ enum PhotoStripComposer {
             // Camcorder OSD Overlay
             NSColor(red: 1, green: 0.15, blue: 0.2, alpha: 1).setFill()
             NSBezierPath(ovalIn: CGRect(x: photoFrame.minX + 16, y: photoFrame.minY + 16, width: 14, height: 14)).fill()
-            draw("REC", font: .boldSystemFont(ofSize: 15), color: .white, at: CGPoint(x: photoFrame.minX + 36, y: photoFrame.minY + 14))
-            draw("SP  00:0\(index + 1):28", font: .monospacedDigitSystemFont(ofSize: 14, weight: .bold), color: .white, at: CGPoint(x: photoFrame.minX + 78, y: photoFrame.minY + 15))
+            draw(
+                "REC", font: .boldSystemFont(ofSize: 15), color: .white,
+                at: CGPoint(x: photoFrame.minX + 36, y: photoFrame.minY + 14))
+            draw(
+                "SP  00:0\(index + 1):28", font: .monospacedDigitSystemFont(ofSize: 14, weight: .bold), color: .white,
+                at: CGPoint(x: photoFrame.minX + 78, y: photoFrame.minY + 15))
 
-            draw("HQ 4:3  [▮▮▯]", font: .boldSystemFont(ofSize: 14), color: .white, at: CGPoint(x: photoFrame.maxX - 110, y: photoFrame.minY + 14))
+            draw(
+                "HQ 4:3  [▮▮▯]", font: .boldSystemFont(ofSize: 14), color: .white,
+                at: CGPoint(x: photoFrame.maxX - 110, y: photoFrame.minY + 14))
 
             let fSize: CGFloat = 22
             let fColor = NSColor.white.withAlphaComponent(0.7)
@@ -663,13 +719,19 @@ enum PhotoStripComposer {
             reticle.lineWidth = 1.5
             reticle.stroke()
 
-            draw("'04 10 12", font: .monospacedDigitSystemFont(ofSize: 16, weight: .bold), color: NSColor(red: 1, green: 0.65, blue: 0.15, alpha: 0.95), at: CGPoint(x: photoFrame.minX + 16, y: photoFrame.maxY - 26))
+            draw(
+                "'04 10 12", font: .monospacedDigitSystemFont(ofSize: 16, weight: .bold),
+                color: NSColor(red: 1, green: 0.65, blue: 0.15, alpha: 0.95),
+                at: CGPoint(x: photoFrame.minX + 16, y: photoFrame.maxY - 26))
 
             NSGraphicsContext.restoreGraphicsState()
 
         case .sakura:
             let r: CGFloat = 24
-            withShadow(color: NSColor(red: 0.9, green: 0.45, blue: 0.6, alpha: 0.22), blur: 14, offset: CGSize(width: 0, height: 4)) {
+            withShadow(
+                color: NSColor(red: 0.9, green: 0.45, blue: 0.6, alpha: 0.22), blur: 14,
+                offset: CGSize(width: 0, height: 4)
+            ) {
                 NSColor.white.setFill()
                 NSBezierPath(roundedRect: cell, xRadius: r, yRadius: r).fill()
             }
@@ -711,7 +773,10 @@ enum PhotoStripComposer {
 
         case .pastel:
             let r: CGFloat = 20
-            withShadow(color: NSColor(red: 0.2, green: 0.4, blue: 0.3, alpha: 0.14), blur: 12, offset: CGSize(width: 0, height: 4)) {
+            withShadow(
+                color: NSColor(red: 0.2, green: 0.4, blue: 0.3, alpha: 0.14), blur: 12,
+                offset: CGSize(width: 0, height: 4)
+            ) {
                 NSColor.white.setFill()
                 NSBezierPath(roundedRect: cell, xRadius: r, yRadius: r).fill()
             }
@@ -735,7 +800,10 @@ enum PhotoStripComposer {
 
         case .love:
             let r: CGFloat = 22
-            withShadow(color: NSColor(red: 0.8, green: 0.1, blue: 0.2, alpha: 0.25), blur: 16, offset: CGSize(width: 0, height: 4)) {
+            withShadow(
+                color: NSColor(red: 0.8, green: 0.1, blue: 0.2, alpha: 0.25), blur: 16,
+                offset: CGSize(width: 0, height: 4)
+            ) {
                 NSColor.white.setFill()
                 NSBezierPath(roundedRect: cell, xRadius: r, yRadius: r).fill()
             }
@@ -750,7 +818,9 @@ enum PhotoStripComposer {
             lBorder.lineWidth = 1.5
             lBorder.stroke()
 
-            symbol("heart.fill", color: NSColor(red: 0.9, green: 0.2, blue: 0.3, alpha: 0.8), at: CGPoint(x: cell.maxX - 16, y: cell.maxY - 16), size: 18)
+            symbol(
+                "heart.fill", color: NSColor(red: 0.9, green: 0.2, blue: 0.3, alpha: 0.8),
+                at: CGPoint(x: cell.maxX - 16, y: cell.maxY - 16), size: 18)
 
         case .album:
             let r: CGFloat = 16
@@ -769,7 +839,9 @@ enum PhotoStripComposer {
             aBorder.lineWidth = 1.2
             aBorder.stroke()
 
-            draw("TRACK 0\(index + 1)", font: .monospacedSystemFont(ofSize: 13, weight: .bold), color: NSColor.white.withAlphaComponent(0.7), at: CGPoint(x: cell.minX + 16, y: cell.minY + 12))
+            draw(
+                "TRACK 0\(index + 1)", font: .monospacedSystemFont(ofSize: 13, weight: .bold),
+                color: NSColor.white.withAlphaComponent(0.7), at: CGPoint(x: cell.minX + 16, y: cell.minY + 12))
 
         default:
             break
@@ -780,13 +852,18 @@ enum PhotoStripComposer {
         let size = CGSize(width: image.width, height: image.height)
         let scale = max(rect.width / size.width, rect.height / size.height)
         let drawn = CGSize(width: size.width * scale, height: size.height * scale)
-        let target = CGRect(x: rect.midX - drawn.width / 2, y: rect.midY - drawn.height / 2, width: drawn.width, height: drawn.height)
-        NSImage(cgImage: image, size: size).draw(in: target, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high.rawValue])
+        let target = CGRect(
+            x: rect.midX - drawn.width / 2, y: rect.midY - drawn.height / 2, width: drawn.width, height: drawn.height)
+        NSImage(cgImage: image, size: size).draw(
+            in: target, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true,
+            hints: [.interpolation: NSImageInterpolation.high.rawValue])
     }
 
     // MARK: - Background
 
-    private static func drawBackground(_ style: StripStyle, canvas: CGRect, cells: [CGRect], info: StripInfo, photos: [CGImage]) {
+    private static func drawBackground(
+        _ style: StripStyle, canvas: CGRect, cells: [CGRect], info: StripInfo, photos: [CGImage]
+    ) {
         switch style {
         case .receipt, .social, .player, .postcard, .scrapbook, .coquette, .desktop:
             drawTrendBackground(style, canvas: canvas, photos: photos, info: info)
@@ -800,17 +877,22 @@ enum PhotoStripComposer {
             borderPath.stroke()
 
             let studioFont = NSFont(name: "Avenir-Medium", size: 15) ?? .systemFont(ofSize: 15, weight: .medium)
-            let studioStr = NSAttributedString(string: "✦  KOREA SELF PHOTO BOOTH  ·  AUTOMATIC STUDIO  ✦", attributes: [
-                .font: studioFont,
-                .foregroundColor: NSColor(white: 0.35, alpha: 0.8),
-                .kern: 2.0
-            ])
+            let studioStr = NSAttributedString(
+                string: "✦  KOREA SELF PHOTO BOOTH  ·  AUTOMATIC STUDIO  ✦",
+                attributes: [
+                    .font: studioFont,
+                    .foregroundColor: NSColor(white: 0.35, alpha: 0.8),
+                    .kern: 2.0,
+                ])
             let sSize = studioStr.size()
             studioStr.draw(at: CGPoint(x: canvas.midX - sSize.width / 2, y: innerCard.minY + 16))
 
         case .midnight:
-            NSGradient(colors: [NSColor(red: 0.08, green: 0.08, blue: 0.1, alpha: 1), NSColor(red: 0.03, green: 0.03, blue: 0.04, alpha: 1)])!
-                .draw(in: canvas, angle: -90)
+            NSGradient(colors: [
+                NSColor(red: 0.08, green: 0.08, blue: 0.1, alpha: 1),
+                NSColor(red: 0.03, green: 0.03, blue: 0.04, alpha: 1),
+            ])!
+            .draw(in: canvas, angle: -90)
             let rim = canvas.insetBy(dx: 18, dy: 18)
             NSColor.white.withAlphaComponent(0.12).setStroke()
             let rPath = NSBezierPath(roundedRect: rim, xRadius: 8, yRadius: 8)
@@ -829,8 +911,11 @@ enum PhotoStripComposer {
                 y += 82
             }
             let amber = NSColor(red: 0.91, green: 0.64, blue: 0.23, alpha: 0.9)
-            let leaderFont = NSFont(name: "Courier New Bold", size: 18) ?? .monospacedSystemFont(ofSize: 18, weight: .bold)
-            draw("▶ KODAK PORTRA 400  ·  5094  ·  SAFETY FILM  ·  ISO 400/27°", font: leaderFont, color: amber, at: CGPoint(x: 120, y: 16))
+            let leaderFont =
+                NSFont(name: "Courier New Bold", size: 18) ?? .monospacedSystemFont(ofSize: 18, weight: .bold)
+            draw(
+                "▶ KODAK PORTRA 400  ·  5094  ·  SAFETY FILM  ·  ISO 400/27°", font: leaderFont, color: amber,
+                at: CGPoint(x: 120, y: 16))
 
         case .polaroid:
             fill(canvas, NSColor(red: 0.96, green: 0.945, blue: 0.91, alpha: 1))
@@ -845,7 +930,7 @@ enum PhotoStripComposer {
         case .sakura:
             NSGradient(colors: [
                 NSColor(red: 1, green: 0.95, blue: 0.97, alpha: 1),
-                NSColor(red: 1, green: 0.86, blue: 0.92, alpha: 1)
+                NSColor(red: 1, green: 0.86, blue: 0.92, alpha: 1),
             ])!.draw(in: canvas, angle: -90)
 
         case .retro:
@@ -859,17 +944,24 @@ enum PhotoStripComposer {
             let stripeW: CGFloat = 10
             for (i, c) in retroColors.enumerated() {
                 fill(CGRect(x: 18 + CGFloat(i) * stripeW, y: 0, width: stripeW, height: canvas.height), c)
-                fill(CGRect(x: canvas.width - 18 - CGFloat(4 - i) * stripeW, y: 0, width: stripeW, height: canvas.height), c)
+                fill(
+                    CGRect(
+                        x: canvas.width - 18 - CGFloat(4 - i) * stripeW, y: 0, width: stripeW, height: canvas.height), c
+                )
             }
 
         case .newspaper:
             fill(canvas, NSColor(red: 0.94, green: 0.93, blue: 0.89, alpha: 1))
-            let mastheadFont = NSFont(name: "Didot-Bold", size: 48) ?? NSFont(name: "Times New Roman Bold", size: 46) ?? .boldSystemFont(ofSize: 44)
-            let titleStr = NSAttributedString(string: "✦ THE DAILY CHRONICLE ✦", attributes: [
-                .font: mastheadFont,
-                .foregroundColor: NSColor.black,
-                .kern: 3.0
-            ])
+            let mastheadFont =
+                NSFont(name: "Didot-Bold", size: 48) ?? NSFont(name: "Times New Roman Bold", size: 46)
+                ?? .boldSystemFont(ofSize: 44)
+            let titleStr = NSAttributedString(
+                string: "✦ THE DAILY CHRONICLE ✦",
+                attributes: [
+                    .font: mastheadFont,
+                    .foregroundColor: NSColor.black,
+                    .kern: 3.0,
+                ])
             let tSize = titleStr.size()
             titleStr.draw(at: CGPoint(x: canvas.midX - tSize.width / 2, y: 16))
 
@@ -886,7 +978,7 @@ enum PhotoStripComposer {
         case .neon:
             NSGradient(colors: [
                 NSColor(red: 0.04, green: 0.03, blue: 0.12, alpha: 1),
-                NSColor(red: 0.09, green: 0.04, blue: 0.22, alpha: 1)
+                NSColor(red: 0.09, green: 0.04, blue: 0.22, alpha: 1),
             ])!.draw(in: canvas, angle: -90)
 
         case .pastel:
@@ -908,14 +1000,16 @@ enum PhotoStripComposer {
         case .love:
             NSGradient(colors: [
                 NSColor(red: 0.58, green: 0.08, blue: 0.16, alpha: 1),
-                NSColor(red: 0.35, green: 0.04, blue: 0.09, alpha: 1)
+                NSColor(red: 0.35, green: 0.04, blue: 0.09, alpha: 1),
             ])!.draw(in: canvas, angle: -90)
 
         case .album:
             if let artwork = info.artwork, let cg = artwork.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                 let blurred = CIImage(cgImage: cg)
                     .clampedToExtent()
-                    .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: Double(max(cg.width, cg.height)) / 12])
+                    .applyingFilter(
+                        "CIGaussianBlur", parameters: [kCIInputRadiusKey: Double(max(cg.width, cg.height)) / 12]
+                    )
                     .cropped(to: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
                 if let output = ciContext.createCGImage(blurred, from: blurred.extent) {
                     drawAspectFill(output, in: canvas)
@@ -943,16 +1037,22 @@ enum PhotoStripComposer {
             let ink = NSColor(red: 0.23, green: 0.18, blue: 0.18, alpha: 0.75)
             let doodles = ["star", "heart", "sparkle", "sun.max", "scribble", "music.note", "camera"]
             for _ in 0..<18 {
-                symbol(doodles.randomElement(using: &rng)!, color: ink, at: scatter(canvas, cells, &rng), size: .random(in: 22...40, using: &rng))
+                symbol(
+                    doodles.randomElement(using: &rng)!, color: ink, at: scatter(canvas, cells, &rng),
+                    size: .random(in: 22...40, using: &rng))
             }
         case .coquette:
             for _ in 0..<22 {
-                symbol("heart.fill", color: NSColor.white.withAlphaComponent(.random(in: 0.5...0.9, using: &rng)), at: scatter(canvas, cells, &rng), size: .random(in: 16...34, using: &rng))
+                symbol(
+                    "heart.fill", color: NSColor.white.withAlphaComponent(.random(in: 0.5...0.9, using: &rng)),
+                    at: scatter(canvas, cells, &rng), size: .random(in: 16...34, using: &rng))
             }
         case .y2k:
             for _ in 0..<26 {
                 let size = CGFloat.random(in: 22...54, using: &rng)
-                symbol(Bool.random(using: &rng) ? "sparkle" : "star.fill", color: .white, at: scatter(canvas, cells, &rng), size: size)
+                symbol(
+                    Bool.random(using: &rng) ? "sparkle" : "star.fill", color: .white, at: scatter(canvas, cells, &rng),
+                    size: size)
             }
         case .sakura:
             for _ in 0..<30 {
@@ -961,22 +1061,32 @@ enum PhotoStripComposer {
             }
         case .love:
             for _ in 0..<28 {
-                symbol("heart.fill", color: NSColor(red: 1, green: 0.75, blue: 0.8, alpha: .random(in: 0.6...1, using: &rng)), at: scatter(canvas, cells, &rng), size: .random(in: 20...50, using: &rng))
+                symbol(
+                    "heart.fill",
+                    color: NSColor(red: 1, green: 0.75, blue: 0.8, alpha: .random(in: 0.6...1, using: &rng)),
+                    at: scatter(canvas, cells, &rng), size: .random(in: 20...50, using: &rng))
             }
         case .film:
             let color = NSColor(red: 0.91, green: 0.64, blue: 0.23, alpha: 1)
             let font = NSFont(name: "Courier New Bold", size: 22) ?? .monospacedSystemFont(ofSize: 22, weight: .bold)
             for (i, cell) in cells.dropLast().enumerated() {
                 draw("\(i + 1)  ▸  \(i + 1)A", font: font, color: color, at: CGPoint(x: cell.minX, y: cell.maxY + 4))
-                drawRotated("PORTRA 400  ▸", font: font, color: color.withAlphaComponent(0.8), center: CGPoint(x: canvas.width - 105, y: cell.midY))
+                drawRotated(
+                    "PORTRA 400  ▸", font: font, color: color.withAlphaComponent(0.8),
+                    center: CGPoint(x: canvas.width - 105, y: cell.midY))
             }
         case .neon:
             for _ in 0..<14 {
-                symbol("sparkle", color: Bool.random(using: &rng) ? .cyan : NSColor(red: 1, green: 0.3, blue: 0.8, alpha: 1), at: scatter(canvas, cells, &rng), size: .random(in: 16...30, using: &rng))
+                symbol(
+                    "sparkle",
+                    color: Bool.random(using: &rng) ? .cyan : NSColor(red: 1, green: 0.3, blue: 0.8, alpha: 1),
+                    at: scatter(canvas, cells, &rng), size: .random(in: 16...30, using: &rng))
             }
         case .midnight:
             for _ in 0..<16 {
-                symbol("sparkle", color: NSColor.white.withAlphaComponent(.random(in: 0.2...0.6, using: &rng)), at: scatter(canvas, cells, &rng), size: .random(in: 14...24, using: &rng))
+                symbol(
+                    "sparkle", color: NSColor.white.withAlphaComponent(.random(in: 0.2...0.6, using: &rng)),
+                    at: scatter(canvas, cells, &rng), size: .random(in: 14...24, using: &rng))
             }
         case .pastel:
             let stickers = ["sparkle", "heart.fill", "cloud.fill", "sun.max.fill", "star.fill"]
@@ -987,7 +1097,9 @@ enum PhotoStripComposer {
                 NSColor(red: 0.75, green: 0.82, blue: 0.98, alpha: 0.75),
             ]
             for _ in 0..<16 {
-                symbol(stickers.randomElement(using: &rng)!, color: colors.randomElement(using: &rng)!, at: scatter(canvas, cells, &rng), size: .random(in: 18...34, using: &rng))
+                symbol(
+                    stickers.randomElement(using: &rng)!, color: colors.randomElement(using: &rng)!,
+                    at: scatter(canvas, cells, &rng), size: .random(in: 18...34, using: &rng))
             }
         default:
             break
@@ -997,7 +1109,9 @@ enum PhotoStripComposer {
     /// A random point in the margins, never on a photo.
     private static func scatter(_ canvas: CGRect, _ cells: [CGRect], _ rng: inout SeededRandom) -> CGPoint {
         for _ in 0..<40 {
-            let p = CGPoint(x: .random(in: 10...(canvas.width - 10), using: &rng), y: .random(in: 10...(canvas.height - 10), using: &rng))
+            let p = CGPoint(
+                x: .random(in: 10...(canvas.width - 10), using: &rng),
+                y: .random(in: 10...(canvas.height - 10), using: &rng))
             if !cells.contains(where: { $0.insetBy(dx: -24, dy: -24).contains(p) }) { return p }
         }
         return CGPoint(x: 30, y: 30)
@@ -1005,9 +1119,14 @@ enum PhotoStripComposer {
 
     private static func symbol(_ name: String, color: NSColor, at center: CGPoint, size: CGFloat) {
         let config = NSImage.SymbolConfiguration(pointSize: size, weight: .bold).applying(.init(paletteColors: [color]))
-        guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) else { return }
-        image.draw(in: CGRect(x: center.x - image.size.width / 2, y: center.y - image.size.height / 2, width: image.size.width, height: image.size.height),
-                   from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        guard
+            let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+        else { return }
+        image.draw(
+            in: CGRect(
+                x: center.x - image.size.width / 2, y: center.y - image.size.height / 2, width: image.size.width,
+                height: image.size.height),
+            from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
 
     private static func petal(at center: CGPoint, size: CGFloat, angle: CGFloat) {
@@ -1018,8 +1137,12 @@ enum PhotoStripComposer {
         NSColor(red: 1, green: 0.66, blue: 0.78, alpha: 0.85).setFill()
         let path = NSBezierPath()
         path.move(to: CGPoint(x: 0, y: -size / 2))
-        path.curve(to: CGPoint(x: 0, y: size / 2), controlPoint1: CGPoint(x: size * 0.6, y: -size / 3), controlPoint2: CGPoint(x: size * 0.4, y: size / 3))
-        path.curve(to: CGPoint(x: 0, y: -size / 2), controlPoint1: CGPoint(x: -size * 0.4, y: size / 3), controlPoint2: CGPoint(x: -size * 0.6, y: -size / 3))
+        path.curve(
+            to: CGPoint(x: 0, y: size / 2), controlPoint1: CGPoint(x: size * 0.6, y: -size / 3),
+            controlPoint2: CGPoint(x: size * 0.4, y: size / 3))
+        path.curve(
+            to: CGPoint(x: 0, y: -size / 2), controlPoint1: CGPoint(x: -size * 0.4, y: size / 3),
+            controlPoint2: CGPoint(x: -size * 0.6, y: -size / 3))
         path.fill()
         cg.restoreGState()
     }
@@ -1043,22 +1166,28 @@ enum PhotoStripComposer {
             drawTrendFooter(style, rect: rect, info: info, caption: custom)
         case .classic:
             var y = rect.minY + 28
-            let titleFont = NSFont(name: "Avenir-Black", size: 60) ?? NSFont(name: "Helvetica-Bold", size: 58) ?? rounded(58, .heavy)
+            let titleFont =
+                NSFont(name: "Avenir-Black", size: 60) ?? NSFont(name: "Helvetica-Bold", size: 58)
+                ?? rounded(58, .heavy)
             let titleText = title("LIFE FOUR CUTS").uppercased()
             let titleAttr: [NSAttributedString.Key: Any] = [
                 .font: titleFont,
                 .foregroundColor: NSColor(white: 0.1, alpha: 1),
-                .kern: 3.5
+                .kern: 3.5,
             ]
             let tStr = NSAttributedString(string: titleText, attributes: titleAttr)
             let tW = min(tStr.size().width, rect.width - 80)
             tStr.draw(at: CGPoint(x: center - tW / 2, y: y))
             y += 66
 
-            draw("MEMORIES OF THE DAY · HARU PHOTO STUDIO", font: .systemFont(ofSize: 20, weight: .semibold), color: NSColor(white: 0.45, alpha: 1), at: CGPoint(x: center - 215, y: y))
+            draw(
+                "MEMORIES OF THE DAY · HARU PHOTO STUDIO", font: .systemFont(ofSize: 20, weight: .semibold),
+                color: NSColor(white: 0.45, alpha: 1), at: CGPoint(x: center - 215, y: y))
             y += 30
 
-            centered(dateString("yyyy.MM.dd  ·  HH:mm"), font: .monospacedDigitSystemFont(ofSize: 21, weight: .medium), color: NSColor(white: 0.5, alpha: 1), x: center, y: y)
+            centered(
+                dateString("yyyy.MM.dd  ·  HH:mm"), font: .monospacedDigitSystemFont(ofSize: 21, weight: .medium),
+                color: NSColor(white: 0.5, alpha: 1), x: center, y: y)
             y += 34
 
             // Authentic Photobooth Barcode
@@ -1071,59 +1200,87 @@ enum PhotoStripComposer {
                 NSBezierPath(rect: CGRect(x: bx, y: y, width: bw, height: 40)).fill()
                 bx += bw + .random(in: 2...5, using: &rng)
             }
-            draw("PHOTO ID: #042918 · AUTOMATIC SYSTEM", font: .monospacedSystemFont(ofSize: 13, weight: .bold), color: NSColor(white: 0.4, alpha: 0.8), at: CGPoint(x: center - 138, y: y + 46))
+            draw(
+                "PHOTO ID: #042918 · AUTOMATIC SYSTEM", font: .monospacedSystemFont(ofSize: 13, weight: .bold),
+                color: NSColor(white: 0.4, alpha: 0.8), at: CGPoint(x: center - 138, y: y + 46))
 
         case .midnight:
             var y = rect.minY + 28
-            let luxuryFont = NSFont(name: "Didot-Bold", size: 56) ?? NSFont(name: "Times New Roman Bold", size: 54) ?? rounded(52, .heavy)
+            let luxuryFont =
+                NSFont(name: "Didot-Bold", size: 56) ?? NSFont(name: "Times New Roman Bold", size: 54)
+                ?? rounded(52, .heavy)
             let mainTitle = custom ?? "OPENNOTCHI ARCHIVE"
             let attr: [NSAttributedString.Key: Any] = [
                 .font: luxuryFont,
                 .foregroundColor: NSColor.white,
-                .kern: 3.5
+                .kern: 3.5,
             ]
             let str = NSAttributedString(string: mainTitle, attributes: attr)
             let w = min(str.size().width, rect.width - 80)
             str.draw(at: CGPoint(x: center - w / 2, y: y))
             y += 68
 
-            draw("COLLECTION N° 01  ·  PRIVATE EXHIBITION", font: .systemFont(ofSize: 20, weight: .semibold), color: NSColor(white: 0.65, alpha: 1), at: CGPoint(x: center - 190, y: y))
+            draw(
+                "COLLECTION N° 01  ·  PRIVATE EXHIBITION", font: .systemFont(ofSize: 20, weight: .semibold),
+                color: NSColor(white: 0.65, alpha: 1), at: CGPoint(x: center - 190, y: y))
             y += 30
-            draw("№ 0084 / LIMITED EDITION", font: .monospacedSystemFont(ofSize: 17, weight: .bold), color: NSColor(white: 0.5, alpha: 1), at: CGPoint(x: center - 110, y: y))
+            draw(
+                "№ 0084 / LIMITED EDITION", font: .monospacedSystemFont(ofSize: 17, weight: .bold),
+                color: NSColor(white: 0.5, alpha: 1), at: CGPoint(x: center - 110, y: y))
             y += 28
-            centered(dateString("yyyy.MM.dd  ·  HH:mm:ss") + " UTC", font: .monospacedDigitSystemFont(ofSize: 19, weight: .medium), color: NSColor(white: 0.45, alpha: 1), x: center, y: y)
+            centered(
+                dateString("yyyy.MM.dd  ·  HH:mm:ss") + " UTC",
+                font: .monospacedDigitSystemFont(ofSize: 19, weight: .medium), color: NSColor(white: 0.45, alpha: 1),
+                x: center, y: y)
 
         case .film:
             var y = rect.minY + 24
             let amber = NSColor(red: 0.91, green: 0.64, blue: 0.23, alpha: 1)
             let font = NSFont(name: "Courier New Bold", size: 48) ?? .monospacedSystemFont(ofSize: 46, weight: .bold)
             y += centered(title("KODAK PORTRA 400"), font: font, color: amber, x: center, y: y) + 4
-            draw("EXPOSURE: 36 EXP  ·  C-41 PROCESS  ·  COLOR NEGATIVE", font: font.withSize(21), color: amber.withAlphaComponent(0.8), at: CGPoint(x: center - 260, y: y))
+            draw(
+                "EXPOSURE: 36 EXP  ·  C-41 PROCESS  ·  COLOR NEGATIVE", font: font.withSize(21),
+                color: amber.withAlphaComponent(0.8), at: CGPoint(x: center - 260, y: y))
             y += 32
             let ledFont = NSFont(name: "Courier New Bold", size: 30) ?? .monospacedSystemFont(ofSize: 30, weight: .bold)
-            centered("’26  10  12", font: ledFont, color: NSColor(red: 1, green: 0.45, blue: 0.15, alpha: 1), x: center, y: y, shadow: NSColor(red: 1, green: 0.3, blue: 0.1, alpha: 0.6))
+            centered(
+                "’26  10  12", font: ledFont, color: NSColor(red: 1, green: 0.45, blue: 0.15, alpha: 1), x: center,
+                y: y, shadow: NSColor(red: 1, green: 0.3, blue: 0.1, alpha: 0.6))
 
         case .polaroid:
             var y = rect.minY + 28
             let ink = NSColor(red: 0.12, green: 0.18, blue: 0.32, alpha: 1)
-            let handFont = NSFont(name: "Marker Felt Wide", size: 66) ?? NSFont(name: "Noteworthy-Bold", size: 60) ?? rounded(60, .bold)
+            let handFont =
+                NSFont(name: "Marker Felt Wide", size: 66) ?? NSFont(name: "Noteworthy-Bold", size: 60)
+                ?? rounded(60, .bold)
             y += centered(title("good times ✌️"), font: handFont, color: ink, x: center, y: y) + 4
-            centered(dateString("d MMMM yyyy"), font: NSFont(name: "Noteworthy-Bold", size: 28) ?? .systemFont(ofSize: 28), color: ink.withAlphaComponent(0.75), x: center, y: y)
+            centered(
+                dateString("d MMMM yyyy"), font: NSFont(name: "Noteworthy-Bold", size: 28) ?? .systemFont(ofSize: 28),
+                color: ink.withAlphaComponent(0.75), x: center, y: y)
             y += 44
-            draw("★ POLAROID COLOR 600 FILM ★", font: .systemFont(ofSize: 18, weight: .bold), color: NSColor(white: 0.45, alpha: 0.7), at: CGPoint(x: center - 140, y: y))
+            draw(
+                "★ POLAROID COLOR 600 FILM ★", font: .systemFont(ofSize: 18, weight: .bold),
+                color: NSColor(white: 0.45, alpha: 0.7), at: CGPoint(x: center - 140, y: y))
 
         case .y2k:
             var y = rect.minY + 24
             let y2kTitle = custom.map { "✦ \($0) ✦" } ?? "✦ cyber besties ✦"
-            y += centered(y2kTitle, font: rounded(68, .black), color: .white, x: center, y: y, shadow: NSColor(red: 0.5, green: 0.2, blue: 0.9, alpha: 0.8)) + 4
+            y +=
+                centered(
+                    y2kTitle, font: rounded(68, .black), color: .white, x: center, y: y,
+                    shadow: NSColor(red: 0.5, green: 0.2, blue: 0.9, alpha: 0.8)) + 4
 
             let barRect = CGRect(x: center - 210, y: y, width: 420, height: 40)
             NSColor(white: 1, alpha: 0.25).setFill()
             NSBezierPath(roundedRect: barRect, xRadius: 20, yRadius: 20).fill()
             let songName = info.songTitle ?? "Favorite Track"
-            draw("● ONLINE  ·  ♪ \(songName)", font: .systemFont(ofSize: 17, weight: .bold), color: .white, at: CGPoint(x: barRect.minX + 20, y: barRect.minY + 10), maxWidth: 380)
+            draw(
+                "● ONLINE  ·  ♪ \(songName)", font: .systemFont(ofSize: 17, weight: .bold), color: .white,
+                at: CGPoint(x: barRect.minX + 20, y: barRect.minY + 10), maxWidth: 380)
             y += 50
-            centered(dateString("MM/dd/yyyy") + "  [SP 00:24:12]", font: rounded(24, .bold), color: .white.withAlphaComponent(0.9), x: center, y: y)
+            centered(
+                dateString("MM/dd/yyyy") + "  [SP 00:24:12]", font: rounded(24, .bold),
+                color: .white.withAlphaComponent(0.9), x: center, y: y)
 
         case .sakura:
             var y = rect.minY + 20
@@ -1131,47 +1288,75 @@ enum PhotoStripComposer {
             let scriptFont = NSFont(name: "Snell Roundhand Bold", size: 84) ?? rounded(64, .bold)
             y += centered(title("sakura days"), font: scriptFont, color: pink, x: center, y: y)
 
-            draw("桜の季節  ·  SPRINGTIME MEMORIES", font: .systemFont(ofSize: 22, weight: .semibold), color: pink.withAlphaComponent(0.85), at: CGPoint(x: center - 170, y: y))
+            draw(
+                "桜の季節  ·  SPRINGTIME MEMORIES", font: .systemFont(ofSize: 22, weight: .semibold),
+                color: pink.withAlphaComponent(0.85), at: CGPoint(x: center - 170, y: y))
             y += 34
 
             let sealRect = CGRect(x: center - 22, y: y, width: 44, height: 44)
             NSColor(red: 0.82, green: 0.2, blue: 0.2, alpha: 0.9).setFill()
             NSBezierPath(roundedRect: sealRect, xRadius: 8, yRadius: 8).fill()
-            draw("桜", font: .boldSystemFont(ofSize: 24), color: .white, at: CGPoint(x: sealRect.minX + 10, y: sealRect.minY + 8))
+            draw(
+                "桜", font: .boldSystemFont(ofSize: 24), color: .white,
+                at: CGPoint(x: sealRect.minX + 10, y: sealRect.minY + 8))
             y += 52
 
-            centered(dateString("yyyy . MM . dd"), font: rounded(24, .semibold), color: pink.withAlphaComponent(0.75), x: center, y: y)
+            centered(
+                dateString("yyyy . MM . dd"), font: rounded(24, .semibold), color: pink.withAlphaComponent(0.75),
+                x: center, y: y)
 
         case .retro:
             var y = rect.minY + 20
             let brown = NSColor(red: 0.42, green: 0.2, blue: 0.1, alpha: 1)
             let orange = NSColor(red: 0.85, green: 0.34, blue: 0.17, alpha: 1)
-            let retroFont = NSFont(name: "Futura-CondensedExtraBold", size: 88) ?? NSFont(name: "Avenir-Black", size: 80) ?? rounded(80, .black)
+            let retroFont =
+                NSFont(name: "Futura-CondensedExtraBold", size: 88) ?? NSFont(name: "Avenir-Black", size: 80)
+                ?? rounded(80, .black)
             centered(title("GROOVY"), font: retroFont, color: brown, x: center, y: y, shadow: orange)
             y += 92
-            draw("☀  SUPER 8 SOUND  ☀  CALIFORNIA 1978", font: NSFont(name: "Futura-Medium", size: 24) ?? .systemFont(ofSize: 24, weight: .bold), color: orange, at: CGPoint(x: center - 210, y: y))
+            draw(
+                "☀  SUPER 8 SOUND  ☀  CALIFORNIA 1978",
+                font: NSFont(name: "Futura-Medium", size: 24) ?? .systemFont(ofSize: 24, weight: .bold), color: orange,
+                at: CGPoint(x: center - 210, y: y))
             y += 34
-            centered(dateString("MMMM d, yyyy").uppercased(), font: NSFont(name: "Futura-Medium", size: 22) ?? .systemFont(ofSize: 22), color: brown.withAlphaComponent(0.8), x: center, y: y)
+            centered(
+                dateString("MMMM d, yyyy").uppercased(),
+                font: NSFont(name: "Futura-Medium", size: 22) ?? .systemFont(ofSize: 22),
+                color: brown.withAlphaComponent(0.8), x: center, y: y)
 
         case .newspaper:
             var y = rect.minY + 16
             NSColor.black.setFill()
             NSBezierPath(rect: CGRect(x: rect.minX + 30, y: y, width: rect.width - 60, height: 3)).fill()
             y += 8
-            let titleFont = NSFont(name: "Didot-Bold", size: 66) ?? NSFont(name: "Times New Roman Bold", size: 62) ?? .boldSystemFont(ofSize: 58)
-            y += centered(title("MOMENTS THAT MADE HISTORY").uppercased(), font: titleFont, color: .black, x: center, y: y) + 4
+            let titleFont =
+                NSFont(name: "Didot-Bold", size: 66) ?? NSFont(name: "Times New Roman Bold", size: 62)
+                ?? .boldSystemFont(ofSize: 58)
+            y +=
+                centered(
+                    title("MOMENTS THAT MADE HISTORY").uppercased(), font: titleFont, color: .black, x: center, y: y)
+                + 4
 
             NSBezierPath(rect: CGRect(x: rect.minX + 30, y: y, width: rect.width - 60, height: 1.5)).fill()
             y += 10
-            centered(dateString("EEEE, MMMM d, yyyy").uppercased() + "  ·  CITY EDITION  ·  FREE", font: NSFont(name: "Times New Roman", size: 22) ?? .systemFont(ofSize: 22), color: NSColor(white: 0.2, alpha: 1), x: center, y: y)
+            centered(
+                dateString("EEEE, MMMM d, yyyy").uppercased() + "  ·  CITY EDITION  ·  FREE",
+                font: NSFont(name: "Times New Roman", size: 22) ?? .systemFont(ofSize: 22),
+                color: NSColor(white: 0.2, alpha: 1), x: center, y: y)
             y += 34
 
             let bodyFont = NSFont(name: "Times New Roman", size: 16) ?? .systemFont(ofSize: 16)
             let colW = (rect.width - 100) / 2
-            let col1 = "Eyewitnesses confirm today was one for the record books. Spirits remained extraordinary throughout, with genuine laughter echoed across every frame captured."
-            let col2 = "Analysts predict these memories will remain timeless for decades to come. Special souvenir print issued by OpenNotchi Press."
-            NSAttributedString(string: col1, attributes: [.font: bodyFont, .foregroundColor: NSColor(white: 0.25, alpha: 1)]).draw(in: CGRect(x: rect.minX + 40, y: y, width: colW - 10, height: 80))
-            NSAttributedString(string: col2, attributes: [.font: bodyFont, .foregroundColor: NSColor(white: 0.25, alpha: 1)]).draw(in: CGRect(x: center + 10, y: y, width: colW - 10, height: 80))
+            let col1 =
+                "Eyewitnesses confirm today was one for the record books. Spirits remained extraordinary throughout, with genuine laughter echoed across every frame captured."
+            let col2 =
+                "Analysts predict these memories will remain timeless for decades to come. Special souvenir print issued by OpenNotchi Press."
+            NSAttributedString(
+                string: col1, attributes: [.font: bodyFont, .foregroundColor: NSColor(white: 0.25, alpha: 1)]
+            ).draw(in: CGRect(x: rect.minX + 40, y: y, width: colW - 10, height: 80))
+            NSAttributedString(
+                string: col2, attributes: [.font: bodyFont, .foregroundColor: NSColor(white: 0.25, alpha: 1)]
+            ).draw(in: CGRect(x: center + 10, y: y, width: colW - 10, height: 80))
 
         case .neon:
             var y = rect.minY + 24
@@ -1179,32 +1364,47 @@ enum PhotoStripComposer {
             let cyan = NSColor.cyan
             let neonFont = rounded(72, .heavy)
             y += centered(title("main character"), font: neonFont, color: pink, x: center, y: y, shadow: pink) + 4
-            draw("ネオン  ·  TOKYO NIGHTS 2026", font: .systemFont(ofSize: 24, weight: .bold), color: cyan, at: CGPoint(x: center - 160, y: y), maxWidth: 360)
+            draw(
+                "ネオン  ·  TOKYO NIGHTS 2026", font: .systemFont(ofSize: 24, weight: .bold), color: cyan,
+                at: CGPoint(x: center - 160, y: y), maxWidth: 360)
             y += 36
-            centered(dateString("dd.MM.yyyy") + "  22:50:00", font: rounded(24, .bold), color: .white, x: center, y: y, shadow: cyan)
+            centered(
+                dateString("dd.MM.yyyy") + "  22:50:00", font: rounded(24, .bold), color: .white, x: center, y: y,
+                shadow: cyan)
 
         case .pastel:
             var y = rect.minY + 22
             let green = NSColor(red: 0.12, green: 0.45, blue: 0.35, alpha: 1)
             y += centered(title("core memories ♡"), font: rounded(64, .heavy), color: green, x: center, y: y) + 2
-            draw("— today was pure magic ✨ —", font: NSFont(name: "Noteworthy-Bold", size: 26) ?? .systemFont(ofSize: 26), color: green.withAlphaComponent(0.8), at: CGPoint(x: center - 150, y: y))
+            draw(
+                "— today was pure magic ✨ —",
+                font: NSFont(name: "Noteworthy-Bold", size: 26) ?? .systemFont(ofSize: 26),
+                color: green.withAlphaComponent(0.8), at: CGPoint(x: center - 150, y: y))
             y += 36
-            centered(dateString("EEEE, d MMMM yyyy"), font: rounded(24, .semibold), color: green.withAlphaComponent(0.7), x: center, y: y)
+            centered(
+                dateString("EEEE, d MMMM yyyy"), font: rounded(24, .semibold), color: green.withAlphaComponent(0.7),
+                x: center, y: y)
 
         case .love:
             var y = rect.minY + 18
             let loveFont = NSFont(name: "Snell Roundhand Bold", size: 88) ?? rounded(68, .bold)
-            y += centered(title("mon amour ♡"), font: loveFont, color: .white, x: center, y: y, shadow: NSColor(red: 0.5, green: 0, blue: 0.1, alpha: 0.6))
+            y += centered(
+                title("mon amour ♡"), font: loveFont, color: .white, x: center, y: y,
+                shadow: NSColor(red: 0.5, green: 0, blue: 0.1, alpha: 0.6))
 
             let sealRect = CGRect(x: center - 26, y: y, width: 52, height: 52)
             withShadow(color: NSColor.black.withAlphaComponent(0.3), blur: 8, offset: CGSize(width: 0, height: 2)) {
                 NSColor(red: 0.65, green: 0.1, blue: 0.15, alpha: 1).setFill()
                 NSBezierPath(ovalIn: sealRect).fill()
             }
-            symbol("heart.fill", color: NSColor(red: 1, green: 0.85, blue: 0.6, alpha: 1), at: CGPoint(x: sealRect.midX, y: sealRect.midY), size: 24)
+            symbol(
+                "heart.fill", color: NSColor(red: 1, green: 0.85, blue: 0.6, alpha: 1),
+                at: CGPoint(x: sealRect.midX, y: sealRect.midY), size: 24)
             y += 62
 
-            draw("PARIS  ·  AVEC AMOUR  ·  " + dateString("yyyy"), font: .systemFont(ofSize: 22, weight: .semibold), color: .white.withAlphaComponent(0.9), at: CGPoint(x: center - 165, y: y))
+            draw(
+                "PARIS  ·  AVEC AMOUR  ·  " + dateString("yyyy"), font: .systemFont(ofSize: 22, weight: .semibold),
+                color: .white.withAlphaComponent(0.9), at: CGPoint(x: center - 165, y: y))
 
         case .album:
             let y = rect.minY + 24
@@ -1212,13 +1412,18 @@ enum PhotoStripComposer {
             let text = info.songTitle ?? "Midnight Drive"
             let sub = info.artist ?? "The Placeholders"
             let titleFont = rounded(46, .heavy)
-            let titleWidth = min(NSAttributedString(string: text, attributes: [.font: titleFont]).size().width, rect.width - thumb - 220)
+            let titleWidth = min(
+                NSAttributedString(string: text, attributes: [.font: titleFont]).size().width, rect.width - thumb - 220)
             let startX = center - (thumb + 30 + titleWidth) / 2
 
             if let artwork = info.artwork {
                 NSGraphicsContext.saveGraphicsState()
-                NSBezierPath(roundedRect: CGRect(x: startX, y: y, width: thumb, height: thumb), xRadius: 14, yRadius: 14).addClip()
-                artwork.draw(in: CGRect(x: startX, y: y, width: thumb, height: thumb), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                NSBezierPath(
+                    roundedRect: CGRect(x: startX, y: y, width: thumb, height: thumb), xRadius: 14, yRadius: 14
+                ).addClip()
+                artwork.draw(
+                    in: CGRect(x: startX, y: y, width: thumb, height: thumb), from: .zero, operation: .sourceOver,
+                    fraction: 1, respectFlipped: true, hints: nil)
                 NSGraphicsContext.restoreGraphicsState()
             } else {
                 let discRect = CGRect(x: startX, y: y, width: thumb, height: thumb)
@@ -1236,18 +1441,26 @@ enum PhotoStripComposer {
             }
 
             let textX = startX + thumb + 26
-            draw(custom ?? "♪ NOW PLAYING", font: rounded(20, .bold), color: .white.withAlphaComponent(0.7), at: CGPoint(x: textX, y: y + 2), maxWidth: rect.width - thumb - 100)
+            draw(
+                custom ?? "♪ NOW PLAYING", font: rounded(20, .bold), color: .white.withAlphaComponent(0.7),
+                at: CGPoint(x: textX, y: y + 2), maxWidth: rect.width - thumb - 100)
             draw(text, font: titleFont, color: .white, at: CGPoint(x: textX, y: y + 28), maxWidth: titleWidth)
-            draw(sub, font: rounded(26, .medium), color: .white.withAlphaComponent(0.75), at: CGPoint(x: textX, y: y + 84), maxWidth: titleWidth)
+            draw(
+                sub, font: rounded(26, .medium), color: .white.withAlphaComponent(0.75),
+                at: CGPoint(x: textX, y: y + 84), maxWidth: titleWidth)
 
             let badgeY = y + 140
-            draw("[ HI-RES AUDIO · STEREO ]", font: .monospacedSystemFont(ofSize: 16, weight: .bold), color: NSColor(white: 1, alpha: 0.55), at: CGPoint(x: startX, y: badgeY))
+            draw(
+                "[ HI-RES AUDIO · STEREO ]", font: .monospacedSystemFont(ofSize: 16, weight: .bold),
+                color: NSColor(white: 1, alpha: 0.55), at: CGPoint(x: startX, y: badgeY))
 
             var wx = startX + 240
             NSColor(white: 1, alpha: 0.65).setFill()
             let heights: [CGFloat] = [12, 22, 16, 28, 34, 20, 14, 30, 24, 18, 26, 12]
             for h in heights {
-                NSBezierPath(roundedRect: CGRect(x: wx, y: badgeY + 16 - h, width: 4, height: h), xRadius: 2, yRadius: 2).fill()
+                NSBezierPath(
+                    roundedRect: CGRect(x: wx, y: badgeY + 16 - h, width: 4, height: h), xRadius: 2, yRadius: 2
+                ).fill()
                 wx += 8
             }
         }
@@ -1283,7 +1496,9 @@ enum PhotoStripComposer {
 
     /// Draws centered text and returns its height.
     @discardableResult
-    private static func centered(_ text: String, font: NSFont, color: NSColor, x: CGFloat, y: CGFloat, shadow: NSColor? = nil) -> CGFloat {
+    private static func centered(
+        _ text: String, font: NSFont, color: NSColor, x: CGFloat, y: CGFloat, shadow: NSColor? = nil
+    ) -> CGFloat {
         var string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
         // Long custom text shrinks to fit the strip.
         if string.size().width > maxTextWidth {
@@ -1300,10 +1515,12 @@ enum PhotoStripComposer {
         return size.height
     }
 
-    private static func draw(_ text: String, font: NSFont, color: NSColor, at point: CGPoint, maxWidth: CGFloat? = nil) {
+    private static func draw(_ text: String, font: NSFont, color: NSColor, at point: CGPoint, maxWidth: CGFloat? = nil)
+    {
         let style = NSMutableParagraphStyle()
         style.lineBreakMode = .byTruncatingTail
-        let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: style])
+        let string = NSAttributedString(
+            string: text, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: style])
         let size = string.size()
         string.draw(in: CGRect(x: point.x, y: point.y, width: maxWidth ?? size.width + 1, height: size.height))
     }
@@ -1362,7 +1579,10 @@ extension PhotoStripComposer {
             NSGraphicsContext.restoreGraphicsState()
 
         case .coquette:
-            withShadow(color: NSColor(red: 0.6, green: 0.2, blue: 0.3, alpha: 0.25), blur: 14, offset: CGSize(width: 0, height: 4)) {
+            withShadow(
+                color: NSColor(red: 0.6, green: 0.2, blue: 0.3, alpha: 0.25), blur: 14,
+                offset: CGSize(width: 0, height: 4)
+            ) {
                 NSColor.white.setFill()
                 NSBezierPath(roundedRect: cell, xRadius: 30, yRadius: 30).fill()
             }
@@ -1427,7 +1647,7 @@ extension PhotoStripComposer {
                 CGPoint(x: cell.minX + 8, y: cell.minY + 8),
                 CGPoint(x: cell.maxX - 8, y: cell.minY + 8),
                 CGPoint(x: cell.minX + 8, y: cell.maxY - 8),
-                CGPoint(x: cell.maxX - 8, y: cell.maxY - 8)
+                CGPoint(x: cell.maxX - 8, y: cell.maxY - 8),
             ] {
                 let path = NSBezierPath()
                 let signX: CGFloat = corner.x > cell.midX ? -1 : 1
@@ -1448,7 +1668,8 @@ extension PhotoStripComposer {
         return true
     }
 
-    fileprivate static func drawTrendBackground(_ style: StripStyle, canvas: CGRect, photos: [CGImage], info: StripInfo) {
+    fileprivate static func drawTrendBackground(_ style: StripStyle, canvas: CGRect, photos: [CGImage], info: StripInfo)
+    {
         switch style {
         case .receipt:
             fill(canvas, NSColor(red: 0.86, green: 0.85, blue: 0.82, alpha: 1))
@@ -1514,7 +1735,9 @@ extension PhotoStripComposer {
             let redColor = NSColor(red: 0.85, green: 0.22, blue: 0.22, alpha: 1)
             let blueColor = NSColor(red: 0.13, green: 0.32, blue: 0.62, alpha: 1)
             let whiteColor = NSColor.white
-            drawAirmailBorder(canvas: canvas, borderWidth: borderWidth, stripeWidth: stripeWidth, red: redColor, blue: blueColor, white: whiteColor)
+            drawAirmailBorder(
+                canvas: canvas, borderWidth: borderWidth, stripeWidth: stripeWidth, red: redColor, blue: blueColor,
+                white: whiteColor)
 
             let innerCard = canvas.insetBy(dx: borderWidth, dy: borderWidth)
             NSColor(red: 0.985, green: 0.97, blue: 0.94, alpha: 1).setFill()
@@ -1532,11 +1755,12 @@ extension PhotoStripComposer {
             let parAvionAttr: [NSAttributedString.Key: Any] = [
                 .font: NSFont(name: "Helvetica-Bold", size: 16) ?? .boldSystemFont(ofSize: 16),
                 .foregroundColor: NSColor.white,
-                .kern: 1.5
+                .kern: 1.5,
             ]
             let parAvionStr = NSAttributedString(string: "✈  PAR AVION  ·  AIR MAIL", attributes: parAvionAttr)
             let paSize = parAvionStr.size()
-            parAvionStr.draw(at: CGPoint(x: headerBadge.midX - paSize.width / 2, y: headerBadge.midY - paSize.height / 2))
+            parAvionStr.draw(
+                at: CGPoint(x: headerBadge.midX - paSize.width / 2, y: headerBadge.midY - paSize.height / 2))
 
         case .desktop:
             fill(canvas, NSColor(red: 0, green: 0.5, blue: 0.5, alpha: 1))
@@ -1546,12 +1770,16 @@ extension PhotoStripComposer {
             fill(CGRect(x: 0, y: bar.minY, width: canvas.width, height: 3), .white)
             let start = CGRect(x: 12, y: bar.minY + 12, width: 150, height: 52)
             bevel(start, raised: true)
-            draw("▦ Start", font: .systemFont(ofSize: 28, weight: .heavy), color: .black, at: CGPoint(x: start.minX + 18, y: start.minY + 9))
+            draw(
+                "▦ Start", font: .systemFont(ofSize: 28, weight: .heavy), color: .black,
+                at: CGPoint(x: start.minX + 18, y: start.minY + 9))
             let clock = CGRect(x: canvas.width - 162, y: bar.minY + 12, width: 150, height: 52)
             bevel(clock, raised: false)
             let f = DateFormatter()
             f.dateFormat = "HH:mm"
-            draw(f.string(from: .now), font: .monospacedDigitSystemFont(ofSize: 26, weight: .medium), color: .black, at: CGPoint(x: clock.minX + 38, y: clock.minY + 11))
+            draw(
+                f.string(from: .now), font: .monospacedDigitSystemFont(ofSize: 26, weight: .medium), color: .black,
+                at: CGPoint(x: clock.minX + 38, y: clock.minY + 11))
 
         default:
             break
@@ -1570,7 +1798,9 @@ extension PhotoStripComposer {
         drawAspectFill(avatar, in: avatarRect)
         NSGraphicsContext.restoreGraphicsState()
         draw("bestie.diaries", font: .systemFont(ofSize: 34, weight: .bold), color: .black, at: CGPoint(x: 146, y: 32))
-        draw("Original audio", font: .systemFont(ofSize: 26), color: NSColor(white: 0.45, alpha: 1), at: CGPoint(x: 146, y: 76))
+        draw(
+            "Original audio", font: .systemFont(ofSize: 26), color: NSColor(white: 0.45, alpha: 1),
+            at: CGPoint(x: 146, y: 76))
         draw("•••", font: .systemFont(ofSize: 34, weight: .bold), color: .black, at: CGPoint(x: width - 90, y: 46))
     }
 
@@ -1590,7 +1820,10 @@ extension PhotoStripComposer {
             f.dateFormat = "HH:mm"
             let time = f.string(from: info.date)
             var y = rect.minY + 34
-            y += centered("★ " + (caption ?? "PHOTOBOX").uppercased() + " ★", font: .monospacedSystemFont(ofSize: 42, weight: .heavy), color: ink, x: rect.midX, y: y) + 6
+            y +=
+                centered(
+                    "★ " + (caption ?? "PHOTOBOX").uppercased() + " ★",
+                    font: .monospacedSystemFont(ofSize: 42, weight: .heavy), color: ink, x: rect.midX, y: y) + 6
             for (text, font) in [
                 ("OPEN DAILY · NO REFUNDS ON VIBES", mono),
                 (line(date, time), mono),
@@ -1618,20 +1851,33 @@ extension PhotoStripComposer {
             let x = rect.minX + 24
             var y = rect.minY + 20
             for (i, name) in ["heart.fill", "bubble.right", "paperplane"].enumerated() {
-                symbol(name, color: i == 0 ? NSColor(red: 0.93, green: 0.22, blue: 0.33, alpha: 1) : .black, at: CGPoint(x: x + 20 + CGFloat(i) * 76, y: y + 24), size: 40)
+                symbol(
+                    name, color: i == 0 ? NSColor(red: 0.93, green: 0.22, blue: 0.33, alpha: 1) : .black,
+                    at: CGPoint(x: x + 20 + CGFloat(i) * 76, y: y + 24), size: 40)
             }
             symbol("bookmark", color: .black, at: CGPoint(x: rect.maxX - 44, y: y + 24), size: 40)
             y += 72
-            draw("Liked by you and 1,024 others", font: .systemFont(ofSize: 30, weight: .semibold), color: .black, at: CGPoint(x: x, y: y))
+            draw(
+                "Liked by you and 1,024 others", font: .systemFont(ofSize: 30, weight: .semibold), color: .black,
+                at: CGPoint(x: x, y: y))
             y += 44
-            let text = NSMutableAttributedString(string: "bestie.diaries ", attributes: [.font: NSFont.systemFont(ofSize: 30, weight: .semibold), .foregroundColor: NSColor.black])
-            text.append(NSAttributedString(string: caption ?? "core memories unlocked ✨", attributes: [.font: NSFont.systemFont(ofSize: 30), .foregroundColor: NSColor.black]))
+            let text = NSMutableAttributedString(
+                string: "bestie.diaries ",
+                attributes: [.font: NSFont.systemFont(ofSize: 30, weight: .semibold), .foregroundColor: NSColor.black])
+            text.append(
+                NSAttributedString(
+                    string: caption ?? "core memories unlocked ✨",
+                    attributes: [.font: NSFont.systemFont(ofSize: 30), .foregroundColor: NSColor.black]))
             text.draw(in: CGRect(x: x, y: y, width: rect.width - 48, height: 42))
             y += 44
-            draw("View all 128 comments", font: .systemFont(ofSize: 27), color: NSColor(white: 0.5, alpha: 1), at: CGPoint(x: x, y: y))
+            draw(
+                "View all 128 comments", font: .systemFont(ofSize: 27), color: NSColor(white: 0.5, alpha: 1),
+                at: CGPoint(x: x, y: y))
             y += 40
             f.dateFormat = "d MMMM"
-            draw(f.string(from: info.date).uppercased(), font: .systemFont(ofSize: 21, weight: .medium), color: NSColor(white: 0.55, alpha: 1), at: CGPoint(x: x, y: y))
+            draw(
+                f.string(from: info.date).uppercased(), font: .systemFont(ofSize: 21, weight: .medium),
+                color: NSColor(white: 0.55, alpha: 1), at: CGPoint(x: x, y: y))
 
         case .player:
             // The song that was playing when the strip was taken; your text becomes the "playing from" line.
@@ -1641,7 +1887,9 @@ extension PhotoStripComposer {
             let title = info.songTitle ?? caption ?? "our little moments"
             let artist = info.artist ?? "you & me"
             if info.songTitle != nil, let caption {
-                draw("PLAYING FROM  " + caption.uppercased(), font: .systemFont(ofSize: 20, weight: .bold), color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: x, y: y), maxWidth: width)
+                draw(
+                    "PLAYING FROM  " + caption.uppercased(), font: .systemFont(ofSize: 20, weight: .bold),
+                    color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: x, y: y), maxWidth: width)
                 y += 34
             }
             var textX = x
@@ -1649,14 +1897,21 @@ extension PhotoStripComposer {
                 let thumb = CGRect(x: x, y: y + 4, width: 96, height: 96)
                 NSGraphicsContext.saveGraphicsState()
                 NSBezierPath(roundedRect: thumb, xRadius: 10, yRadius: 10).addClip()
-                artwork.draw(in: thumb, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                artwork.draw(
+                    in: thumb, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
                 NSGraphicsContext.restoreGraphicsState()
                 textX += 116
             }
-            draw(title, font: .systemFont(ofSize: 46, weight: .bold), color: .white, at: CGPoint(x: textX, y: y), maxWidth: x + width - 70 - textX)
-            symbol("heart.fill", color: NSColor(red: 0.2, green: 0.85, blue: 0.45, alpha: 1), at: CGPoint(x: x + width - 20, y: y + 32), size: 40)
+            draw(
+                title, font: .systemFont(ofSize: 46, weight: .bold), color: .white, at: CGPoint(x: textX, y: y),
+                maxWidth: x + width - 70 - textX)
+            symbol(
+                "heart.fill", color: NSColor(red: 0.2, green: 0.85, blue: 0.45, alpha: 1),
+                at: CGPoint(x: x + width - 20, y: y + 32), size: 40)
             y += 60
-            draw(artist, font: .systemFont(ofSize: 30, weight: .medium), color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: textX, y: y), maxWidth: x + width - 70 - textX)
+            draw(
+                artist, font: .systemFont(ofSize: 30, weight: .medium), color: NSColor(white: 1, alpha: 0.6),
+                at: CGPoint(x: textX, y: y), maxWidth: x + width - 70 - textX)
             y += 82
             let duration = info.songDuration ?? 225
             let position = min(info.songPosition ?? 84, duration)
@@ -1667,17 +1922,25 @@ extension PhotoStripComposer {
             NSBezierPath(ovalIn: CGRect(x: x + width * fraction - 10, y: y - 7, width: 20, height: 20)).fill()
             y += 20
             func clock(_ seconds: Double) -> String { String(format: "%d:%02d", Int(seconds) / 60, Int(seconds) % 60) }
-            draw(clock(position), font: .monospacedDigitSystemFont(ofSize: 22, weight: .medium), color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: x, y: y))
-            draw("-" + clock(duration - position), font: .monospacedDigitSystemFont(ofSize: 22, weight: .medium), color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: x + width - 62, y: y))
+            draw(
+                clock(position), font: .monospacedDigitSystemFont(ofSize: 22, weight: .medium),
+                color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: x, y: y))
+            draw(
+                "-" + clock(duration - position), font: .monospacedDigitSystemFont(ofSize: 22, weight: .medium),
+                color: NSColor(white: 1, alpha: 0.6), at: CGPoint(x: x + width - 62, y: y))
             y += 90
-            let controls: [(String, CGFloat)] = [("shuffle", 32), ("backward.fill", 44), ("", 0), ("forward.fill", 44), ("repeat", 32)]
+            let controls: [(String, CGFloat)] = [
+                ("shuffle", 32), ("backward.fill", 44), ("", 0), ("forward.fill", 44), ("repeat", 32),
+            ]
             for (i, control) in controls.enumerated() {
                 let center = CGPoint(x: x + 16 + (width - 32) * CGFloat(i) / 4, y: y)
                 if control.0.isEmpty {
                     // Play button: white disc with a dark pause glyph.
                     NSColor.white.setFill()
                     NSBezierPath(ovalIn: CGRect(x: center.x - 46, y: center.y - 46, width: 92, height: 92)).fill()
-                    symbol(info.isPlaying ? "pause.fill" : "play.fill", color: NSColor(white: 0.1, alpha: 1), at: center, size: 38)
+                    symbol(
+                        info.isPlaying ? "pause.fill" : "play.fill", color: NSColor(white: 0.1, alpha: 1), at: center,
+                        size: 38)
                 } else {
                     symbol(control.0, color: .white, at: center, size: control.1)
                 }
@@ -1686,16 +1949,25 @@ extension PhotoStripComposer {
         case .scrapbook:
             let ink = NSColor(red: 0.23, green: 0.18, blue: 0.18, alpha: 1)
             var y = rect.minY + 40
-            y += centered(caption ?? "our little adventure", font: NSFont(name: "Marker Felt Wide", size: 64) ?? rounded(56, .bold), color: ink, x: rect.midX, y: y)
+            y += centered(
+                caption ?? "our little adventure",
+                font: NSFont(name: "Marker Felt Wide", size: 64) ?? rounded(56, .bold), color: ink, x: rect.midX, y: y)
             f.dateFormat = "dd.MM.yy"
-            centered("— " + f.string(from: info.date) + " —", font: NSFont(name: "Noteworthy-Bold", size: 30) ?? .systemFont(ofSize: 28), color: ink.withAlphaComponent(0.7), x: rect.midX, y: y + 10)
+            centered(
+                "— " + f.string(from: info.date) + " —",
+                font: NSFont(name: "Noteworthy-Bold", size: 30) ?? .systemFont(ofSize: 28),
+                color: ink.withAlphaComponent(0.7), x: rect.midX, y: y + 10)
 
         case .coquette:
             let rose = NSColor(red: 0.76, green: 0.1, blue: 0.36, alpha: 1)
             var y = rect.minY + 30
-            y += centered(caption ?? "lovely", font: NSFont(name: "Snell Roundhand Bold", size: 96) ?? rounded(70, .bold), color: rose, x: rect.midX, y: y)
+            y += centered(
+                caption ?? "lovely", font: NSFont(name: "Snell Roundhand Bold", size: 96) ?? rounded(70, .bold),
+                color: rose, x: rect.midX, y: y)
             f.dateFormat = "dd · MM · yyyy"
-            centered("🎀  " + f.string(from: info.date) + "  🎀", font: rounded(28, .semibold), color: rose.withAlphaComponent(0.8), x: rect.midX, y: y)
+            centered(
+                "🎀  " + f.string(from: info.date) + "  🎀", font: rounded(28, .semibold),
+                color: rose.withAlphaComponent(0.8), x: rect.midX, y: y)
 
         case .postcard:
             let ink = NSColor(red: 0.16, green: 0.2, blue: 0.28, alpha: 1)
@@ -1716,7 +1988,7 @@ extension PhotoStripComposer {
             let headerFont = NSFont(name: "Times New Roman Bold", size: 36) ?? .boldSystemFont(ofSize: 36)
             let headerAttr: [NSAttributedString.Key: Any] = [
                 .font: headerFont,
-                .foregroundColor: NSColor(red: 0.25, green: 0.22, blue: 0.2, alpha: 0.9)
+                .foregroundColor: NSColor(red: 0.25, green: 0.22, blue: 0.2, alpha: 0.9),
             ]
             let headerStr = NSAttributedString(string: "CARTE POSTALE  ★  POST CARD", attributes: headerAttr)
             let hSize = headerStr.size()
@@ -1727,16 +1999,22 @@ extension PhotoStripComposer {
             let msgWidth = dividerX - msgLeft - 30
             var msgY = topY + 54
 
-            draw("MESSAGE / CORRESPONDENCE:", font: .systemFont(ofSize: 18, weight: .bold), color: NSColor(white: 0.4, alpha: 0.8), at: CGPoint(x: msgLeft, y: msgY))
+            draw(
+                "MESSAGE / CORRESPONDENCE:", font: .systemFont(ofSize: 18, weight: .bold),
+                color: NSColor(white: 0.4, alpha: 0.8), at: CGPoint(x: msgLeft, y: msgY))
             msgY += 34
 
-            let handFont = NSFont(name: "Marker Felt Wide", size: 38) ?? NSFont(name: "Noteworthy-Bold", size: 34) ?? rounded(34, .bold)
+            let handFont =
+                NSFont(name: "Marker Felt Wide", size: 38) ?? NSFont(name: "Noteworthy-Bold", size: 34)
+                ?? rounded(34, .bold)
             let message = caption ?? "Greetings from OpenNotchi! Wishing you were here ♡"
             let msgBox = CGRect(x: msgLeft, y: msgY, width: msgWidth, height: 160)
             NSAttributedString(string: message, attributes: [.font: handFont, .foregroundColor: ink]).draw(in: msgBox)
 
             let dateY = bottomY - 35
-            draw("Date: \(dateStr)", font: NSFont(name: "Noteworthy-Bold", size: 24) ?? .systemFont(ofSize: 24), color: ink.withAlphaComponent(0.8), at: CGPoint(x: msgLeft, y: dateY))
+            draw(
+                "Date: \(dateStr)", font: NSFont(name: "Noteworthy-Bold", size: 24) ?? .systemFont(ofSize: 24),
+                color: ink.withAlphaComponent(0.8), at: CGPoint(x: msgLeft, y: dateY))
 
             // Right Side: Stamp, Postmark & Address Lines
             let rightX = dividerX + 35
@@ -1746,27 +2024,42 @@ extension PhotoStripComposer {
 
             drawPerforatedStamp(stampRect, color: red)
             symbol("airplane", color: .white, at: CGPoint(x: stampRect.midX, y: stampRect.minY + 65), size: 48)
-            draw("AIR MAIL", font: .boldSystemFont(ofSize: 16), color: .white, at: CGPoint(x: stampRect.midX - 35, y: stampRect.minY + 115))
-            draw("50¢", font: .boldSystemFont(ofSize: 22), color: .white, at: CGPoint(x: stampRect.midX - 18, y: stampRect.minY + 20))
+            draw(
+                "AIR MAIL", font: .boldSystemFont(ofSize: 16), color: .white,
+                at: CGPoint(x: stampRect.midX - 35, y: stampRect.minY + 115))
+            draw(
+                "50¢", font: .boldSystemFont(ofSize: 22), color: .white,
+                at: CGPoint(x: stampRect.midX - 18, y: stampRect.minY + 20))
 
             let postmarkCenter = CGPoint(x: stampRect.minX - 10, y: stampRect.minY + 70)
             drawPostmark(center: postmarkCenter, dateString: f.string(from: info.date).uppercased())
 
             var addrY = stampRect.maxY + 35
-            draw("ADDRESS / DESTINATAIRE:", font: .systemFont(ofSize: 18, weight: .bold), color: NSColor(white: 0.4, alpha: 0.8), at: CGPoint(x: rightX, y: addrY))
+            draw(
+                "ADDRESS / DESTINATAIRE:", font: .systemFont(ofSize: 18, weight: .bold),
+                color: NSColor(white: 0.4, alpha: 0.8), at: CGPoint(x: rightX, y: addrY))
             addrY += 34
 
-            for line in ["To: __________________________________",
-                         "     __________________________________",
-                         "     __________________________________",
-                         "     OpenNotchi · Special Delivery ✈"] {
-                draw(line, font: NSFont(name: "Courier New Bold", size: 22) ?? .monospacedSystemFont(ofSize: 22, weight: .bold), color: NSColor(white: 0.35, alpha: 0.85), at: CGPoint(x: rightX, y: addrY))
+            for line in [
+                "To: __________________________________",
+                "     __________________________________",
+                "     __________________________________",
+                "     OpenNotchi · Special Delivery ✈",
+            ] {
+                draw(
+                    line,
+                    font: NSFont(name: "Courier New Bold", size: 22)
+                        ?? .monospacedSystemFont(ofSize: 22, weight: .bold), color: NSColor(white: 0.35, alpha: 0.85),
+                    at: CGPoint(x: rightX, y: addrY))
                 addrY += 36
             }
 
         case .desktop:
             let y = rect.minY + 34
-            centered(caption ?? "my_memories.exe", font: NSFont(name: "Courier New Bold", size: 54) ?? .monospacedSystemFont(ofSize: 50, weight: .bold), color: .white, x: rect.midX, y: y, shadow: NSColor.black.withAlphaComponent(0.6))
+            centered(
+                caption ?? "my_memories.exe",
+                font: NSFont(name: "Courier New Bold", size: 54) ?? .monospacedSystemFont(ofSize: 50, weight: .bold),
+                color: .white, x: rect.midX, y: y, shadow: NSColor.black.withAlphaComponent(0.6))
 
         default:
             break
@@ -1778,14 +2071,21 @@ extension PhotoStripComposer {
         bevel(cell, raised: true)
         let inner = cell.insetBy(dx: 6, dy: 6)
         let titleBar = CGRect(x: inner.minX, y: inner.minY, width: inner.width, height: 46)
-        NSGradient(colors: [NSColor(red: 0, green: 0, blue: 0.5, alpha: 1), NSColor(red: 0.06, green: 0.52, blue: 0.82, alpha: 1)])!.draw(in: titleBar, angle: 0)
-        draw(title, font: .systemFont(ofSize: 24, weight: .bold), color: .white, at: CGPoint(x: titleBar.minX + 14, y: titleBar.minY + 9))
+        NSGradient(colors: [
+            NSColor(red: 0, green: 0, blue: 0.5, alpha: 1), NSColor(red: 0.06, green: 0.52, blue: 0.82, alpha: 1),
+        ])!.draw(in: titleBar, angle: 0)
+        draw(
+            title, font: .systemFont(ofSize: 24, weight: .bold), color: .white,
+            at: CGPoint(x: titleBar.minX + 14, y: titleBar.minY + 9))
         for (i, glyph) in ["_", "□", "×"].enumerated() {
             let button = CGRect(x: titleBar.maxX - CGFloat(3 - i) * 42 - 4, y: titleBar.minY + 7, width: 36, height: 32)
             bevel(button, raised: true)
-            draw(glyph, font: .systemFont(ofSize: 22, weight: .heavy), color: .black, at: CGPoint(x: button.minX + 10, y: button.minY + 1))
+            draw(
+                glyph, font: .systemFont(ofSize: 22, weight: .heavy), color: .black,
+                at: CGPoint(x: button.minX + 10, y: button.minY + 1))
         }
-        let photoRect = CGRect(x: inner.minX + 4, y: titleBar.maxY + 6, width: inner.width - 8, height: inner.maxY - titleBar.maxY - 10)
+        let photoRect = CGRect(
+            x: inner.minX + 4, y: titleBar.maxY + 6, width: inner.width - 8, height: inner.maxY - titleBar.maxY - 10)
         bevel(photoRect.insetBy(dx: -3, dy: -3), raised: false)
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: photoRect).addClip()
@@ -1796,7 +2096,8 @@ extension PhotoStripComposer {
     /// Classic 3D bevel: light top-left, dark bottom-right (reversed when sunken).
     private static func bevel(_ rect: CGRect, raised: Bool) {
         fill(rect, NSColor(white: 0.75, alpha: 1))
-        let light = NSColor.white, dark = NSColor(white: 0.35, alpha: 1)
+        let light = NSColor.white
+        let dark = NSColor(white: 0.35, alpha: 1)
         let (topLeft, bottomRight) = raised ? (light, dark) : (dark, light)
         fill(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: 3), topLeft)
         fill(CGRect(x: rect.minX, y: rect.minY, width: 3, height: rect.height), topLeft)
@@ -1815,13 +2116,18 @@ extension PhotoStripComposer {
         let ci = CIImage(cgImage: image)
         let average = ci.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: ci.extent)])
         var pixel = [UInt8](repeating: 0, count: 4)
-        ciContext.render(average, toBitmap: &pixel, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
-        return NSColor(srgbRed: CGFloat(pixel[0]) / 255, green: CGFloat(pixel[1]) / 255, blue: CGFloat(pixel[2]) / 255, alpha: 1)
+        ciContext.render(
+            average, toBitmap: &pixel, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8,
+            colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        return NSColor(
+            srgbRed: CGFloat(pixel[0]) / 255, green: CGFloat(pixel[1]) / 255, blue: CGFloat(pixel[2]) / 255, alpha: 1)
     }
 
     // MARK: - Postcard helpers
 
-    private static func drawAirmailBorder(canvas: CGRect, borderWidth: CGFloat, stripeWidth: CGFloat, red: NSColor, blue: NSColor, white: NSColor) {
+    private static func drawAirmailBorder(
+        canvas: CGRect, borderWidth: CGFloat, stripeWidth: CGFloat, red: NSColor, blue: NSColor, white: NSColor
+    ) {
         guard let cg = NSGraphicsContext.current?.cgContext else { return }
         cg.saveGState()
 
@@ -1910,15 +2216,18 @@ extension PhotoStripComposer {
 
         let stampFont = NSFont(name: "Helvetica-Bold", size: 10) ?? .boldSystemFont(ofSize: 10)
         draw("AIR MAIL POST", font: stampFont, color: postmarkInk, at: CGPoint(x: center.x - 38, y: center.y - 28))
-        draw(dateString, font: NSFont(name: "Courier New Bold", size: 11) ?? .boldSystemFont(ofSize: 11), color: postmarkInk, at: CGPoint(x: center.x - 36, y: center.y - 6))
+        draw(
+            dateString, font: NSFont(name: "Courier New Bold", size: 11) ?? .boldSystemFont(ofSize: 11),
+            color: postmarkInk, at: CGPoint(x: center.x - 36, y: center.y - 6))
         draw("★ VERIFIED ★", font: stampFont, color: postmarkInk, at: CGPoint(x: center.x - 35, y: center.y + 16))
 
         let wavePath = NSBezierPath()
         for dy: CGFloat in [-16, 0, 16] {
             wavePath.move(to: CGPoint(x: center.x - 55, y: center.y + dy))
-            wavePath.curve(to: CGPoint(x: center.x - 135, y: center.y + dy),
-                           controlPoint1: CGPoint(x: center.x - 80, y: center.y + dy - 10),
-                           controlPoint2: CGPoint(x: center.x - 110, y: center.y + dy + 10))
+            wavePath.curve(
+                to: CGPoint(x: center.x - 135, y: center.y + dy),
+                controlPoint1: CGPoint(x: center.x - 80, y: center.y + dy - 10),
+                controlPoint2: CGPoint(x: center.x - 110, y: center.y + dy + 10))
         }
         wavePath.lineWidth = 2
         wavePath.stroke()
@@ -1928,7 +2237,7 @@ extension PhotoStripComposer {
 /// Deterministic random numbers, so a style's decorations are laid out the same way every time.
 private struct SeededRandom: RandomNumberGenerator {
     private var state: UInt64
-    init(seed: UInt64) { state = seed &* 0x9E3779B97F4A7C15 | 1 }
+    init(seed: UInt64) { state = seed &* 0x9E37_79B9_7F4A_7C15 | 1 }
     mutating func next() -> UInt64 {
         state ^= state << 13
         state ^= state >> 7
@@ -1937,8 +2246,8 @@ private struct SeededRandom: RandomNumberGenerator {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+extension String {
+    fileprivate var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 /// Small renders of every style for pickers, shared by Settings and the Mirror tab.
@@ -1957,7 +2266,7 @@ final class StripPreviews: ObservableObject {
         key = newKey
         task?.cancel()
         task = Task {
-            try? await Task.sleep(for: .milliseconds(250)) // debounce typing
+            try? await Task.sleep(for: .milliseconds(250))  // debounce typing
             guard !Task.isCancelled else { return }
             var info = info
             info.caption = caption
@@ -1967,7 +2276,8 @@ final class StripPreviews: ObservableObject {
                 let photos = (0..<shots).map { samples[$0 % samples.count] }
                 for style in StripStyle.allCases {
                     guard let full = PhotoStripComposer.compose(photos, style: style, format: format, info: info),
-                          let small = Self.downscaled(full, width: 400) else { continue }
+                        let small = Self.downscaled(full, width: 400)
+                    else { continue }
                     result[style] = NSImage(cgImage: small, size: NSSize(width: small.width, height: small.height))
                 }
                 return result
@@ -1980,11 +2290,12 @@ final class StripPreviews: ObservableObject {
     nonisolated private static func downscaled(_ image: CGImage, width: Int) -> CGImage? {
         let height = Int(Double(image.height) * Double(width) / Double(image.width))
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+            let ctx = CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
         ctx.interpolationQuality = .high
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return ctx.makeImage()
     }
 }
-
