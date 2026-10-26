@@ -30,7 +30,7 @@ Rules
 - [ ] `Views/NotchiMascot.swift` (666): `drawRobot` is 174 lines → split per body part
 - [ ] `Views/Mirror/MirrorView.swift`: `body` is 214 lines → subviews
 - [ ] `Views/AI/AskSection.swift` (545): header / conversation / composer → subviews
-- [ ] `Views/LyricsShare/LyricsShareView.swift` (880): controlDeck (122), chooseVideoFile (139) → subviews + export helper
+- [x] `Views/LyricsShare/LyricsShareView.swift` (880): split into `+Controls`, `+LinePicker`, `+Media`, `+Export` extensions
 - [ ] `Views/LyricsShare/LyricCard.swift` (724): one frame style per subview
 - [x] `Features/NineRouterService.swift` (551): one NULL-safe `query()` helper replaces 7 copies of open/prepare/step/finalize; models → `NineRouterModels.swift`
 - [ ] `Settings/AppSettings.swift` (524): 111 settings in one class; fine for now, split by feature group only if it keeps growing
