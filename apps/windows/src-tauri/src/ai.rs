@@ -1199,6 +1199,13 @@ fn ask_blocking(req: &AskRequest) -> Result<String, String> {
             let r = agent.post(format!("{base}/api/chat"));
             ollama_text(&send(r, json!({ "model": req.model, "messages": messages, "stream": false }))?)
         }
+        "ninerouter" => {
+            let key = crate::ninerouter::api_key().ok_or("No active API key in 9router. Create one in its dashboard › Endpoint & Key.")?;
+            let model = ninerouter_model(&req.model)?;
+            let messages = json!([{ "role": "system", "content": SYSTEM_PROMPT }, { "role": "user", "content": req.prompt }]);
+            let r = agent.post(format!("{}/chat/completions", crate::ninerouter::BASE_URL)).header("Authorization", &format!("Bearer {key}"));
+            openai_text(&send(r, json!({ "model": model, "messages": messages }))?)
+        }
         _ => Err("Unknown provider".into()),
     }
 }

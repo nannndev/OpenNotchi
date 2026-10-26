@@ -101,7 +101,8 @@ fn cursor_over_pill(app: tauri::AppHandle) -> bool {
         return false;
     };
     let pill = *w.state::<PillSize>().0.lock().unwrap();
-    cursor_in_pill((cursor.x, cursor.y), (pos.x as f64, pos.y as f64), size.width as f64, pill, scale)
+    let effective_pill = (pill.0.max(600.0), pill.1.max(210.0));
+    cursor_in_pill((cursor.x, cursor.y), (pos.x as f64, pos.y as f64), size.width as f64, effective_pill, scale)
 }
 
 /// Returns all available monitors with their dimensions and primary flag.
@@ -235,8 +236,17 @@ fn hide_lyrics(app: tauri::AppHandle) -> Result<(), String> {
 
 /// True when the cursor (physical px) is over a pill of `pill` logical size, centered at the top of the window.
 fn cursor_in_pill(cursor: (f64, f64), window_pos: (f64, f64), window_width: f64, pill: (f64, f64), scale: f64) -> bool {
-    let left = window_pos.0 + (window_width - pill.0 * scale) / 2.0;
-    cursor.0 >= left && cursor.0 <= left + pill.0 * scale && cursor.1 >= window_pos.1 && cursor.1 <= window_pos.1 + pill.1 * scale
+    let is_open = pill.1 > 60.0 || pill.0 > 450.0;
+    let pad_x = if is_open { 24.0 * scale } else { 0.0 };
+    let pad_bottom = if is_open { 20.0 * scale } else { 0.0 };
+    let top_margin = 24.0 * scale;
+
+    let left = window_pos.0 + (window_width - pill.0 * scale) / 2.0 - pad_x;
+    let right = left + pill.0 * scale + pad_x * 2.0;
+    let top = window_pos.1 - top_margin;
+    let bottom = window_pos.1 + pill.1 * scale + pad_bottom;
+
+    cursor.0 >= left && cursor.0 <= right && cursor.1 >= top && cursor.1 <= bottom
 }
 
 /// True when the cursor (physical px) is over a sub-rect (in logical px relative to the pill) of the pill.
@@ -275,6 +285,7 @@ fn watch_hover(window: WebviewWindow) {
         let mut current_state: Option<HoverState> = None;
         let mut cached_geom: Option<((f64, f64), f64, f64)> = None; // (pos, width, scale)
         let mut last_geom_refresh = std::time::Instant::now();
+        let mut outside_ticks: u32 = 0;
 
         loop {
             std::thread::sleep(Duration::from_millis(40));
@@ -302,10 +313,20 @@ fn watch_hover(window: WebviewWindow) {
             let pill = *window.state::<PillSize>().0.lock().unwrap();
             let mascot = *window.state::<MascotRect>().0.lock().unwrap();
 
-            let in_pill = cursor_in_pill((cursor.x, cursor.y), win_pos, win_width, pill, scale);
+            // When the pill is open (or actively hovered), maintain the expanded open bounds
+            // so moving toward menu tabs (left edge) never causes it to snap shut.
+            let is_currently_open = pill.1 > 60.0 || pill.0 > 450.0 || current_state == Some(HoverState::Pill);
+            let effective_pill = if is_currently_open {
+                (pill.0.max(600.0), pill.1.max(210.0))
+            } else {
+                pill
+            };
+
+            let in_pill = cursor_in_pill((cursor.x, cursor.y), win_pos, win_width, effective_pill, scale);
             let state = if !in_pill {
                 HoverState::Outside
-            } else if let Some(m) = mascot {
+            } else if !is_currently_open && mascot.is_some() {
+                let m = mascot.unwrap();
                 if cursor_in_pill_subrect((cursor.x, cursor.y), win_pos, win_width, pill, m, scale) {
                     HoverState::Mascot
                 } else {
@@ -314,6 +335,16 @@ fn watch_hover(window: WebviewWindow) {
             } else {
                 HoverState::Pill
             };
+
+            // Small 80ms hysteresis on exit so fast mouse gestures across menu headers don't drop the hover
+            if state == HoverState::Outside && current_state == Some(HoverState::Pill) {
+                outside_ticks += 1;
+                if outside_ticks < 2 {
+                    continue;
+                }
+            } else {
+                outside_ticks = 0;
+            }
 
             if current_state != Some(state) {
                 current_state = Some(state);
@@ -363,6 +394,9 @@ pub fn run() {
                 .with_denylist(&["pill", "settings", "share"])
                 .build(),
         )
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let _ = open_settings(app.clone());
+        }))
         .on_window_event(|window, event| {
             if window.label() == "settings" || window.label() == "share" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -453,6 +487,17 @@ pub fn run() {
                     "quit" => app.exit(0),
                     _ => {}
                 })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        button_state: tauri::tray::MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        let _ = open_settings(app.clone());
+                    }
+                })
                 .build(app)?;
             Ok(())
         })
@@ -505,6 +550,28 @@ mod tests {
         // (100, 30) is outside the pill entirely
         assert!(!hit_pill(100.0, 30.0));
         assert!(!hit_mascot(100.0, 30.0));
+    }
+
+    #[test]
+    fn open_pill_has_generous_margins_and_reaches_screen_top() {
+        // 640-wide window at x=100, y=0 on a 1x screen; open pill is 600x210.
+        // Pad_x is 24px, pad_bottom is 20px, top_margin is 24px.
+        // Pill left = 100 + (640 - 600)/2 - 24 = 100 + 20 - 24 = 96.
+        // Pill right = 96 + 600 + 48 = 744.
+        // Pill top = -24, bottom = 230.
+        let hit = |x, y| cursor_in_pill((x, y), (100.0, 0.0), 640.0, (600.0, 210.0), 1.0);
+        // Inside center
+        assert!(hit(420.0, 50.0));
+        // Near top screen edge (y = 0 or even slightly above)
+        assert!(hit(420.0, 0.0));
+        assert!(hit(420.0, -10.0));
+        // Near left menu tab
+        assert!(hit(110.0, 20.0));
+        assert!(hit(98.0, 20.0));
+        // Outside bounds
+        assert!(!hit(80.0, 20.0));
+        assert!(!hit(750.0, 20.0));
+        assert!(!hit(420.0, 240.0));
     }
 }
 

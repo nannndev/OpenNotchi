@@ -43,8 +43,33 @@ pub struct NineRouterConnection {
 }
 
 pub fn router_dir() -> PathBuf {
-    let home = std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).unwrap_or_default();
-    PathBuf::from(home).join(".9router")
+    #[cfg(windows)]
+    {
+        // 9router on Windows stores data in %APPDATA%\9router (per 9router's getAppDataDir)
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let p = PathBuf::from(appdata).join("9router");
+            if p.join("db").join("data.sqlite").exists() {
+                return p;
+            }
+        }
+        // Fallback to %USERPROFILE%\.9router if present
+        if let Ok(home) = std::env::var("USERPROFILE") {
+            let p = PathBuf::from(home).join(".9router");
+            if p.join("db").join("data.sqlite").exists() {
+                return p;
+            }
+        }
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            return PathBuf::from(appdata).join("9router");
+        }
+        let home = std::env::var("USERPROFILE").unwrap_or_default();
+        PathBuf::from(home).join(".9router")
+    }
+    #[cfg(not(windows))]
+    {
+        let home = std::env::var("HOME").unwrap_or_default();
+        PathBuf::from(home).join(".9router")
+    }
 }
 
 pub fn db_path() -> PathBuf {

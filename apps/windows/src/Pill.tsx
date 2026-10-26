@@ -165,6 +165,8 @@ export function Pill() {
   const mirrorBusyRef = useRef(false)
   // A pinned Mirror stays open until unpinned or another tab is chosen.
   mirrorBusyRef.current = mirrorBusy || (activeTab === "mirror" && settings.mirrorPinned)
+  const isMouseOverPillRef = useRef(false)
+  const closeTimerRef = useRef<number | undefined>(undefined)
   const { updateInfo } = useUpdateChecker()
   useTick(250)
 
@@ -209,15 +211,24 @@ export function Pill() {
 
   // Hover comes from Rust polling the cursor, so the pill reacts without first being clicked.
   useEffect(() => {
-    let closeTimer: number | undefined
     const unlistenHover = listen<boolean>("pill-hover", ({ payload: inside }) => {
-      clearTimeout(closeTimer)
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = undefined
+      }
       if (activeBannerRef.current) {
         setBannerHovered(inside)
         return
       }
-      if (inside) setOpen(true)
-      else closeTimer = window.setTimeout(() => !mirrorBusyRef.current && setOpen(false), settings.closeDelayMs ?? 300)
+      if (inside) {
+        setOpen(true)
+      } else {
+        closeTimerRef.current = window.setTimeout(() => {
+          if (!mirrorBusyRef.current && !isMouseOverPillRef.current) {
+            setOpen(false)
+          }
+        }, settings.closeDelayMs ?? 300)
+      }
     })
     const unlistenMascot = listen<boolean>("pill-hover-mascot", ({ payload: inside }) => {
       setMascotHovered(inside)
@@ -229,6 +240,10 @@ export function Pill() {
       showBanner(payload)
     })
     return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = undefined
+      }
       unlistenHover.then((f) => f())
       unlistenMascot.then((f) => f())
       unlistenBanner.then((f) => f())
@@ -294,8 +309,8 @@ export function Pill() {
         <div
           className={`aura-backdrop ${settings.auraGlow}`}
           style={{
-            width: size.width + 48,
-            height: size.height + 48,
+            width: Math.min(size.width, 580),
+            height: size.height,
             backgroundImage: np?.artwork ? `url(${np.artwork})` : undefined,
             backgroundColor: !np?.artwork ? resolvedAccent : undefined,
           }}
@@ -305,6 +320,24 @@ export function Pill() {
       <div
         className={`pill ${open ? "open" : ""} ${hidden ? "hidden" : ""} theme-${settings.theme} border-${settings.borderStyle} anim-${settings.openAnimation}`}
         style={{ width: size.width, height: size.height, zIndex: 1 }}
+        onMouseEnter={() => {
+          isMouseOverPillRef.current = true
+          if (closeTimerRef.current) {
+            clearTimeout(closeTimerRef.current)
+            closeTimerRef.current = undefined
+          }
+        }}
+        onMouseLeave={() => {
+          isMouseOverPillRef.current = false
+          if (open && !mirrorBusyRef.current) {
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+            closeTimerRef.current = window.setTimeout(() => {
+              if (!mirrorBusyRef.current && !isMouseOverPillRef.current) {
+                setOpen(false)
+              }
+            }, settings.closeDelayMs ?? 300)
+          }
+        }}
       >
         {/* Album Art theme background */}
         {settings.theme === "albumArt" && np?.artwork && (
@@ -480,35 +513,42 @@ export function Pill() {
             </div>
 
             <div className="pill-header-actions">
-              <button
-                className={`header-action-btn ${awake ? "on" : ""}`}
-                onClick={toggleAwake}
-                title={awake ? "Stop keeping awake" : "Keep awake"}
-              >
-                <Coffee size={12} />
-              </button>
-              <button
-                className={`header-action-btn ${widgetOn ? "on" : ""}`}
-                onClick={toggleWidget}
-                title={widgetOn ? "Hide desktop lyrics" : "Show desktop lyrics"}
-              >
-                <PictureInPicture2 size={12} />
-              </button>
-              <button
-                className="header-action-btn"
-                onClick={openShare}
-                title="Share lyric card"
-              >
-                <Share2 size={12} />
-              </button>
-              <button
-                className="header-action-btn"
-                onClick={() => invoke("open_now_playing").catch(() => {})}
-                title="Full-screen player"
-                aria-label="Full-screen player"
-              >
-                <Maximize2 size={12} />
-              </button>
+              {/* Keep awake belongs to Notes; elsewhere it shows only while on, so it can be turned off. */}
+              {(currentTabSafe === "notes" || awake) && (
+                <button
+                  className={`header-action-btn ${awake ? "on" : ""}`}
+                  onClick={toggleAwake}
+                  title={awake ? "Stop keeping awake" : "Keep awake"}
+                >
+                  <Coffee size={12} />
+                </button>
+              )}
+              {currentTabSafe === "music" && (
+                <>
+                  <button
+                    className={`header-action-btn ${widgetOn ? "on" : ""}`}
+                    onClick={toggleWidget}
+                    title={widgetOn ? "Hide desktop lyrics" : "Show desktop lyrics"}
+                  >
+                    <PictureInPicture2 size={12} />
+                  </button>
+                  <button
+                    className="header-action-btn"
+                    onClick={openShare}
+                    title="Share lyric card"
+                  >
+                    <Share2 size={12} />
+                  </button>
+                  <button
+                    className="header-action-btn"
+                    onClick={() => invoke("open_now_playing").catch(() => {})}
+                    title="Full-screen player"
+                    aria-label="Full-screen player"
+                  >
+                    <Maximize2 size={12} />
+                  </button>
+                </>
+              )}
               <button
                 className="header-action-btn"
                 onClick={openSettings}

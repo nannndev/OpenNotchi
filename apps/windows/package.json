@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "tauri": "tauri",
-    "test": "node --test src/*.test.ts"
+    "test": "node --experimental-strip-types --test src/*.test.ts"
   },
   "license": "MIT",
   "type": "module",

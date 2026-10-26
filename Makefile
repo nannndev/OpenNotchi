@@ -47,6 +47,9 @@ web-build: web-install
 windows-dev:
 	npm --prefix $(WINDOWS) run dev
 
+windows-run:
+	npm --prefix $(WINDOWS) run tauri dev
+
 windows-build:
 	npm --prefix $(WINDOWS) run build
 

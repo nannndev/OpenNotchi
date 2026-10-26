@@ -65,6 +65,8 @@ button:focus-visible {
   border-radius: 0 0 20px 20px;
   translate: 0 0;
   overflow: hidden;
+  /* clip, unlike hidden, can't be scrolled by scrollIntoView, so content can't slide out of the pill. */
+  overflow: clip;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0);
   transform-origin: top center;
   transform-style: preserve-3d;
@@ -81,15 +83,13 @@ button:focus-visible {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
 }
 
-/* 2. Liquid Glass: light tint so the blurred desktop shows through, plus specular rim + top sheen */
+/* 2. Liquid Glass: authentic smoked glass on Windows without Chromium transparent-window backdrop-filter artifacts */
 .theme-liquidGlass {
   background:
-    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.14), transparent 60%),
-    linear-gradient(180deg, rgba(40, 42, 50, 0.38) 0%, rgba(14, 15, 20, 0.52) 100%) !important;
-  backdrop-filter: blur(24px) saturate(180%) brightness(1.05);
-  -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.05);
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.16), transparent 60%),
+    linear-gradient(180deg, rgba(30, 32, 42, 0.92) 0%, rgba(12, 13, 18, 0.98) 100%) !important;
   box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.45),
+    0 18px 40px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
     inset 0 -1px 0 rgba(255, 255, 255, 0.10),
     inset 1px 0 0 rgba(255, 255, 255, 0.16),
@@ -97,15 +97,13 @@ button:focus-visible {
     inset 0 0 24px rgba(255, 255, 255, 0.06) !important;
 }
 
-/* 3. Liquid Glass Clear: barely tinted, lighter blur */
+/* 3. Liquid Glass Clear: crystal glass refraction */
 .theme-liquidGlassClear {
   background:
-    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.18), transparent 60%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(10, 12, 18, 0.28) 100%) !important;
-  backdrop-filter: blur(12px) saturate(200%) brightness(1.08);
-  -webkit-backdrop-filter: blur(12px) saturate(200%) brightness(1.08);
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.22), transparent 60%),
+    linear-gradient(180deg, rgba(42, 46, 60, 0.88) 0%, rgba(16, 18, 25, 0.96) 100%) !important;
   box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.35),
+    0 18px 40px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
     inset 0 -1px 0 rgba(255, 255, 255, 0.14),
     inset 1px 0 0 rgba(255, 255, 255, 0.22),
@@ -403,10 +401,10 @@ button:focus-visible {
   transform: translateX(-50%);
   background-size: cover;
   background-position: center;
-  filter: blur(44px) saturate(1.8);
+  filter: blur(16px) saturate(1.8);
   pointer-events: none;
   z-index: 0;
-  border-radius: 36px;
+  border-radius: 20px;
   animation: aura-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .aura-backdrop.vibrant {

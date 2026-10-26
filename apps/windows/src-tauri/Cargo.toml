@@ -24,6 +24,7 @@ log = "0.4"
 tauri = { version = "2.12.5", features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-log = "2"
 tauri-plugin-window-state = "2.5.0"
+tauri-plugin-single-instance = "2"
 # Ask AI: provider HTTP calls (blocking, run off the main thread) and API keys in Credential Manager / Keychain.
 ureq = { version = "3", features = ["json"] }
 keyring = { version = "3", features = ["apple-native", "windows-native"] }

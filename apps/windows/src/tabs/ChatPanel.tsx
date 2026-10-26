@@ -139,14 +139,19 @@ export function ChatPanel({
   const [copied, setCopied] = useState<number | null>(null)
   const [undone, setUndone] = useState<Set<string>>(new Set())
   const cancelled = useRef(false)
-  const bottom = useRef<HTMLDivElement>(null)
+  const scroller = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const current = sessions.find((s) => s.id === currentId) ?? null
   const messages = current?.messages ?? []
 
   useEffect(() => saveSessions(sessions), [sessions])
-  useEffect(() => bottom.current?.scrollIntoView({ block: "end" }), [messages.length, messages[messages.length - 1]?.content])
+  // Scroll only the chat list: scrollIntoView also scrolls every overflow:hidden ancestor,
+  // which shifted the whole pill up out of the window and left the aura glow behind.
+  useEffect(() => {
+    const el = scroller.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [messages.length, messages[messages.length - 1]?.content, busy, error])
   useEffect(() => {
     if (settings.aiProvider === "ninerouter") invoke<string[]>("ninerouter_models").then(setModels).catch(() => {})
   }, [settings.aiProvider])
@@ -396,7 +401,7 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className="chat-scroll">
+      <div className="chat-scroll" ref={scroller}>
         {messages.length === 0 && !error && (
           <div className="chat-empty">
             <b>What can I help with?</b>
@@ -480,7 +485,6 @@ export function ChatPanel({
             <button onClick={regenerate}>Retry</button>
           </div>
         )}
-        <div ref={bottom} />
       </div>
 
       <div className="chat-composer">
