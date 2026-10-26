@@ -4,6 +4,9 @@ import AppKit
 if let i = CommandLine.arguments.firstIndex(of: "--ai-selftest") {
     AISelfTest.run(Array(CommandLine.arguments[(i + 1)...]))
 }
+if let i = CommandLine.arguments.firstIndex(of: "--strip-snapshot") {
+    StripSnapshot.run(Array(CommandLine.arguments[(i + 1)...]))
+}
 #endif
 
 let app = NSApplication.shared
