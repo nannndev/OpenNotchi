@@ -27,7 +27,7 @@ Rules
       Verified with `OpenNotchi --strip-snapshot <dir>`: 380 renders pixel-identical before/after.
 - [x] `Views/PrompterView.swift` (704): `controlToolbar` is 215 lines → subviews (`Views/Prompter/`)
 - [x] `Views/PhotoboxStudioView.swift` (748): `canvasSection` and `controlsSection` → subviews (`Views/Photobox/`)
-- [ ] `Views/NotchiMascot.swift` (666): `drawRobot` is 174 lines → split per body part
+- [x] `Views/NotchiMascot.swift` (666): `drawRobot` 174 lines → antenna/headphones/ear pads/helmet/cheeks/eyes
 - [x] `Views/Mirror/MirrorView.swift`: `body` 214 → 87 lines (`cameraSource`, overlays as properties, `CameraAccessPrompt`)
 - [x] `Views/AI/AskSection.swift` (545): `+Header`, `+Conversation`, `+Composer`, `+Actions` extensions
 - [x] `Views/LyricsShare/LyricsShareView.swift` (880): split into `+Controls`, `+LinePicker`, `+Media`, `+Export` extensions

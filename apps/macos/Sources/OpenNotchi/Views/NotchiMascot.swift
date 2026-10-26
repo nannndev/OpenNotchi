@@ -155,6 +155,7 @@ struct NotchiMascot: View {
         .shadow(color: tint.opacity(glow * 0.35), radius: 6)
     }
 
+    /// Draws the bot in a 32×32 space, back to front.
     private func drawRobot(
         context: inout GraphicsContext,
         t: Double,
@@ -163,24 +164,41 @@ struct NotchiMascot: View {
         isBlinking: Bool,
         alertBlink: Bool
     ) {
-        // 1. Top Antenna
+        drawAntenna(&context, alertBlink: alertBlink)
+        drawHeadphones(&context)
+        drawEarPads(&context)
+        drawHelmet(&context)
+        drawCheeks(&context)
+        drawEyes(
+            &context, t: t, gazeShift: gazeShift, blinkScale: blinkScale, isBlinking: isBlinking, alertBlink: alertBlink
+        )
+    }
+
+    private func drawAntenna(_ context: inout GraphicsContext, alertBlink: Bool) {
         var pole = Path()
         pole.move(to: CGPoint(x: 16, y: 4.5))
         pole.addLine(to: CGPoint(x: 16, y: 7.5))
-        context.stroke(pole, with: .color(Color(red: 0.28, green: 0.33, blue: 0.41)), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+        context.stroke(
+            pole, with: .color(Color(red: 0.28, green: 0.33, blue: 0.41)),
+            style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
 
         let beaconRect = CGRect(x: 16 - 1.8, y: 3.8 - 1.8, width: 3.6, height: 3.6)
         let beaconAlpha = (mood == .alert && alertBlink) ? 1.0 : 0.85
         context.fill(Path(ellipseIn: beaconRect), with: .color(eyeColor.opacity(beaconAlpha)))
+    }
 
-        // 2. Headphone Arc when vibing to music
+    /// Headphone band, only while vibing to music.
+    private func drawHeadphones(_ context: inout GraphicsContext) {
         if mood == .vibing {
             var arc = Path()
-            arc.addArc(center: CGPoint(x: 16, y: 16), radius: 13.5, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+            arc.addArc(
+                center: CGPoint(x: 16, y: 16), radius: 13.5, startAngle: .degrees(180), endAngle: .degrees(0),
+                clockwise: false)
             context.stroke(arc, with: .color(tint), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
         }
+    }
 
-        // 3. Ear Pads
+    private func drawEarPads(_ context: inout GraphicsContext) {
         let earPadColor = (mood == .vibing) ? tint : Color(red: 0.2, green: 0.25, blue: 0.33)
         let earStroke = (mood == .vibing) ? Color.white : Color.white.opacity(0.15)
         let leftEarRect = CGRect(x: 1.8, y: 12, width: 3.2, height: 9)
@@ -191,44 +209,58 @@ struct NotchiMascot: View {
 
         context.fill(Path(roundedRect: rightEarRect, cornerRadius: 1.6), with: .color(earPadColor))
         context.stroke(Path(roundedRect: rightEarRect, cornerRadius: 1.6), with: .color(earStroke), lineWidth: 0.8)
+    }
 
-        // 4. Robot Head / Helmet Base
+    /// Helmet, the dark visor screen and its gloss.
+    private func drawHelmet(_ context: inout GraphicsContext) {
         let helmetRect = CGRect(x: 4, y: 7.5, width: 24, height: 18)
         let helmetPath = Path(roundedRect: helmetRect, cornerRadius: 6.5)
-        context.fill(helmetPath, with: .linearGradient(
-            Gradient(colors: [Color(red: 0.14, green: 0.16, blue: 0.2), Color(red: 0.07, green: 0.07, blue: 0.09)]),
-            startPoint: CGPoint(x: 16, y: 7.5),
-            endPoint: CGPoint(x: 16, y: 25.5)
-        ))
+        context.fill(
+            helmetPath,
+            with: .linearGradient(
+                Gradient(colors: [Color(red: 0.14, green: 0.16, blue: 0.2), Color(red: 0.07, green: 0.07, blue: 0.09)]),
+                startPoint: CGPoint(x: 16, y: 7.5),
+                endPoint: CGPoint(x: 16, y: 25.5)
+            ))
         context.stroke(helmetPath, with: .color(Color.white.opacity(0.16)), lineWidth: 1)
 
-        // 5. OLED Visor Screen
         let visorRect = CGRect(x: 6, y: 9.5, width: 20, height: 14)
         let visorPath = Path(roundedRect: visorRect, cornerRadius: 4.5)
         context.fill(visorPath, with: .color(Color(red: 0.024, green: 0.027, blue: 0.039)))
         context.stroke(visorPath, with: .color(Color.white.opacity(0.08)), lineWidth: 0.7)
 
-        // 6. Visor Gloss Reflection
         var glossPath = Path()
         glossPath.move(to: CGPoint(x: 6.8, y: 11.5))
         glossPath.addQuadCurve(to: CGPoint(x: 25.2, y: 12.2), control: CGPoint(x: 16, y: 9.8))
         glossPath.addLine(to: CGPoint(x: 25.2, y: 10.5))
         glossPath.addQuadCurve(to: CGPoint(x: 6.8, y: 10.5), control: CGPoint(x: 16, y: 9.0))
         glossPath.closeSubpath()
-        context.fill(glossPath, with: .linearGradient(
-            Gradient(colors: [Color.white.opacity(0.22), Color.white.opacity(0.0)]),
-            startPoint: CGPoint(x: 6.8, y: 9.5),
-            endPoint: CGPoint(x: 25.2, y: 14.0)
-        ))
+        context.fill(
+            glossPath,
+            with: .linearGradient(
+                Gradient(colors: [Color.white.opacity(0.22), Color.white.opacity(0.0)]),
+                startPoint: CGPoint(x: 6.8, y: 9.5),
+                endPoint: CGPoint(x: 25.2, y: 14.0)
+            ))
+    }
 
-        // 7. Cheeks / Blushing on Loved & Happy
+    /// Blush, when loved or happy.
+    private func drawCheeks(_ context: inout GraphicsContext) {
         if mood == .loved || mood == .happy {
             let blushColor = Color(red: 0.96, green: 0.25, blue: 0.37).opacity(0.65)
-            context.fill(Path(ellipseIn: CGRect(x: 8.5 - 1.4, y: 19.5 - 1.4, width: 2.8, height: 2.8)), with: .color(blushColor))
-            context.fill(Path(ellipseIn: CGRect(x: 23.5 - 1.4, y: 19.5 - 1.4, width: 2.8, height: 2.8)), with: .color(blushColor))
+            context.fill(
+                Path(ellipseIn: CGRect(x: 8.5 - 1.4, y: 19.5 - 1.4, width: 2.8, height: 2.8)), with: .color(blushColor))
+            context.fill(
+                Path(ellipseIn: CGRect(x: 23.5 - 1.4, y: 19.5 - 1.4, width: 2.8, height: 2.8)), with: .color(blushColor)
+            )
         }
+    }
 
-        // 8. Eyes / Visor Face by Mood
+    /// The face on the visor, one look per mood.
+    private func drawEyes(
+        _ context: inout GraphicsContext, t: Double, gazeShift: CGFloat, blinkScale: CGFloat, isBlinking: Bool,
+        alertBlink: Bool
+    ) {
         switch mood {
         case .loved:
             // Heart Eyes ♥ ♥
@@ -266,24 +298,28 @@ struct NotchiMascot: View {
             var leftLine = Path()
             leftLine.move(to: CGPoint(x: 9.5, y: 16.5))
             leftLine.addLine(to: CGPoint(x: 13.5, y: 16.5))
-            context.stroke(leftLine, with: .color(eyeColor.opacity(0.75)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+            context.stroke(
+                leftLine, with: .color(eyeColor.opacity(0.75)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
 
             var rightLine = Path()
             rightLine.move(to: CGPoint(x: 18.5, y: 16.5))
             rightLine.addLine(to: CGPoint(x: 22.5, y: 16.5))
-            context.stroke(rightLine, with: .color(eyeColor.opacity(0.75)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+            context.stroke(
+                rightLine, with: .color(eyeColor.opacity(0.75)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
 
         case .tired:
             // Drooping Sad Lines v v
             var leftLine = Path()
             leftLine.move(to: CGPoint(x: 9.5, y: 15.8))
             leftLine.addLine(to: CGPoint(x: 13.5, y: 17.2))
-            context.stroke(leftLine, with: .color(eyeColor.opacity(0.6)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+            context.stroke(
+                leftLine, with: .color(eyeColor.opacity(0.6)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
 
             var rightLine = Path()
             rightLine.move(to: CGPoint(x: 18.5, y: 17.2))
             rightLine.addLine(to: CGPoint(x: 22.5, y: 15.8))
-            context.stroke(rightLine, with: .color(eyeColor.opacity(0.6)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+            context.stroke(
+                rightLine, with: .color(eyeColor.opacity(0.6)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
 
         case .busy:
             // Cyber Scanning Slits + Sweeping Scan Dot
@@ -308,8 +344,10 @@ struct NotchiMascot: View {
                 context.stroke(Path(ellipseIn: leftCircle), with: .color(eyeColor), lineWidth: 1.6)
                 context.stroke(Path(ellipseIn: rightCircle), with: .color(eyeColor), lineWidth: 1.6)
             }
-            context.fill(Path(ellipseIn: CGRect(x: 11.5 - 1.2, y: 16 - 1.2, width: 2.4, height: 2.4)), with: .color(.white))
-            context.fill(Path(ellipseIn: CGRect(x: 20.5 - 1.2, y: 16 - 1.2, width: 2.4, height: 2.4)), with: .color(.white))
+            context.fill(
+                Path(ellipseIn: CGRect(x: 11.5 - 1.2, y: 16 - 1.2, width: 2.4, height: 2.4)), with: .color(.white))
+            context.fill(
+                Path(ellipseIn: CGRect(x: 20.5 - 1.2, y: 16 - 1.2, width: 2.4, height: 2.4)), with: .color(.white))
 
         case .idle:
             // Standard Rounded LED Eyes (with Blink + Gaze)
@@ -448,7 +486,9 @@ private struct NotchiState: DynamicProperty {
     /// Like `agentStates`, but a "done" older than `doneFor` seconds counts as idle.
     func recentAgentStates(now: Date, doneFor: TimeInterval) -> [AgentState] {
         guard settings.aiEnabled && settings.aiAgents else { return [] }
-        return agents.sessions.map { $0.state == .done && now.timeIntervalSince($0.updatedAt) > doneFor ? .idle : $0.state }
+        return agents.sessions.map {
+            $0.state == .done && now.timeIntervalSince($0.updatedAt) > doneFor ? .idle : $0.state
+        }
     }
 
     func context(now: Date, idleFor: TimeInterval = 0, petted: Bool = false) -> NotchiContext {
