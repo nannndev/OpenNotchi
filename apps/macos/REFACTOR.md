@@ -31,7 +31,7 @@ Rules
 - [ ] `Views/Mirror/MirrorView.swift`: `body` is 214 lines → subviews
 - [ ] `Views/AI/AskSection.swift` (545): header / conversation / composer → subviews
 - [x] `Views/LyricsShare/LyricsShareView.swift` (880): split into `+Controls`, `+LinePicker`, `+Media`, `+Export` extensions
-- [ ] `Views/LyricsShare/LyricCard.swift` (724): one frame style per subview
+- [x] `Views/LyricsShare/LyricCard.swift` (724): one `LyricCard+<Style>.swift` extension per style
 - [x] `Features/NineRouterService.swift` (551): one NULL-safe `query()` helper replaces 7 copies of open/prepare/step/finalize; models → `NineRouterModels.swift`
 - [ ] `Settings/AppSettings.swift` (524): 111 settings in one class; fine for now, split by feature group only if it keeps growing
 - [ ] Any `var body` over ~100 lines found while doing phase 1 → extract subviews

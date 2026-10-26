@@ -106,7 +106,8 @@ struct BarcodePattern: View {
     var body: some View {
         HStack(spacing: 2) {
             ForEach(0..<32) { i in
-                let dynamicH: CGFloat = animatedOffset > 0 ? CGFloat(abs(sin(animatedOffset * 3 + Double(i) * 0.7))) : 1.0
+                let dynamicH: CGFloat =
+                    animatedOffset > 0 ? CGFloat(abs(sin(animatedOffset * 3 + Double(i) * 0.7))) : 1.0
                 Rectangle()
                     .fill(Color.black.opacity(0.8))
                     .frame(width: (i % 3 == 0) ? 2.5 : ((i % 5 == 0) ? 4.0 : 1.2))
@@ -122,9 +123,9 @@ struct Grain: View {
 
     var body: some View {
         Canvas { context, size in
-            var seed: UInt64 = 0x9E3779B97F4A7C15
+            var seed: UInt64 = 0x9E37_79B9_7F4A_7C15
             func next() -> Double {
-                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
                 return Double(seed >> 33) / Double(1 << 31)
             }
             for _ in 0..<2600 {
