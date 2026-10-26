@@ -21,194 +21,66 @@ struct MirrorView: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Group {
-                if media.isDemo {
-                    // Demo mode (screenshots, marketing): a sample portrait instead of the real camera.
-                    // Fills whatever space it's given without asking for more.
-                    Color.black.overlay {
-                        Image(decorative: PhotoStripComposer.samplePhotos[1], scale: 1)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    }
-                    .clipped()
-                } else if cameraAuthStatus == .denied || cameraAuthStatus == .restricted {
-                    VStack(spacing: 8) {
-                        Image(systemName: "camera.slash.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.secondary)
-                        Text("Camera Access Restricted")
-                            .font(.system(size: 13, weight: .bold))
-                        Text("OpenNotchi needs camera access to preview your camera and take photobox snapshots.")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 24)
-                        Button("Open Privacy Settings") {
-                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                        .padding(.top, 4)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.85))
-                } else if cameraAuthStatus == .notDetermined {
-                    VStack(spacing: 8) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.secondary)
-                        Text("Camera Access Required")
-                            .font(.system(size: 13, weight: .bold))
-                        Text("Grant camera access to use Mirror and photobox booth features.")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 24)
-                        Button("Allow Camera Access") {
-                            AVCaptureDevice.requestAccess(for: .video) { granted in
-                                DispatchQueue.main.async {
-                                    cameraAuthStatus = granted ? .authorized : .denied
-                                }
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                        .padding(.top, 4)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.85))
-                } else {
-                    CameraPreview(
-                        effect: settings.mirrorEffect,
-                        ringLight: settings.mirrorRingLight,
-                        background: settings.mirrorBackground,
-                        artwork: settings.mirrorBackground == .album ? media.artwork?.cgImage(forProposedRect: nil, context: nil, hints: nil) : nil,
-                        musicPlaying: media.info?.isPlaying ?? false,
-                        gesturesEnabled: settings.mirrorGestures,
-                        cameraID: settings.mirrorCameraID,
-                        captureRequest: captureRequest,
-                        onGesture: handle,
-                        onCapture: captured
-                    )
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay { ringLightGlow }
-            .overlay {
-                ForEach(bursts, id: \.self) { id in
-                    ConfettiBurst()
-                        .task {
-                            try? await Task.sleep(for: .seconds(2.4))
-                            bursts.removeAll { $0 == id }
-                        }
-                }
+            cameraSource
                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                .allowsHitTesting(false)
-            }
-            .overlay {
-                if let countdown {
-                    Text("\(countdown)")
-                        .font(.system(size: 64, weight: .heavy, design: .rounded))
-                        .shadow(color: .black.opacity(0.5), radius: 10)
-                        .id(countdown)
-                        .transition(.scale(scale: 1.6).combined(with: .opacity))
-                }
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.white)
-                    .opacity(flash ? 0.9 : 0)
+                .overlay { ringLightGlow }
+                .overlay {
+                    ForEach(bursts, id: \.self) { id in
+                        ConfettiBurst()
+                            .task {
+                                try? await Task.sleep(for: .seconds(2.4))
+                                bursts.removeAll { $0 == id }
+                            }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                     .allowsHitTesting(false)
-            }
-            .overlay(alignment: .topTrailing) {
-                if let savedPhoto {
-                    SavedToast(url: savedPhoto)
-                        .padding(8)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
-            }
-            .overlay(alignment: .top) {
-                if let shots = boothShots {
-                    HStack(spacing: 6) {
-                        ForEach(0..<settings.stripShots, id: \.self) { i in
-                            Circle()
-                                .fill(i < shots.count ? Color.white : Color.white.opacity(0.3))
-                                .frame(width: 8, height: 8)
+                .overlay {
+                    if let countdown {
+                        Text("\(countdown)")
+                            .font(.system(size: 64, weight: .heavy, design: .rounded))
+                            .shadow(color: .black.opacity(0.5), radius: 10)
+                            .id(countdown)
+                            .transition(.scale(scale: 1.6).combined(with: .opacity))
+                    }
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.white)
+                        .opacity(flash ? 0.9 : 0)
+                        .allowsHitTesting(false)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if let savedPhoto {
+                        SavedToast(url: savedPhoto)
+                            .padding(8)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
+                }
+                .overlay(alignment: .top) { boothProgress }
+                .overlay(alignment: .topLeading) { gestureHint }
+                .overlay(alignment: .trailing) {
+                    VStack(spacing: 10) {
+                        ShutterButton(action: { startCountdown() })
+                        PhotoboxButton {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { choosingStrip = true }
                         }
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(.black.opacity(0.5)))
-                    .padding(8)
+                    .padding(.trailing, 12)
+                    .opacity(isHovering && countdown == nil && boothShots == nil && !choosingStrip ? 1 : 0)
                 }
-            }
-            .overlay(alignment: .topLeading) {
-                if isHovering && settings.mirrorGestures && savedPhoto == nil && boothShots == nil {
-                    Text("✌️ photo   👍 confetti   ✋ light")
-                        .font(.system(size: 10, weight: .medium))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(.black.opacity(0.5)))
+                .overlay { stripPicker }
+                .overlay { studio }
+                .overlay(alignment: .bottom) {
+                    MirrorControls()
                         .padding(8)
-                        .transition(.opacity)
+                        .opacity(isHovering && !choosingStrip && studioSession == nil ? 1 : 0)
                 }
-            }
-            .overlay(alignment: .trailing) {
-                VStack(spacing: 10) {
-                    ShutterButton(action: { startCountdown() })
-                    PhotoboxButton { withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { choosingStrip = true } }
+                .shadow(color: settings.mirrorRingLight ? .white.opacity(0.35) : .clear, radius: 12)
+                .onHover { inside in
+                    withAnimation(.easeInOut(duration: 0.2)) { isHovering = inside }
                 }
-                .padding(.trailing, 12)
-                .opacity(isHovering && countdown == nil && boothShots == nil && !choosingStrip ? 1 : 0)
-            }
-            .overlay {
-                if choosingStrip && studioSession == nil {
-                    StripPicker(
-                        onStart: {
-                            withAnimation { choosingStrip = false }
-                            startPhotobox()
-                        },
-                        onOpenStudio: {
-                            withAnimation { choosingStrip = false }
-                            openStudioWithDemo()
-                        },
-                        onClose: { withAnimation { choosingStrip = false } }
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
-                }
-            }
-            .overlay {
-                if let session = studioSession {
-                    PhotoboxStudioView(
-                        session: Binding(get: { session }, set: { studioSession = $0 }),
-                        onFinish: { url in
-                            photoSaved(url)
-                            bursts.append(UUID())
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                studioSession = nil
-                            }
-                        },
-                        onCancel: {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                studioSession = nil
-                            }
-                        }
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                }
-            }
-            .overlay(alignment: .bottom) {
-                MirrorControls()
-                    .padding(8)
-                    .opacity(isHovering && !choosingStrip && studioSession == nil ? 1 : 0)
-            }
-            .shadow(color: settings.mirrorRingLight ? .white.opacity(0.35) : .clear, radius: 12)
-            .onHover { inside in
-                withAnimation(.easeInOut(duration: 0.2)) { isHovering = inside }
-            }
-            .animation(.easeInOut(duration: 0.25), value: settings.mirrorRingLight)
+                .animation(.easeInOut(duration: 0.25), value: settings.mirrorRingLight)
 
             ResizeHandle()
         }
@@ -229,6 +101,131 @@ struct MirrorView: View {
         .onDisappear {
             vm.holdOpen = false
             vm.isStudioOpen = false
+        }
+    }
+
+    /// The live camera, a sample portrait in demo mode, or a prompt when camera access is missing.
+    @ViewBuilder
+    private var cameraSource: some View {
+        if media.isDemo {
+            // Demo mode (screenshots, marketing): a sample portrait instead of the real camera.
+            // Fills whatever space it's given without asking for more.
+            Color.black.overlay {
+                Image(decorative: PhotoStripComposer.samplePhotos[1], scale: 1)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            }
+            .clipped()
+        } else if cameraAuthStatus == .denied || cameraAuthStatus == .restricted {
+            CameraAccessPrompt(
+                icon: "camera.slash.fill",
+                title: "Camera Access Restricted",
+                message: "OpenNotchi needs camera access to preview your camera and take photobox snapshots.",
+                buttonTitle: "Open Privacy Settings"
+            ) {
+                NSWorkspace.shared.open(
+                    URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!)
+            }
+        } else if cameraAuthStatus == .notDetermined {
+            CameraAccessPrompt(
+                icon: "camera.fill",
+                title: "Camera Access Required",
+                message: "Grant camera access to use Mirror and photobox booth features.",
+                buttonTitle: "Allow Camera Access"
+            ) {
+                AVCaptureDevice.requestAccess(for: .video) { granted in
+                    DispatchQueue.main.async {
+                        cameraAuthStatus = granted ? .authorized : .denied
+                    }
+                }
+            }
+        } else {
+            CameraPreview(
+                effect: settings.mirrorEffect,
+                ringLight: settings.mirrorRingLight,
+                background: settings.mirrorBackground,
+                artwork: settings.mirrorBackground == .album
+                    ? media.artwork?.cgImage(forProposedRect: nil, context: nil, hints: nil) : nil,
+                musicPlaying: media.info?.isPlaying ?? false,
+                gesturesEnabled: settings.mirrorGestures,
+                cameraID: settings.mirrorCameraID,
+                captureRequest: captureRequest,
+                onGesture: handle,
+                onCapture: captured
+            )
+        }
+    }
+
+    /// One dot per photobox shot, filled as they're taken.
+    @ViewBuilder
+    private var boothProgress: some View {
+        if let shots = boothShots {
+            HStack(spacing: 6) {
+                ForEach(0..<settings.stripShots, id: \.self) { i in
+                    Circle()
+                        .fill(i < shots.count ? Color.white : Color.white.opacity(0.3))
+                        .frame(width: 8, height: 8)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(.black.opacity(0.5)))
+            .padding(8)
+        }
+    }
+
+    @ViewBuilder
+    private var gestureHint: some View {
+        if isHovering && settings.mirrorGestures && savedPhoto == nil && boothShots == nil {
+            Text("✌️ photo   👍 confetti   ✋ light")
+                .font(.system(size: 10, weight: .medium))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(.black.opacity(0.5)))
+                .padding(8)
+                .transition(.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private var stripPicker: some View {
+        if choosingStrip && studioSession == nil {
+            StripPicker(
+                onStart: {
+                    withAnimation { choosingStrip = false }
+                    startPhotobox()
+                },
+                onOpenStudio: {
+                    withAnimation { choosingStrip = false }
+                    openStudioWithDemo()
+                },
+                onClose: { withAnimation { choosingStrip = false } }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .transition(.opacity.combined(with: .scale(scale: 0.97)))
+        }
+    }
+
+    @ViewBuilder
+    private var studio: some View {
+        if let session = studioSession {
+            PhotoboxStudioView(
+                session: Binding(get: { session }, set: { studioSession = $0 }),
+                onFinish: { url in
+                    photoSaved(url)
+                    bursts.append(UUID())
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        studioSession = nil
+                    }
+                },
+                onCancel: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        studioSession = nil
+                    }
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
         }
     }
 
