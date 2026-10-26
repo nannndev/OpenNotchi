@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+/// One message. User on the right in the accent color, assistant on the left with copy / regenerate on hover.
 struct ChatBubble: View {
     let message: AIAssistant.Message
     let isStreaming: Bool

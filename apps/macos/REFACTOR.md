@@ -29,7 +29,7 @@ Rules
 - [x] `Views/PhotoboxStudioView.swift` (748): `canvasSection` and `controlsSection` → subviews (`Views/Photobox/`)
 - [ ] `Views/NotchiMascot.swift` (666): `drawRobot` is 174 lines → split per body part
 - [ ] `Views/Mirror/MirrorView.swift`: `body` is 214 lines → subviews
-- [ ] `Views/AI/AskSection.swift` (545): header / conversation / composer → subviews
+- [x] `Views/AI/AskSection.swift` (545): `+Header`, `+Conversation`, `+Composer`, `+Actions` extensions
 - [x] `Views/LyricsShare/LyricsShareView.swift` (880): split into `+Controls`, `+LinePicker`, `+Media`, `+Export` extensions
 - [x] `Views/LyricsShare/LyricCard.swift` (724): one `LyricCard+<Style>.swift` extension per style
 - [x] `Features/NineRouterService.swift` (551): one NULL-safe `query()` helper replaces 7 copies of open/prepare/step/finalize; models → `NineRouterModels.swift`
