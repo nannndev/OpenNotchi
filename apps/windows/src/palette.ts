@@ -54,6 +54,16 @@ export function accentFromPixels(px: ArrayLike<number>): string | null {
   return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
 }
 
+/** The accent (hex or `rgb()`) as an `rgba()` with the given alpha, for canvas gradients. */
+export function withAlpha(color: string, alpha: number): string {
+  const rgb = color.match(/\d+/g)
+  if (color.startsWith("rgb") && rgb) return `rgba(${rgb.slice(0, 3).join(", ")}, ${alpha})`
+  let hex = color.replace("#", "")
+  if (hex.length === 3) hex = [...hex].map((c) => c + c).join("")
+  const n = parseInt(hex.slice(0, 6), 16)
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
+}
+
 /** Accent for the given artwork data URL; white when there's no artwork. */
 export function useAccent(src: string | null | undefined): string {
   const [accent, setAccent] = useState(WHITE)

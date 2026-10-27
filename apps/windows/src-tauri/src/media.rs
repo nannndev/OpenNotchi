@@ -17,6 +17,8 @@ pub struct NowPlaying {
     pub updated_at: f64,
     /// Album art as a data URL, when the player shares one.
     pub artwork: Option<String>,
+    /// Bumped whenever `artwork` changes, so the UI knows to fetch it again.
+    pub artwork_rev: u32,
     /// App that owns the session, e.g. "Spotify.exe".
     pub source: String,
 }
@@ -48,6 +50,9 @@ mod imp {
     }
 
     static MEDIA_STATE: OnceLock<MediaState> = OnceLock::new();
+
+    /// Poll ticks (500ms each) to keep re-reading the thumbnail after a track change.
+    const ARTWORK_RECHECK_TICKS: u32 = 8;
 
     fn get_state() -> &'static MediaState {
         MEDIA_STATE.get_or_init(|| {
@@ -230,6 +235,10 @@ mod imp {
         let mut manager_opt: Option<Manager> = None;
         let mut last_track_id = String::new();
         let mut last_artwork: Option<String> = None;
+        let mut artwork_rev: u32 = 0;
+        // Browsers publish the new title before the new cover (showing the tab or browser icon
+        // in between), so the thumbnail is re-read for a few ticks after each track change.
+        let mut artwork_checks_left: u32 = 0;
         let mut last_source = String::new();
         let mut active_session: Option<Session> = None;
         let mut missed_ticks = 0;
@@ -271,7 +280,15 @@ mod imp {
 
                                 if track_id != last_track_id {
                                     last_track_id = track_id;
-                                    last_artwork = props.Thumbnail().ok().and_then(read_artwork);
+                                    artwork_checks_left = ARTWORK_RECHECK_TICKS;
+                                }
+                                if artwork_checks_left > 0 {
+                                    artwork_checks_left -= 1;
+                                    let art = props.Thumbnail().ok().and_then(read_artwork);
+                                    if art != last_artwork {
+                                        last_artwork = art;
+                                        artwork_rev = artwork_rev.wrapping_add(1);
+                                    }
                                 }
 
                                 last_source = source.clone();
@@ -290,6 +307,7 @@ mod imp {
                                     duration: seconds(timeline.as_ref().and_then(|t| t.EndTime().ok()).map(|d| d.Duration).unwrap_or(0)),
                                     updated_at: unix_ms(timeline.as_ref().and_then(|t| t.LastUpdatedTime().ok()).map(|u| u.UniversalTime).unwrap_or(0)),
                                     artwork: last_artwork.clone(),
+                                    artwork_rev,
                                     source,
                                 };
 
@@ -380,6 +398,7 @@ mod imp {
             duration: 230.0,
             updated_at: now - 75_000.0,
             artwork: None,
+            artwork_rev: 0,
             source: "demo".into(),
         })
     }

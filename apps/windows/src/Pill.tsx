@@ -35,6 +35,8 @@ import { MirrorTab } from "./tabs/MirrorTab"
 import { NotesTab } from "./tabs/NotesTab"
 import { PrompterTab } from "./tabs/PrompterTab"
 import { TimerTab } from "./tabs/TimerTab"
+import { ClosedTimer } from "./ClosedTimer"
+import { isActive as isTimerActive, useTimer } from "./timer"
 import { useUpdateChecker } from "./updater"
 import { BannerView } from "./BannerView"
 import { playBannerSound, type Banner } from "./banner"
@@ -44,6 +46,10 @@ const CLOSED = { width: 340, height: 38 }
 const PEEKING = { width: 380, height: 38 }
 const BANNER_SIZE = { width: 420, height: 96 }
 const OPEN = { width: 600, height: 210 }
+/** The AI tab needs room for chat messages above the composer (macOS uses 340 too). */
+const OPEN_AI = { width: 600, height: 340 }
+/** How long the cursor must rest on the closed pill before it opens, so passing by doesn't open it. */
+const OPEN_DELAY_MS = 150
 /** Gap above the floating pill. */
 const FLOAT_GAP = 10
 /** Height of the invisible top-edge strip that reveals an auto-hidden pill. */
@@ -98,6 +104,8 @@ export function Pill() {
   const agents = useAgents(settings.aiEnabled && settings.aiAgents, showBanner)
   const { usage, toggleActive } = useUsage(settings.aiEnabled)
   const meter = settings.aiEnabled && settings.aiClosedMeter && usage ? closedMeter(usage, Date.now()) : null
+  const timerState = useTimer()
+  const timerActive = isTimerActive(timerState)
 
   // Notchi Mascot state
   const [pettedAt, setPettedAt] = useState<number | null>(null)
@@ -165,14 +173,17 @@ export function Pill() {
   const mirrorBusyRef = useRef(false)
   // A pinned Mirror stays open until unpinned or another tab is chosen.
   mirrorBusyRef.current = mirrorBusy || (activeTab === "mirror" && settings.mirrorPinned)
-  const isMouseOverPillRef = useRef(false)
+  // Hover comes only from Rust: WebView2 fires a stray mouseleave whenever the window resizes
+  // (Mirror, Ask), so DOM mouse events closed the pill under a still cursor.
   const closeTimerRef = useRef<number | undefined>(undefined)
+  const openTimerRef = useRef<number | undefined>(undefined)
   const { updateInfo } = useUpdateChecker()
   useTick(250)
 
   const onMirror = activeTab === "mirror" && settings.tabMirror
-  const openSize = onMirror ? { width: 620, height: settings.mirrorHeight } : OPEN
-  const isMascotIdle = settings.showMascot && !peek && !activeBanner && !np && !meter
+  const onAi = activeTab === "ai" && settings.aiEnabled
+  const openSize = onMirror ? { width: 620, height: settings.mirrorHeight } : onAi ? OPEN_AI : OPEN
+  const isMascotIdle = settings.showMascot && !peek && !activeBanner && !np && !meter && !timerActive
   const closedWidth = isMascotIdle ? 220 : CLOSED.width
   const closedSize = { width: closedWidth, height: CLOSED.height }
   const size = open ? openSize : activeBanner ? BANNER_SIZE : peek ? PEEKING : closedSize
@@ -183,8 +194,8 @@ export function Pill() {
     ? { width: size.width, height: REVEAL_STRIP }
     : { width: size.width, height: size.height + (mode === "floating" ? FLOAT_GAP : 0) }
   useEffect(() => {
-    invoke("set_pill_size", hover).catch(() => {})
-  }, [hover.width, hover.height])
+    invoke("set_pill_size", { ...hover, open }).catch(() => {})
+  }, [hover.width, hover.height, open])
 
   // The pill window is sized for the normal open pill; grow it for a taller Mirror.
   const windowHeight = Math.max(280, (open ? size.height : 0) + 70)
@@ -216,17 +227,16 @@ export function Pill() {
         clearTimeout(closeTimerRef.current)
         closeTimerRef.current = undefined
       }
+      clearTimeout(openTimerRef.current)
       if (activeBannerRef.current) {
         setBannerHovered(inside)
         return
       }
       if (inside) {
-        setOpen(true)
+        openTimerRef.current = window.setTimeout(() => setOpen(true), OPEN_DELAY_MS)
       } else {
         closeTimerRef.current = window.setTimeout(() => {
-          if (!mirrorBusyRef.current && !isMouseOverPillRef.current) {
-            setOpen(false)
-          }
+          if (!mirrorBusyRef.current) setOpen(false)
         }, settings.closeDelayMs ?? 300)
       }
     })
@@ -244,6 +254,7 @@ export function Pill() {
         clearTimeout(closeTimerRef.current)
         closeTimerRef.current = undefined
       }
+      clearTimeout(openTimerRef.current)
       unlistenHover.then((f) => f())
       unlistenMascot.then((f) => f())
       unlistenBanner.then((f) => f())
@@ -320,24 +331,6 @@ export function Pill() {
       <div
         className={`pill ${open ? "open" : ""} ${hidden ? "hidden" : ""} theme-${settings.theme} border-${settings.borderStyle} anim-${settings.openAnimation}`}
         style={{ width: size.width, height: size.height, zIndex: 1 }}
-        onMouseEnter={() => {
-          isMouseOverPillRef.current = true
-          if (closeTimerRef.current) {
-            clearTimeout(closeTimerRef.current)
-            closeTimerRef.current = undefined
-          }
-        }}
-        onMouseLeave={() => {
-          isMouseOverPillRef.current = false
-          if (open && !mirrorBusyRef.current) {
-            if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
-            closeTimerRef.current = window.setTimeout(() => {
-              if (!mirrorBusyRef.current && !isMouseOverPillRef.current) {
-                setOpen(false)
-              }
-            }, settings.closeDelayMs ?? 300)
-          }
-        }}
       >
         {/* Album Art theme background */}
         {settings.theme === "albumArt" && np?.artwork && (
@@ -362,6 +355,8 @@ export function Pill() {
                 IN USE
               </span>
             </>
+          ) : timerActive ? (
+            <ClosedTimer t={timerState} />
           ) : np ? (
             <>
               <Vinyl src={np.artwork} size={24} playing={np.isPlaying} />

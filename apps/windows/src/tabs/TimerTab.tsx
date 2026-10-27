@@ -1,127 +1,23 @@
 import { Coffee, Pause, Play, Plus, RotateCcw, SkipForward, Timer } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
-import { nextPhase, PHASE_LABEL, PHASE_MINUTES, SESSIONS_PER_LONG_BREAK, type Phase } from "../pomodoro"
+import { PHASE_LABEL, PHASE_MINUTES, SESSIONS_PER_LONG_BREAK } from "../pomodoro"
+import { formatCountdown, remaining, timer, useTimer } from "../timer"
 
 const PRESETS = [1, 5, 10, 15, 25, 50]
 
 export function TimerTab() {
-  const [totalSeconds, setTotalSeconds] = useState(25 * 60)
-  const [remainingSeconds, setRemainingSeconds] = useState(25 * 60)
-  const [isRunning, setIsRunning] = useState(false)
-  const [didFinish, setDidFinish] = useState(false)
-  const [pomodoro, setPomodoro] = useState(false)
-  const [phase, setPhase] = useState<Phase>("focus")
-  const [focusToday, setFocusToday] = useState(0)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  // Read inside the interval callback, which only sees the state from when it was created.
-  const pomoRef = useRef({ pomodoro, phase, focusToday })
-  pomoRef.current = { pomodoro, phase, focusToday }
-
-  const startPhase = (next: Phase) => {
-    setPhase(next)
-    setTotalSeconds(PHASE_MINUTES[next] * 60)
-    setRemainingSeconds(PHASE_MINUTES[next] * 60)
-    setDidFinish(false)
-    setIsRunning(true)
-  }
-
-  const finishPhase = () => {
-    const { pomodoro, phase, focusToday } = pomoRef.current
-    playChime()
-    if (!pomodoro) {
-      setIsRunning(false)
-      setDidFinish(true)
-      return
-    }
-    const done = phase === "focus" ? focusToday + 1 : focusToday
-    setFocusToday(done)
-    startPhase(nextPhase(phase, done))
-  }
-
-  useEffect(() => {
-    let interval: number | undefined
-    if (isRunning && remainingSeconds > 0) {
-      interval = window.setInterval(() => {
-        setRemainingSeconds((prev) => {
-          if (prev <= 1) {
-            // Deferred so state updates don't run inside this updater.
-            setTimeout(finishPhase)
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-    }
-    return () => clearInterval(interval)
-  }, [isRunning, remainingSeconds])
-
-  const playChime = () => {
-    try {
-      const ctx = audioContextRef.current || new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
-      audioContextRef.current = ctx
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = "sine"
-      osc.frequency.setValueAtTime(880, ctx.currentTime) // A5
-      osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.3)
-      gain.gain.setValueAtTime(0.3, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6)
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.start()
-      osc.stop(ctx.currentTime + 0.6)
-    } catch {}
-  }
-
-  const setPreset = (mins: number) => {
-    setIsRunning(false)
-    setDidFinish(false)
-    setTotalSeconds(mins * 60)
-    setRemainingSeconds(mins * 60)
-  }
-
-  const toggleRun = () => {
-    if (didFinish) {
-      setRemainingSeconds(totalSeconds)
-      setDidFinish(false)
-      setIsRunning(true)
-      return
-    }
-    setIsRunning(!isRunning)
-  }
-
-  const addMinute = () => {
-    setRemainingSeconds((r) => r + 60)
-    setTotalSeconds((t) => t + 60)
-  }
-
-  const reset = () => {
-    setIsRunning(false)
-    setDidFinish(false)
-    setRemainingSeconds(totalSeconds)
-  }
-
-  const togglePomodoro = () => {
-    const on = !pomodoro
-    const mins = on ? PHASE_MINUTES.focus : 25
-    setPomodoro(on)
-    setPhase("focus")
-    setIsRunning(false)
-    setDidFinish(false)
-    setTotalSeconds(mins * 60)
-    setRemainingSeconds(mins * 60)
-  }
-
-  const skip = () => startPhase(nextPhase(phase, focusToday, true))
+  const t = useTimer()
+  const { pomodoro, phase, focusToday, finished: didFinish } = t
+  const isRunning = t.endsAt !== null
+  const totalSeconds = t.total
+  const remainingSeconds = remaining(t)
+  const { setPreset, toggleRun, addMinute, reset, togglePomodoro, skip } = timer
 
   // Position inside the current 4-session round; the long break shows the full round.
   const roundDots = phase === "longBreak" ? SESSIONS_PER_LONG_BREAK : focusToday % SESSIONS_PER_LONG_BREAK
   const isBreak = pomodoro && phase !== "focus"
 
   const progress = totalSeconds > 0 ? remainingSeconds / totalSeconds : 0
-  const minutes = Math.floor(remainingSeconds / 60)
-  const seconds = remainingSeconds % 60
-  const formatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+  const formatted = formatCountdown(remainingSeconds)
 
   const radius = 48
   const circumference = 2 * Math.PI * radius

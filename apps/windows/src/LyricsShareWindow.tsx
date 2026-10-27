@@ -28,7 +28,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react"
 import { currentIndex, getNextLyricSelection, makeRange } from "./lyrics"
 import { positionAt, useLyrics, useNowPlaying } from "./media"
-import { useAccent } from "./palette"
+import { useAccent, withAlpha } from "./palette"
 import { resolveAccentColor, useSettings } from "./settings"
 import {
   copyCardToClipboard,
@@ -1027,7 +1027,7 @@ function LiveCardPreview({
               <div
                 className="live-aura-glow"
                 style={{
-                  background: `radial-gradient(circle at 50% 60%, ${accent}66 0%, transparent 75%)`,
+                  background: `radial-gradient(circle at 50% 60%, ${withAlpha(accent, 0.4)} 0%, transparent 75%)`,
                 }}
               />
             </div>
@@ -1039,7 +1039,7 @@ function LiveCardPreview({
               <div
                 className="live-player-glow"
                 style={{
-                  background: `radial-gradient(circle at 50% 35%, ${accent}33 0%, transparent 70%)`,
+                  background: `radial-gradient(circle at 50% 35%, ${withAlpha(accent, 0.2)} 0%, transparent 70%)`,
                 }}
               />
             </div>
@@ -1051,7 +1051,7 @@ function LiveCardPreview({
               <div
                 className="live-glass-glow"
                 style={{
-                  background: `radial-gradient(circle at 30% 30%, ${accent}55 0%, transparent 60%), radial-gradient(circle at 70% 70%, #8b5cf644 0%, transparent 60%)`,
+                  background: `radial-gradient(circle at 30% 30%, ${withAlpha(accent, 0.33)} 0%, transparent 60%), radial-gradient(circle at 70% 70%, #8b5cf644 0%, transparent 60%)`,
                 }}
               />
             </div>
@@ -1062,7 +1062,7 @@ function LiveCardPreview({
               className="live-solid-bg"
               style={{
                 backgroundColor: accent,
-                background: `linear-gradient(135deg, ${accent} 0%, ${accent}ee 100%)`,
+                background: `linear-gradient(135deg, ${accent} 0%, ${withAlpha(accent, 0.93)} 100%)`,
               }}
             />
           )}

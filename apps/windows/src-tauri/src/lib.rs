@@ -9,9 +9,9 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager, State, WebviewWindow};
 
-/// Size of the visible pill in logical pixels. The window itself stays large and transparent so the
-/// pill can animate inside it; clicks outside the pill pass through to the desktop.
-struct PillSize(Mutex<(f64, f64)>);
+/// Size of the visible pill in logical pixels, and whether it is open. The window itself stays large and
+/// transparent so the pill can animate inside it; clicks outside the pill pass through to the desktop.
+struct PillSize(Mutex<(f64, f64, bool)>);
 
 /// (x, y, width, height) of Notchi relative to the pill in logical pixels.
 struct MascotRect(Mutex<Option<(f64, f64, f64, f64)>>);
@@ -57,8 +57,8 @@ fn place_pill(window: &WebviewWindow) -> tauri::Result<()> {
 
 /// The frontend reports the pill's target size whenever it opens, closes or peeks.
 #[tauri::command]
-fn set_pill_size(size: State<PillSize>, width: f64, height: f64) {
-    *size.0.lock().unwrap() = (width, height);
+fn set_pill_size(size: State<PillSize>, width: f64, height: f64, open: bool) {
+    *size.0.lock().unwrap() = (width, height, open);
 }
 
 /// The frontend reports Notchi's bounding box relative to the pill, so hovering Notchi does not open the pill.
@@ -100,9 +100,8 @@ fn cursor_over_pill(app: tauri::AppHandle) -> bool {
     let (Ok(pos), Ok(size), Ok(scale), Ok(cursor)) = (w.outer_position(), w.outer_size(), w.scale_factor(), w.cursor_position()) else {
         return false;
     };
-    let pill = *w.state::<PillSize>().0.lock().unwrap();
-    let effective_pill = (pill.0.max(600.0), pill.1.max(210.0));
-    cursor_in_pill((cursor.x, cursor.y), (pos.x as f64, pos.y as f64), size.width as f64, effective_pill, scale)
+    let (width, height, open) = *w.state::<PillSize>().0.lock().unwrap();
+    cursor_in_pill((cursor.x, cursor.y), (pos.x as f64, pos.y as f64), size.width as f64, (width, height), open, scale)
 }
 
 /// Returns all available monitors with their dimensions and primary flag.
@@ -155,8 +154,10 @@ fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 /// Opens the full-screen player on the pill's monitor (created on first use, reused after).
+/// Async on purpose: building a window inside a sync command deadlocks WebView2 on Windows,
+/// which froze every other pill action until restart.
 #[tauri::command]
-fn open_now_playing(app: tauri::AppHandle) -> Result<(), String> {
+async fn open_now_playing(app: tauri::AppHandle) -> Result<(), String> {
     let window = match app.get_webview_window("nowplaying") {
         Some(w) => w,
         None => tauri::WebviewWindowBuilder::new(&app, "nowplaying", tauri::WebviewUrl::App("index.html#nowplaying".into()))
@@ -235,10 +236,11 @@ fn hide_lyrics(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 /// True when the cursor (physical px) is over a pill of `pill` logical size, centered at the top of the window.
-fn cursor_in_pill(cursor: (f64, f64), window_pos: (f64, f64), window_width: f64, pill: (f64, f64), scale: f64) -> bool {
-    let is_open = pill.1 > 60.0 || pill.0 > 450.0;
-    let pad_x = if is_open { 24.0 * scale } else { 0.0 };
-    let pad_bottom = if is_open { 20.0 * scale } else { 0.0 };
+/// Only an open pill gets a margin around it, so a closed one opens only when the cursor is really on it.
+fn cursor_in_pill(cursor: (f64, f64), window_pos: (f64, f64), window_width: f64, pill: (f64, f64), open: bool, scale: f64) -> bool {
+    let pill = if open { (pill.0.max(600.0), pill.1.max(210.0)) } else { pill };
+    let pad_x = if open { 24.0 * scale } else { 0.0 };
+    let pad_bottom = if open { 20.0 * scale } else { 0.0 };
     let top_margin = 24.0 * scale;
 
     let left = window_pos.0 + (window_width - pill.0 * scale) / 2.0 - pad_x;
@@ -310,22 +312,16 @@ fn watch_hover(window: WebviewWindow) {
                 continue;
             };
 
-            let pill = *window.state::<PillSize>().0.lock().unwrap();
+            let (width, height, open) = *window.state::<PillSize>().0.lock().unwrap();
+            let pill = (width, height);
             let mascot = *window.state::<MascotRect>().0.lock().unwrap();
 
-            // When the pill is open (or actively hovered), maintain the expanded open bounds
-            // so moving toward menu tabs (left edge) never causes it to snap shut.
-            let is_currently_open = pill.1 > 60.0 || pill.0 > 450.0 || current_state == Some(HoverState::Pill);
-            let effective_pill = if is_currently_open {
-                (pill.0.max(600.0), pill.1.max(210.0))
-            } else {
-                pill
-            };
-
-            let in_pill = cursor_in_pill((cursor.x, cursor.y), win_pos, win_width, effective_pill, scale);
+            // Only an open pill gets the wider bounds (so reaching for the edge tabs doesn't close it).
+            // Growing them as soon as a closed pill was touched opened it for a cursor just passing by.
+            let in_pill = cursor_in_pill((cursor.x, cursor.y), win_pos, win_width, pill, open, scale);
             let state = if !in_pill {
                 HoverState::Outside
-            } else if !is_currently_open && mascot.is_some() {
+            } else if !open && mascot.is_some() {
                 let m = mascot.unwrap();
                 if cursor_in_pill_subrect((cursor.x, cursor.y), win_pos, win_width, pill, m, scale) {
                     HoverState::Mascot
@@ -381,7 +377,7 @@ fn open_external_url(url: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(PillSize(Mutex::new((360.0, 44.0))))
+        .manage(PillSize(Mutex::new((360.0, 44.0, false))))
         .manage(MascotRect(Mutex::new(None)))
         // Only remember the position and size where the desktop lyrics widget was dragged;
         // Never restore window visibility so the lyrics widget does not open at launch.
@@ -512,7 +508,7 @@ mod tests {
     #[test]
     fn hover_zone_is_the_centered_pill_scaled_to_physical_pixels() {
         // 600-wide window at x=100 on a 2x screen; a 360x44 pill spans x 340..1060, y 0..88.
-        let hit = |x, y| cursor_in_pill((x, y), (100.0, 0.0), 1200.0, (360.0, 44.0), 2.0);
+        let hit = |x, y| cursor_in_pill((x, y), (100.0, 0.0), 1200.0, (360.0, 44.0), false, 2.0);
         assert!(hit(700.0, 10.0));
         assert!(hit(340.0, 88.0));
         assert!(!hit(339.0, 10.0));
@@ -527,7 +523,7 @@ mod tests {
         // Pill spans physical x 360..1040, y 0..76.
         // Mascot is at (x=10, y=5, w=30, h=28) relative to pill.
         // In physical px: mascot spans x (360 + 10*2)..(360 + 40*2) = 380..440, y 10..66.
-        let hit_pill = |x, y| cursor_in_pill((x, y), (100.0, 0.0), 1200.0, (340.0, 38.0), 2.0);
+        let hit_pill = |x, y| cursor_in_pill((x, y), (100.0, 0.0), 1200.0, (340.0, 38.0), false, 2.0);
         let hit_mascot = |x, y| {
             cursor_in_pill_subrect(
                 (x, y),
@@ -559,7 +555,7 @@ mod tests {
         // Pill left = 100 + (640 - 600)/2 - 24 = 100 + 20 - 24 = 96.
         // Pill right = 96 + 600 + 48 = 744.
         // Pill top = -24, bottom = 230.
-        let hit = |x, y| cursor_in_pill((x, y), (100.0, 0.0), 640.0, (600.0, 210.0), 1.0);
+        let hit = |x, y| cursor_in_pill((x, y), (100.0, 0.0), 640.0, (600.0, 210.0), true, 1.0);
         // Inside center
         assert!(hit(420.0, 50.0));
         // Near top screen edge (y = 0 or even slightly above)
@@ -572,6 +568,17 @@ mod tests {
         assert!(!hit(80.0, 20.0));
         assert!(!hit(750.0, 20.0));
         assert!(!hit(420.0, 240.0));
+    }
+
+    #[test]
+    fn closed_pill_does_not_borrow_the_open_bounds() {
+        // 640-wide window at x=100 on a 1x screen; a closed 340x38 pill spans x 250..590, y 0..38.
+        // Passing below or beside it must not count, or it opens before the cursor reaches it.
+        let hit = |x, y| cursor_in_pill((x, y), (100.0, 0.0), 640.0, (340.0, 38.0), false, 1.0);
+        assert!(hit(420.0, 20.0));
+        assert!(!hit(420.0, 60.0));
+        assert!(!hit(140.0, 20.0));
+        assert!(!hit(700.0, 20.0));
     }
 }
 

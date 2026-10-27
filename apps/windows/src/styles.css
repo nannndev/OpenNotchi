@@ -80,7 +80,6 @@ button:focus-visible {
 /* 1. Classic Black */
 .theme-classic {
   background: #000000 !important;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
 }
 
 /* 2. Liquid Glass: authentic smoked glass on Windows without Chromium transparent-window backdrop-filter artifacts */
@@ -89,7 +88,6 @@ button:focus-visible {
     radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.16), transparent 60%),
     linear-gradient(180deg, rgba(30, 32, 42, 0.92) 0%, rgba(12, 13, 18, 0.98) 100%) !important;
   box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
     inset 0 -1px 0 rgba(255, 255, 255, 0.10),
     inset 1px 0 0 rgba(255, 255, 255, 0.16),
@@ -103,7 +101,6 @@ button:focus-visible {
     radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.22), transparent 60%),
     linear-gradient(180deg, rgba(42, 46, 60, 0.88) 0%, rgba(16, 18, 25, 0.96) 100%) !important;
   box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
     inset 0 -1px 0 rgba(255, 255, 255, 0.14),
     inset 1px 0 0 rgba(255, 255, 255, 0.22),
@@ -114,13 +111,11 @@ button:focus-visible {
 /* 4. Frosted */
 .theme-frosted {
   background: #14151e !important;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7) !important;
 }
 
 /* 5. Music Adaptive */
 .theme-adaptive {
   background: linear-gradient(145deg, #090a0f 0%, color-mix(in srgb, var(--accent) 35%, #050508) 100%) !important;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7) !important;
 }
 
 /* 6. Album Art */
@@ -142,7 +137,6 @@ button:focus-visible {
 /* 7. Midnight */
 .theme-midnight {
   background: linear-gradient(135deg, #070918 0%, #150e33 50%, #20114a 100%) !important;
-  box-shadow: 0 16px 40px rgba(6, 7, 24, 0.8) !important;
 }
 
 /* 8. Aurora */
@@ -152,7 +146,6 @@ button:focus-visible {
     radial-gradient(circle at 85% 15%, rgba(168, 85, 247, 0.45), transparent 55%),
     radial-gradient(circle at 50% 55%, rgba(16, 185, 129, 0.25), transparent 65%),
     #060814 !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75) !important;
 }
 
 /* ==========================================================================
@@ -554,6 +547,91 @@ button:focus-visible {
   gap: 20px;
   width: 100%;
   height: 100%;
+}
+
+/* Running timer in the closed pill (macOS ClosedTimerView) */
+.closed-timer {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fade-up 0.35s ease both;
+}
+.closed-timer-ring {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.closed-timer-ring svg {
+  position: absolute;
+  inset: 0;
+  rotate: -90deg;
+}
+.closed-timer-ring circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+}
+.closed-timer-ring .track {
+  opacity: 0.2;
+}
+.closed-timer-ring .fill {
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px currentColor);
+  transition: stroke-dashoffset 0.25s linear;
+}
+.closed-timer-label {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.closed-timer-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.closed-timer-time {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.closed-timer:not(.paused) .colon {
+  animation: timer-colon 1s steps(1) infinite;
+}
+.closed-timer.paused .closed-timer-time {
+  opacity: 0.55;
+}
+.closed-timer.urgent .closed-timer-ring {
+  animation: timer-beat 1s ease-out infinite;
+}
+.closed-timer-dots {
+  display: flex;
+  gap: 2.5px;
+}
+.closed-timer-dots i {
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.25;
+}
+.closed-timer-dots i.on {
+  opacity: 1;
+}
+@keyframes timer-colon {
+  50% { opacity: 0.35; }
+}
+@keyframes timer-beat {
+  from { scale: 1.08; }
+  to { scale: 1; }
 }
 
 .closed-text {
@@ -4012,7 +4090,6 @@ button:focus-visible {
 }
 .mode-floating .pill {
   border-radius: 19px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 .mode-floating .pill.open {
   border-radius: 24px;

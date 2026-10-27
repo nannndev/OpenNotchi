@@ -6,6 +6,8 @@
  * custom backdrop/cover, active line karaoke sync, and video recording.
  */
 
+import { withAlpha } from "./palette"
+
 export type LyricCardStyle =
   | "aura"
   | "player"
@@ -392,7 +394,7 @@ function drawAura(
     height * 0.62,
     width * (0.8 + pulse),
   )
-  radial.addColorStop(0, options.accentColor + "66")
+  radial.addColorStop(0, withAlpha(options.accentColor, 0.4))
   radial.addColorStop(1, "transparent")
   ctx.fillStyle = radial
   ctx.fillRect(0, 0, width, height)
@@ -482,7 +484,7 @@ function drawPlayer(
     height * 0.32,
     width * 0.7,
   )
-  radial.addColorStop(0, options.accentColor + "40")
+  radial.addColorStop(0, withAlpha(options.accentColor, 0.25))
   radial.addColorStop(1, "transparent")
   ctx.fillStyle = radial
   ctx.fillRect(0, 0, width, height)
@@ -1054,7 +1056,7 @@ function drawGlass(
 
   // Accent and purple dual radial glow
   const r1 = ctx.createRadialGradient(width * 0.2, height * 0.3, 20, width * 0.2, height * 0.3, width * 0.6)
-  r1.addColorStop(0, options.accentColor + "55")
+  r1.addColorStop(0, withAlpha(options.accentColor, 0.33))
   r1.addColorStop(1, "transparent")
   ctx.fillStyle = r1
   ctx.fillRect(0, 0, width, height)
@@ -1134,7 +1136,7 @@ function drawGlass(
 
   // Gradient Glass Border
   const borderGrad = ctx.createLinearGradient(pad, cardY, pad + cardW, cardY + cardH)
-  borderGrad.addColorStop(0, options.accentColor + "aa")
+  borderGrad.addColorStop(0, withAlpha(options.accentColor, 0.67))
   borderGrad.addColorStop(0.5, "#a855f7aa")
   borderGrad.addColorStop(1, "rgba(255,255,255,0.25)")
   ctx.strokeStyle = borderGrad

@@ -11,6 +11,8 @@ export type NowPlaying = {
   duration: number
   updatedAt: number
   artwork: string | null
+  /** Changes whenever the artwork does; it can arrive a moment after the title. */
+  artworkRev: number
   source: string
 }
 
@@ -23,7 +25,7 @@ export function positionAt(np: NowPlaying, now = Date.now()): number {
 export const control = (action: "toggle" | "next" | "previous" | "seek", seekTo?: number) =>
   invoke("media_control", { action, seekTo }).catch(() => {})
 
-/** Polls Windows' media session; artwork is only re-read when the track changes. */
+/** Polls Windows' media session; artwork is only re-read when Rust reports it changed. */
 export function useNowPlaying(): NowPlaying | null {
   const [np, setNp] = useState<NowPlaying | null>(null)
   useEffect(() => {
@@ -33,7 +35,7 @@ export function useNowPlaying(): NowPlaying | null {
     const poll = async () => {
       const next = await invoke<NowPlaying | null>("now_playing", { withArtwork: false }).catch(() => null)
       if (!alive) return
-      const nextKey = next ? `${next.title}\u0000${next.artist}\u0000${next.source}` : ""
+      const nextKey = next ? `${next.title}\u0000${next.artist}\u0000${next.source}\u0000${next.artworkRev}` : ""
       if (next && nextKey !== key) {
         key = nextKey
         artwork = (await invoke<NowPlaying | null>("now_playing", { withArtwork: true }).catch(() => null))?.artwork ?? null
