@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event"
 import { ArrowUp, Check, Clipboard, Copy, Image as ImageIcon, Music2, Paperclip, PenSquare, RotateCcw, Square, Trash2, Undo2, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { formatTokens, type UsageReport } from "../ai"
+import { parseBlocks, type Inline } from "../chatMarkdown"
 import type { NowPlaying } from "../media"
 import { settingsChanges, splitReply, systemPrompt, type Change, type Options } from "../notchiBrain"
 import {
@@ -432,7 +433,7 @@ export function ChatPanel({
               </div>
             )}
             <div className="chat-bubble">
-              {m.content}
+              {m.role === "assistant" ? <Markdown text={m.content} /> : m.content}
               {streaming && i === messages.length - 1 && <span className="chat-caret">▍</span>}
             </div>
             {m.changes && (
@@ -572,4 +573,65 @@ export function ChatPanel({
       {dragging && <div className="chat-drop">Drop to attach</div>}
     </div>
   )
+}
+
+/** Assistant text with code blocks (with a copy button), inline code, bold, italics and links. */
+function Markdown({ text }: { text: string }) {
+  const [copied, setCopied] = useState<number | null>(null)
+  return (
+    <>
+      {parseBlocks(text).map((b, i) =>
+        b.kind === "code" ? (
+          <div key={i} className="chat-code">
+            <div className="chat-code-head">
+              <span>{b.lang || "code"}</span>
+              <button
+                onClick={() =>
+                  navigator.clipboard.writeText(b.code).then(() => {
+                    setCopied(i)
+                    setTimeout(() => setCopied(null), 1200)
+                  })
+                }
+              >
+                {copied === i ? <Check size={10} /> : <Copy size={10} />} {copied === i ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <pre>{b.code}</pre>
+          </div>
+        ) : (
+          <span key={i}>{b.parts.map(renderInline)}</span>
+        ),
+      )}
+    </>
+  )
+}
+
+function renderInline(p: Inline, i: number) {
+  switch (p.kind) {
+    case "bold":
+      return <b key={i}>{p.text}</b>
+    case "italic":
+      return <i key={i}>{p.text}</i>
+    case "code":
+      return (
+        <code key={i} className="chat-inline-code">
+          {p.text}
+        </code>
+      )
+    case "link":
+      return (
+        <a
+          key={i}
+          href={p.href}
+          onClick={(e) => {
+            e.preventDefault()
+            invoke("open_external_url", { url: p.href }).catch(() => {})
+          }}
+        >
+          {p.text}
+        </a>
+      )
+    default:
+      return p.text
+  }
 }
