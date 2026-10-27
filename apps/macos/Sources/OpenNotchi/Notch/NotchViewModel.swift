@@ -79,7 +79,6 @@ final class NotchViewModel: ObservableObject {
         return CGSize(width: tab == .ai ? 720 : Self.openWidth, height: height)
     }
 
-
     /// True while the bottom edge is being dragged, so the notch doesn't close if the pointer slips outside.
     @Published var isResizing = false
 
@@ -140,7 +139,9 @@ final class NotchViewModel: ObservableObject {
 
     /// The Mirror or Prompter tab stays open when the pointer leaves; a click elsewhere closes it.
     private var staysOpenOnHoverExit: Bool {
-        isOpen && (pinned || (tab == .mirror && settings.mirrorStaysOpen) || (tab == .prompter && settings.prompterStaysOpen))
+        isOpen
+            && (pinned || (tab == .mirror && settings.mirrorStaysOpen)
+                || (tab == .prompter && settings.prompterStaysOpen))
     }
 
     /// Keeps the notch open regardless of the pointer (the `pin` command, for demos and screenshots).
@@ -208,7 +209,9 @@ final class NotchViewModel: ObservableObject {
     private func scheduleClose(after delay: TimeInterval) {
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            guard let self, !self.isHovering, !self.isDropTargeted, !self.isResizing else { return }
+            // holdOpen also covers the pointer leaving: a file picker or screenshot crosshair always moves it away,
+            // and closing would tear down the chat view along with the attachment being added.
+            guard let self, !self.isHovering, !self.isDropTargeted, !self.isResizing, !self.holdOpen else { return }
             self.close()
         }
         pending = work

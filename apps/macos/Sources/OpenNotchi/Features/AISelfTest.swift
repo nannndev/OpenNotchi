@@ -1,5 +1,5 @@
 #if DEBUG
-import Foundation
+import AppKit
 
 /// Assert-based checks for the AI log parsing, run with `OpenNotchi --ai-selftest [claudeDir codexDir]`.
 /// With folders given it also prints what the AI tab would show for them.
@@ -158,6 +158,37 @@ enum AISelfTest {
         try! Data("{not json".utf8).write(to: tmp.appendingPathComponent("settings.json"))
         check((try? ClaudeHooks.apply(dir: tmp, install: true)) == nil, "invalid JSON is left alone")
         try? FileManager.default.removeItem(at: tmp)
+
+        print("Chat attachments")
+        let attachDir = FileManager.default.temporaryDirectory.appendingPathComponent("notchi-attach-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: attachDir, withIntermediateDirectories: true)
+        let txt = attachDir.appendingPathComponent("notes.txt")
+        try? "hello notes".write(to: txt, atomically: true, encoding: .utf8)
+        if case .text(let name, let body) = ChatAttachment.load(txt) {
+            check(name == "notes.txt" && body == "hello notes", "text file read as text")
+        } else { check(false, "text file read as text") }
+        let rich = NSAttributedString(string: "hello from word")
+        let docx = attachDir.appendingPathComponent("letter.docx")
+        try? rich.data(from: NSRange(location: 0, length: rich.length), documentAttributes: [
+            .documentType: NSAttributedString.DocumentType.officeOpenXML,
+        ]).write(to: docx)
+        if case .text(_, let body) = ChatAttachment.load(docx) {
+            check(body.contains("hello from word"), "Word .docx read as text")
+        } else { check(false, "Word .docx read as text") }
+        let rtf = attachDir.appendingPathComponent("memo.rtf")
+        try? rich.rtf(from: NSRange(location: 0, length: rich.length), documentAttributes: [:])?.write(to: rtf)
+        if case .text(_, let body) = ChatAttachment.load(rtf) {
+            check(body.contains("hello from word") && !body.contains("rtf1"), "RTF read as plain text, not markup")
+        } else { check(false, "RTF read as plain text, not markup") }
+        let png = attachDir.appendingPathComponent("dot.png")
+        let dot = NSImage(size: NSSize(width: 4, height: 4))
+        dot.lockFocus(); NSColor.red.setFill(); NSRect(x: 0, y: 0, width: 4, height: 4).fill(); dot.unlockFocus()
+        try? NSBitmapImageRep(data: dot.tiffRepresentation!)?.representation(using: .png, properties: [:])?.write(to: png)
+        if case .image = ChatAttachment.load(png) { check(true, "image file read as image") } else { check(false, "image file read as image") }
+        let bin = attachDir.appendingPathComponent("blob.bin")
+        try? Data([0xFF, 0xFE, 0x00, 0xC3, 0x28]).write(to: bin)
+        check(ChatAttachment.load(bin) == nil, "binary file rejected")
+        try? FileManager.default.removeItem(at: attachDir)
 
         print("Analytics period change")
         check(AnalyticsSection.change(120, 100) == "▲ 20%", "increase")
