@@ -20,7 +20,8 @@ final class ChatStore: ObservableObject {
     @Published var currentID: UUID?
 
     private let file: URL = {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("OpenNotchi")
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("OpenNotchi")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("chats.json")
     }()
@@ -90,9 +91,10 @@ enum ChatAttachment {
         guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
         let scale = min(1, maxSide / CGFloat(max(cg.width, cg.height)))
         let size = NSSize(width: CGFloat(cg.width) * scale, height: CGFloat(cg.height) * scale)
-        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width), pixelsHigh: Int(size.height),
-                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(size.width), pixelsHigh: Int(size.height),
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
         guard let rep else { return nil }
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
@@ -108,15 +110,25 @@ enum ChatAttachment {
         case text(name: String, body: String)
     }
 
+    /// Formats NSAttributedString reads natively: Word, RTF, OpenDocument and web pages.
+    private static let documentExtensions: Set<String> = [
+        "docx", "doc", "rtf", "rtfd", "odt", "html", "htm", "webarchive",
+    ]
+
     /// An image file becomes an image; PDFs and text-like files become text (capped so one file can't flood the prompt).
     static func load(_ url: URL) -> Loaded? {
         if let image = NSImage(contentsOf: url), url.pathExtension.lowercased() != "pdf", let b64 = jpegBase64(image) {
             return .image(b64)
         }
         let body: String?
-        if url.pathExtension.lowercased() == "pdf" {
+        let ext = url.pathExtension.lowercased()
+        if ext == "pdf" {
             body = PDFDocument(url: url)?.string
+        } else if documentExtensions.contains(ext) {
+            // RTF is text on disk too, so read documents by type, or the model would get the markup.
+            body = (try? NSAttributedString(url: url, options: [:], documentAttributes: nil))?.string
         } else {
+            // Anything else only if it's valid UTF-8 text; the document readers would turn binaries into junk.
             body = try? String(contentsOf: url, encoding: .utf8)
         }
         guard let body, !body.isEmpty else { return nil }

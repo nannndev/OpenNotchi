@@ -5847,6 +5847,8 @@ button:focus-visible {
   gap: 8px;
   font-size: 10px;
   flex-shrink: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .chat-model {
   max-width: 190px;
@@ -5859,7 +5861,11 @@ button:focus-visible {
   padding: 3px 8px;
 }
 .chat-provider {
-  display: none;
+  font-size: 9.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .chat-head-actions {
   margin-left: auto;
@@ -5916,11 +5922,12 @@ button:focus-visible {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 0 2px;
+  gap: 10px;
+  padding: 2px 4px 2px 2px;
 }
 .chat-empty {
   margin: auto;
@@ -5949,7 +5956,7 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  max-width: 82%;
+  max-width: 88%;
   animation: chat-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 .chat-msg.user {
@@ -5970,9 +5977,9 @@ button:focus-visible {
   to { opacity: 1; transform: none; }
 }
 .chat-bubble {
-  padding: 7px 11px;
-  font-size: 12px;
-  line-height: 1.4;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
   user-select: text;
@@ -6075,9 +6082,14 @@ button:focus-visible {
 .chat-composer {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   flex-shrink: 0;
+  padding: 7px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
+.chat-composer:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .chat-contexts {
   display: flex;
   align-items: center;
@@ -6147,20 +6159,19 @@ button:focus-visible {
 .chat-input {
   flex: 1;
   resize: none;
-  max-height: 72px;
+  min-height: 32px;
+  max-height: 96px;
   field-sizing: content;
   padding: 7px 11px;
   font: inherit;
   font-size: 12.5px;
   color: #fff;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: transparent;
+  border: 0;
   outline: none;
   user-select: text;
-  transition: border-color 0.15s ease;
 }
-.chat-input:focus { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
 .chat-send {
   display: grid;
   place-items: center;
@@ -6172,6 +6183,40 @@ button:focus-visible {
   transition: transform 0.15s ease;
 }
 .chat-send:not(:disabled):hover { transform: scale(1.08); }
+.chat-send:disabled { opacity: 0.35; }
+.chat-bubble a { color: var(--accent); text-decoration: underline; cursor: pointer; }
+.chat-inline-code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  font: 11.5px ui-monospace, "Cascadia Code", Consolas, monospace;
+  background: rgba(255, 255, 255, 0.1);
+}
+.chat-code {
+  margin: 6px 0;
+  border-radius: 9px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: normal;
+}
+.chat-code-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 9px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+.chat-code-head button { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); }
+.chat-code-head button:hover { color: #fff; }
+.chat-code pre {
+  margin: 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  font: 11px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+  white-space: pre;
+}
 .chat-drop {
   position: absolute;
   inset: 0;

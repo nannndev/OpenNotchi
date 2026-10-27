@@ -4,6 +4,25 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] - 2026-10-27
+
+### Added
+- **Live crypto prices (macOS)**: BTC, ETH and other coins update every 3 seconds from Binance, no key needed. Cards show a LIVE badge, and stocks show how old the exchange's last price is (Yahoo's IDX prices run about 10 minutes behind).
+- **Notchi per agent (macOS)**: every agent card has a Notchi acting out its state: busy while working, alert when it needs you, happy when done, sleepy when idle.
+- **Agent details (macOS)**: click an agent to see its project and full path, last activity and full last message, with buttons to open the terminal or the project folder.
+- **Richer 9router analytics (macOS)**: stacked bars per day for input, cached and output tokens, hover a day for its numbers, a top-models panel, and each total compared with the previous period.
+- **Word, RTF and OpenDocument attachments (macOS)**: attach .docx, .doc, .rtf, .odt and HTML files in chat.
+
+### Changed
+- **Closed-notch timer (macOS)**: a ring that empties as time runs out, a blinking colon, Pomodoro session dots, green breaks, and an orange pulse in the last minute. It no longer sits against the camera.
+- **AI chat (Windows)**: replies render code blocks with a copy button, inline code, bold, italics and links; the composer is one panel and the provider shows in the header.
+- The macOS app's code is split into feature folders, so each feature is easier to read and change.
+
+### Fixed
+- Photos and documents attached in chat (macOS) are no longer lost when the notch closes behind the file picker or screenshot.
+- The 9router analytics and usage views (macOS) no longer crash when its database has empty model, date or status fields.
+- The Windows pill no longer closes while moving toward its menu tabs, and only one copy of the app runs at a time.
+
 ## [0.14.0] - 2026-10-25
 
 ### Added

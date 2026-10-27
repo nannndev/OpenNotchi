@@ -3,6 +3,7 @@ import SwiftUI
 struct AgentsSection: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var agents: AgentMonitor
+    @State private var selectedID: String?
 
     /// Needs-you first, then working, done, idle; newest first inside each group.
     private var sorted: [AgentSession] {
@@ -33,12 +34,28 @@ struct AgentsSection: View {
                 if agents.sessions.isEmpty {
                     emptyAgents
                 } else {
-                    ScrollView(.vertical, showsIndicators: false) {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 6)], spacing: 6) {
-                            ForEach(sorted) { AgentRow(session: $0) }
+                    HStack(alignment: .top, spacing: 8) {
+                        ScrollView(.vertical, showsIndicators: false) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 6)], spacing: 6) {
+                                ForEach(sorted) { session in
+                                    AgentRow(session: session, isSelected: session.id == selectedID) {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                            selectedID = selectedID == session.id ? nil : session.id
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 2)
+                            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: sorted.map(\.id))
                         }
-                        .padding(.horizontal, 2)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: sorted.map(\.id))
+                        // Looked up live so the panel follows state changes, and closes if the session goes away.
+                        if let session = agents.sessions.first(where: { $0.id == selectedID }) {
+                            AgentDetail(session: session) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { selectedID = nil }
+                            }
+                            .frame(width: 250)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                        }
                     }
                 }
             }
@@ -78,11 +95,13 @@ struct AgentsSection: View {
             VStack(spacing: 3) {
                 Text("No agents running")
                     .font(.system(size: 12.5, weight: .bold))
-                Text("Start Claude Code, Codex, Antigravity or Command Code. Progress and approval prompts show up here.")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                Text(
+                    "Start Claude Code, Codex, Antigravity or Command Code. Progress and approval prompts show up here."
+                )
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -91,6 +110,8 @@ struct AgentsSection: View {
 
 struct AgentRow: View {
     let session: AgentSession
+    var isSelected = false
+    let onSelect: () -> Void
     @Environment(\.notchAccent) private var accent
     @State private var hovering = false
     @State private var pulse = false
@@ -105,9 +126,7 @@ struct AgentRow: View {
     }
 
     var body: some View {
-        Button {
-            AgentMonitor.activateTerminal(for: session.tool)
-        } label: {
+        Button(action: onSelect) {
             HStack(spacing: 9) {
                 toolIcon
                 VStack(alignment: .leading, spacing: 2) {
@@ -142,8 +161,8 @@ struct AgentRow: View {
                             .lineLimit(2)
                     }
                 }
-                if hovering {
-                    Image(systemName: "arrow.up.forward.app")
+                if hovering || isSelected {
+                    Image(systemName: isSelected ? "chevron.left" : "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .transition(.opacity)
@@ -169,12 +188,18 @@ struct AgentRow: View {
         .onAppear {
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true }
         }
-        .help(session.message ?? "Open the session")
+        .help(session.message ?? "Show details")
         .accessibilityLabel("\(session.tool.displayName), \(session.project), \(session.state.label)")
     }
 
+    /// Notchi acting out the state, with the tool's logo as a badge.
     private var toolIcon: some View {
-        ToolLogo(tool: session.tool, size: 28)
+        NotchiMascot(mood: session.state.mood, size: 32)
+            .overlay(alignment: .bottomTrailing) {
+                ToolLogo(tool: session.tool, size: 13)
+                    .shadow(color: .black.opacity(0.5), radius: 1.5)
+                    .offset(x: 3, y: 2)
+            }
     }
 
     private var rowBackground: some View {
@@ -182,7 +207,11 @@ struct AgentRow: View {
             .fill(session.state == .needsYou ? Color.orange.opacity(0.12) : Color.white.opacity(hovering ? 0.08 : 0.04))
             .overlay(
                 RoundedRectangle(cornerRadius: 11)
-                    .stroke(session.state == .needsYou ? Color.orange.opacity(0.45) : Color.white.opacity(0.06), lineWidth: 1)
+                    .stroke(
+                        isSelected
+                            ? stateColor.opacity(0.7)
+                            : session.state == .needsYou ? Color.orange.opacity(0.45) : Color.white.opacity(0.06),
+                        lineWidth: isSelected ? 1.5 : 1)
             )
     }
 

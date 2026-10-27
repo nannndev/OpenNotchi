@@ -280,6 +280,34 @@ final class NineRouterService {
         return rows
     }
 
+    struct ModelStat: Identifiable {
+        /// 9router's `byModel` key, "model|provider".
+        var id: String
+        var tokens: Int
+        var cost: Double
+        var model: String { String(id.split(separator: "|").first ?? Substring(id)) }
+        var provider: String { id.split(separator: "|").dropFirst().first.map(String.init) ?? "" }
+    }
+
+    /// Tokens (prompt + completion) and cost per model over the same window as `dailyStats`, biggest first.
+    func modelStats(days: Int?) -> [ModelStat] {
+        var rows: [ModelStat] = []
+        query(
+            """
+            SELECT m.key,
+                   sum(coalesce(json_extract(m.value, '$.promptTokens'), 0) + coalesce(json_extract(m.value, '$.completionTokens'), 0)),
+                   sum(coalesce(json_extract(m.value, '$.cost'), 0.0))
+            FROM usageDaily, json_each(usageDaily.data, '$.byModel') AS m
+            WHERE dateKey >= date('now', 'localtime', ?)
+            GROUP BY m.key ORDER BY 2 DESC;
+            """, ["-\((days ?? 100_000) - 1) days"]
+        ) { r in
+            guard let key = r.text(0) else { return }
+            rows.append(ModelStat(id: key, tokens: r.int(1), cost: r.double(2)))
+        }
+        return rows
+    }
+
     /// Latest routed requests, newest first.
     func recentRequests(limit: Int = 20) -> [RecentRequest] {
         let iso = ISO8601DateFormatter()

@@ -205,7 +205,7 @@ enum AgentLogs {
         }
         guard let state else { return nil }
         return AgentSession(tool: tool, id: sid.isEmpty ? url.deletingPathExtension().lastPathComponent : sid,
-                            project: projectName(cwd), state: state, updatedAt: mtime, message: msg)
+                            project: projectName(cwd), state: state, updatedAt: mtime, message: msg, cwd: cwd)
     }
 
     static func jsonlFiles(in dir: URL) -> [(URL, Date)] {
@@ -257,10 +257,12 @@ enum AgentLogs {
                 s.updatedAt = max(s.updatedAt, at)
                 s.message = event.message
                 if s.project.isEmpty { s.project = event.project }
+                if s.cwd.isEmpty { s.cwd = event.cwd }
                 byId[event.sessionId] = s
             } else {
                 byId[event.sessionId] = AgentSession(tool: .claude, id: event.sessionId, project: event.project,
-                                                     state: event.state, updatedAt: at, message: event.message)
+                                                     state: event.state, updatedAt: at, message: event.message,
+                                                     cwd: event.cwd)
             }
         }
         return byId.values

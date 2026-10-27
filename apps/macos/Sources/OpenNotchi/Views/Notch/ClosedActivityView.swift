@@ -48,16 +48,7 @@ struct ClosedActivityView: View {
                 }
                 .frame(width: height - 14, height: height - 14)
             } else if timer.isActive {
-                Image(systemName: !timer.isRunning ? "pause.fill" : timer.pomodoro && timer.phase != .focus ? "cup.and.saucer.fill" : "timer")
-                    .font(.system(size: height * 0.45, weight: .semibold))
-                    .foregroundStyle(accent.highlight)
-                    .frame(width: height - 10)
-                Spacer()
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(formatCountdown(timer.remaining(at: context.date)))
-                        .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(accent.highlight)
-                }
+                ClosedTimerView(height: height)
             } else if settings.networkLiveActivity && stats.isNetworkActive && !(media.info?.isPlaying ?? false) {
                 HStack(spacing: 3) {
                     Image(systemName: "arrow.down")
@@ -80,7 +71,9 @@ struct ClosedActivityView: View {
                         .foregroundStyle(.white)
                 }
                 .frame(width: height + 36, alignment: .trailing)
-            } else if settings.aiEnabled && settings.aiClosedMeter && !(media.info?.isPlaying ?? false), let meter = aiUsage.closedMeter {
+            } else if settings.aiEnabled && settings.aiClosedMeter && !(media.info?.isPlaying ?? false),
+                let meter = aiUsage.closedMeter
+            {
                 Group {
                     if settings.showMascot {
                         NotchiLive(size: height - 4)
@@ -124,10 +117,10 @@ struct ClosedActivityView: View {
                         WaveformView(isPlaying: isPlaying, barCount: 4, maxHeight: height - 16, color: accent.color)
                     }
                 }
-                    .frame(width: height - 10)
-                    .contentShape(Rectangle())
-                    .onTapGesture { media.playPause() }
-                    .help(isPlaying ? "Pause music" : "Play music")
+                .frame(width: height - 10)
+                .contentShape(Rectangle())
+                .onTapGesture { media.playPause() }
+                .help(isPlaying ? "Pause music" : "Play music")
             }
         }
         .frame(height: height)
@@ -217,7 +210,7 @@ struct MiniSpinningVinylDisc: View {
                         RadialGradient(
                             colors: [
                                 Color(red: 0.16, green: 0.16, blue: 0.18),
-                                Color(red: 0.05, green: 0.05, blue: 0.06)
+                                Color(red: 0.05, green: 0.05, blue: 0.06),
                             ],
                             center: .center,
                             startRadius: size * 0.15,
@@ -242,7 +235,7 @@ struct MiniSpinningVinylDisc: View {
                         .white.opacity(0.18),
                         .clear,
                         .white.opacity(0.18),
-                        .clear
+                        .clear,
                     ]),
                     center: .center
                 )

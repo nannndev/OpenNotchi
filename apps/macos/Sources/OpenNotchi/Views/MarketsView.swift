@@ -5,7 +5,9 @@ struct MarketsView: View {
     @EnvironmentObject private var markets: MarketManager
     @EnvironmentObject private var settings: AppSettings
 
-    private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+    private let columns = [
+        GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10),
+    ]
 
     var body: some View {
         VStack(spacing: 6) {
@@ -24,13 +26,16 @@ struct MarketsView: View {
                                 QuoteCard(quote: quote)
                             } else {
                                 RoundedRectangle(cornerRadius: 14).fill(.white.opacity(0.05)).frame(height: 62)
-                                    .overlay(Text(Quote.displaySymbol(for: symbol)).font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary))
+                                    .overlay(
+                                        Text(Quote.displaySymbol(for: symbol)).font(
+                                            .system(size: 11, weight: .semibold)
+                                        ).foregroundStyle(.tertiary))
                             }
                         }
                     }
                 }
                 HStack {
-                    Text("Delayed quotes · Yahoo Finance")
+                    Text("Stocks delayed · Yahoo Finance · Crypto live · Binance")
                     Spacer()
                     if let updated = markets.lastUpdated {
                         Text("Updated \(updated, format: .dateTime.hour().minute())")
@@ -44,7 +49,7 @@ struct MarketsView: View {
     }
 }
 
-private struct QuoteCard: View {
+struct QuoteCard: View {
     let quote: Quote
 
     private var color: Color { quote.change >= 0 ? .green : .red }
@@ -62,9 +67,12 @@ private struct QuoteCard: View {
                     .font(.system(size: 13, weight: .semibold).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                Text(quote.formattedChange)
-                    .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(color)
+                HStack(spacing: 4) {
+                    Text(quote.formattedChange)
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(color)
+                    freshness
+                }
             }
             Spacer(minLength: 0)
             Sparkline(points: quote.points, baseline: quote.previousClose, color: color)
@@ -75,6 +83,35 @@ private struct QuoteCard: View {
         .frame(height: 62)
         .background(RoundedRectangle(cornerRadius: 14).fill(.white.opacity(0.06)))
         .help("\(quote.name) · \(quote.currency)\(quote.isMarketOpen ? "" : " · market closed")")
+    }
+
+    /// "LIVE" for Binance prices; otherwise how old the exchange's last price is, while it's trading.
+    @ViewBuilder
+    private var freshness: some View {
+        if quote.isLive {
+            Text("LIVE")
+                .font(.system(size: 7.5, weight: .heavy))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 3)
+                .padding(.vertical, 1)
+                .background(Capsule().fill(.green.opacity(0.18)))
+        } else if quote.isMarketOpen, let at = quote.priceTime {
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                if let label = Self.delayLabel(since: at, now: context.date) {
+                    Text(label)
+                        .font(.system(size: 8.5, weight: .medium).monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .help("Yahoo's price for this exchange is delayed")
+                }
+            }
+        }
+    }
+
+    /// "10m" for a price more than a minute old; nil when it's fresh.
+    static func delayLabel(since at: Date, now: Date) -> String? {
+        let minutes = Int(now.timeIntervalSince(at) / 60)
+        guard minutes >= 1 else { return nil }
+        return minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h"
     }
 }
 
