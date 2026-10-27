@@ -10,6 +10,10 @@ struct Quote: Identifiable, Equatable {
     let isMarketOpen: Bool
     /// Intraday closes for the sparkline.
     let points: [Double]
+    /// When the exchange last traded at `price`; Yahoo's IDX prices run about 10 minutes behind.
+    var priceTime: Date? = nil
+    /// Updated every few seconds from Binance rather than Yahoo.
+    var isLive = false
 
     var id: String { symbol }
     var change: Double { price - previousClose }
@@ -66,7 +70,9 @@ final class MarketManager: ObservableObject {
     @Published private(set) var quotes: [String: Quote] = [:]
     @Published private(set) var lastUpdated: Date?
 
-    static let presets = ["^JKSE", "BBCA.JK", "BBRI.JK", "TLKM.JK", "^GSPC", "^IXIC", "AAPL", "NVDA", "BTC-USD", "IDR=X"]
+    static let presets = [
+        "^JKSE", "BBCA.JK", "BBRI.JK", "TLKM.JK", "^GSPC", "^IXIC", "AAPL", "NVDA", "BTC-USD", "IDR=X",
+    ]
 
     private let settings: AppSettings
     private var timer: Timer?
@@ -80,6 +86,66 @@ final class MarketManager: ObservableObject {
             .sink { [weak self] _ in self?.refresh() }
             .store(in: &cancellables)
         timer = Timer.scheduledTimer(withTimeInterval: 90, repeats: true) { [weak self] _ in self?.refresh() }
+        liveTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.refreshLive() }
+    }
+
+    private var liveTimer: Timer?
+
+    /// Binance pair for a Yahoo crypto symbol ("BTC-USD" → "BTCUSDT"); nil for everything else.
+    static func binancePair(for symbol: String) -> String? {
+        guard symbol.hasSuffix("-USD") else { return nil }
+        let base = symbol.dropLast(4)
+        guard !base.isEmpty, base.allSatisfy({ $0.isLetter || $0.isNumber }) else { return nil }
+        return base.uppercased() + "USDT"
+    }
+
+    /// Live crypto prices from Binance's public market-data mirror (no key). Yahoo still supplies the
+    /// previous close and sparkline; a symbol Binance doesn't list keeps its Yahoo price.
+    func refreshLive() {
+        guard settings.marketsEnabled || settings.showTickerInHeader else { return }
+        let pairs = settings.marketTickers.compactMap { s in Self.binancePair(for: s).map { (s, $0) } }
+        guard !pairs.isEmpty else { return }
+        let list = "[" + pairs.map { "\"\($0.1)\"" }.joined(separator: ",") + "]"
+        var components = URLComponents(string: "https://data-api.binance.vision/api/v3/ticker/price")!
+        components.queryItems = [URLQueryItem(name: "symbols", value: list)]
+        guard let url = components.url else { return }
+        URLSession.shared.dataTask(with: URLRequest(url: url, timeoutInterval: 5)) { [weak self] data, _, _ in
+            let prices = data.map(Self.parseBinancePrices) ?? [:]
+            guard !prices.isEmpty else { return }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                for (symbol, pair) in pairs {
+                    guard let price = prices[pair], var quote = self.quotes[symbol] else { continue }
+                    quote = Quote(
+                        symbol: quote.symbol, name: quote.name, price: price, previousClose: quote.previousClose,
+                        currency: quote.currency, isMarketOpen: true, points: quote.points, priceTime: Date(),
+                        isLive: true)
+                    self.quotes[symbol] = quote
+                }
+            }
+        }.resume()
+    }
+
+    /// A Yahoo refresh brings a new sparkline and previous close, but keeps a live price that's newer than its own.
+    static func merge(yahoo: Quote, over current: Quote?) -> Quote {
+        guard let current, current.isLive, let liveAt = current.priceTime, liveAt > (yahoo.priceTime ?? .distantPast)
+        else { return yahoo }
+        return Quote(
+            symbol: yahoo.symbol, name: yahoo.name, price: current.price, previousClose: yahoo.previousClose,
+            currency: yahoo.currency, isMarketOpen: yahoo.isMarketOpen, points: yahoo.points, priceTime: liveAt,
+            isLive: true)
+    }
+
+    /// `[{"symbol":"BTCUSDT","price":"79782.01"}, …]` → pair: price.
+    static func parseBinancePrices(_ data: Data) -> [String: Double] {
+        guard let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [:] }
+        var out: [String: Double] = [:]
+        for row in rows {
+            if let pair = row["symbol"] as? String, let price = (row["price"] as? String).flatMap(Double.init) {
+                out[pair] = price
+            }
+        }
+        return out
     }
 
     /// Quotes in watchlist order (tickers that failed to load are skipped).
@@ -93,8 +159,9 @@ final class MarketManager: ObservableObject {
             Self.fetch(symbol) { [weak self] quote in
                 guard let quote else { return }
                 DispatchQueue.main.async {
-                    self?.quotes[symbol] = quote
-                    self?.lastUpdated = Date()
+                    guard let self else { return }
+                    self.quotes[symbol] = Self.merge(yahoo: quote, over: self.quotes[symbol])
+                    self.lastUpdated = Date()
                 }
             }
         }
@@ -110,18 +177,23 @@ final class MarketManager: ObservableObject {
     }
 
     private static func fetch(_ symbol: String, completion: @escaping (Quote?) -> Void) {
-        let encoded = symbol.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "=^"))) ?? symbol
-        guard let url = URL(string: "https://query1.finance.yahoo.com/v8/finance/chart/\(encoded)?range=1d&interval=5m") else {
+        let encoded =
+            symbol.addingPercentEncoding(
+                withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "=^"))) ?? symbol
+        guard let url = URL(string: "https://query1.finance.yahoo.com/v8/finance/chart/\(encoded)?range=1d&interval=5m")
+        else {
             return completion(nil)
         }
         URLSession.shared.dataTask(with: request(url)) { data, _, _ in
             guard let data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let result = ((json["chart"] as? [String: Any])?["result"] as? [[String: Any]])?.first,
-                  let meta = result["meta"] as? [String: Any],
-                  let price = meta["regularMarketPrice"] as? Double else { return completion(nil) }
+                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let result = ((json["chart"] as? [String: Any])?["result"] as? [[String: Any]])?.first,
+                let meta = result["meta"] as? [String: Any],
+                let price = meta["regularMarketPrice"] as? Double
+            else { return completion(nil) }
 
-            let closes = ((((result["indicators"] as? [String: Any])?["quote"] as? [[String: Any]])?.first)?["close"] as? [Any])?
+            let closes =
+                ((((result["indicators"] as? [String: Any])?["quote"] as? [[String: Any]])?.first)?["close"] as? [Any])?
                 .compactMap { $0 as? Double } ?? []
             let regular = (meta["currentTradingPeriod"] as? [String: Any])?["regular"] as? [String: Any]
             let now = Date().timeIntervalSince1970
@@ -129,15 +201,17 @@ final class MarketManager: ObservableObject {
             let end = regular?["end"] as? Double ?? 0
             let isCrypto = (meta["instrumentType"] as? String) == "CRYPTOCURRENCY"
 
-            completion(Quote(
-                symbol: symbol,
-                name: meta["shortName"] as? String ?? meta["longName"] as? String ?? symbol,
-                price: price,
-                previousClose: meta["chartPreviousClose"] as? Double ?? meta["previousClose"] as? Double ?? price,
-                currency: meta["currency"] as? String ?? "",
-                isMarketOpen: isCrypto || (now >= start && now <= end),
-                points: closes
-            ))
+            completion(
+                Quote(
+                    symbol: symbol,
+                    name: meta["shortName"] as? String ?? meta["longName"] as? String ?? symbol,
+                    price: price,
+                    previousClose: meta["chartPreviousClose"] as? Double ?? meta["previousClose"] as? Double ?? price,
+                    currency: meta["currency"] as? String ?? "",
+                    isMarketOpen: isCrypto || (now >= start && now <= end),
+                    points: closes,
+                    priceTime: (meta["regularMarketTime"] as? Double).map(Date.init(timeIntervalSince1970:))
+                ))
         }.resume()
     }
 
@@ -149,14 +223,16 @@ final class MarketManager: ObservableObject {
             URLQueryItem(name: "newsCount", value: "0"),
         ]
         guard let url = components.url,
-              let (data, _) = try? await URLSession.shared.data(for: request(url)),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let quotes = json["quotes"] as? [[String: Any]] else { return [] }
+            let (data, _) = try? await URLSession.shared.data(for: request(url)),
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let quotes = json["quotes"] as? [[String: Any]]
+        else { return [] }
 
         let allowed: Set<String> = ["EQUITY", "INDEX", "ETF", "CRYPTOCURRENCY", "CURRENCY", "MUTUALFUND", "FUTURE"]
         return quotes.compactMap { quote in
             guard let symbol = quote["symbol"] as? String,
-                  allowed.contains(quote["quoteType"] as? String ?? "") else { return nil }
+                allowed.contains(quote["quoteType"] as? String ?? "")
+            else { return nil }
             return TickerSearchResult(
                 symbol: symbol,
                 name: quote["shortname"] as? String ?? quote["longname"] as? String ?? symbol,

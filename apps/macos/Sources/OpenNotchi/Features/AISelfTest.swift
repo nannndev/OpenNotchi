@@ -190,6 +190,24 @@ enum AISelfTest {
         check(ChatAttachment.load(bin) == nil, "binary file rejected")
         try? FileManager.default.removeItem(at: attachDir)
 
+        print("Live crypto")
+        check(MarketManager.binancePair(for: "BTC-USD") == "BTCUSDT", "BTC-USD → BTCUSDT")
+        check(MarketManager.binancePair(for: "BBCA.JK") == nil && MarketManager.binancePair(for: "^JKSE") == nil,
+              "stocks and indices stay on Yahoo")
+        check(MarketManager.binancePair(for: "-USD") == nil, "empty base rejected")
+        let binance = Data(#"[{"symbol":"BTCUSDT","price":"79782.01"},{"symbol":"ETHUSDT","price":"bad"}]"#.utf8)
+        check(MarketManager.parseBinancePrices(binance) == ["BTCUSDT": 79782.01], "Binance prices parsed, bad rows skipped")
+        let yahooQuote = Quote(symbol: "BTC-USD", name: "Bitcoin", price: 79000, previousClose: 78000, currency: "USD",
+                               isMarketOpen: true, points: [1, 2], priceTime: now.addingTimeInterval(-120))
+        let liveQuote = Quote(symbol: "BTC-USD", name: "Bitcoin", price: 79800, previousClose: 78000, currency: "USD",
+                              isMarketOpen: true, points: [1], priceTime: now, isLive: true)
+        let mergedQuote = MarketManager.merge(yahoo: yahooQuote, over: liveQuote)
+        check(mergedQuote.price == 79800 && mergedQuote.points == [1, 2] && mergedQuote.isLive,
+              "Yahoo refresh keeps the newer live price, takes its sparkline")
+        check(MarketManager.merge(yahoo: yahooQuote, over: nil).price == 79000, "no live price: Yahoo's")
+        check(QuoteCard.delayLabel(since: now.addingTimeInterval(-600), now: now) == "10m", "10 min delay label")
+        check(QuoteCard.delayLabel(since: now.addingTimeInterval(-20), now: now) == nil, "fresh price: no label")
+
         print("Analytics period change")
         check(AnalyticsSection.change(120, 100) == "▲ 20%", "increase")
         check(AnalyticsSection.change(60, 100) == "▼ 40%", "decrease")
