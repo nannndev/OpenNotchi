@@ -3,6 +3,7 @@ import AppKit
 struct HookEvent: Equatable {
     var sessionId: String
     var project: String
+    var cwd: String
     var state: AgentState
     var message: String?
 
@@ -16,7 +17,8 @@ struct HookEvent: Equatable {
         }
         guard let sid = v["session_id"] as? String else { return nil }
         sessionId = sid
-        project = projectName(v["cwd"] as? String ?? "")
+        cwd = v["cwd"] as? String ?? ""
+        project = projectName(cwd)
         message = v["message"] as? String
     }
 }

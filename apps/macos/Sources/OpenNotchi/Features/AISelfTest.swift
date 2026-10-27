@@ -82,6 +82,10 @@ enum AISelfTest {
         let hook = HookEvent(["hook_event_name": "Notification", "session_id": "a", "cwd": "/x/p", "message": "Needs permission"])!
         let merged = AgentLogs.merge([old], hooks: ["a": (hook, now)], now: now)
         check(merged.first?.state == .needsYou && merged.first?.message == "Needs permission", "newer hook overrides log state")
+        check(merged.first?.cwd == "/x/p", "hook fills in the working directory the log lacked")
+        let hookOnly = AgentLogs.merge([], hooks: ["a": (hook, now)], now: now).first
+        check(hookOnly?.cwd == "/x/p" && hookOnly?.project == "p", "hook-only session keeps cwd and project")
+        check(AgentState.working.mood == .busy && AgentState.needsYou.mood == .alert, "agent state → Notchi mood")
         check(AgentLogs.peekTitle(previous: .working, next: merged[0]) == "Claude Code needs you · p", "peek text needs you")
         var done = merged[0]; done.state = .done
         check(AgentLogs.peekTitle(previous: .working, next: done) == "Claude Code finished · p", "peek text finished")

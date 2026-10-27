@@ -24,15 +24,32 @@ enum AgentTool: String, Codable, CaseIterable, Identifiable {
     /// The provider's real logo, bundled from 9router's provider icons (Resources/ProviderIcons).
     var logo: NSImage? { Self.logos[self] ?? nil }
 
-    private static let logos: [AgentTool: NSImage?] = Dictionary(uniqueKeysWithValues: allCases.map { tool in
-        (tool, Bundle.main.url(forResource: tool.rawValue, withExtension: "png", subdirectory: "ProviderIcons").flatMap(NSImage.init(contentsOf:)))
-    })
+    private static let logos: [AgentTool: NSImage?] = Dictionary(
+        uniqueKeysWithValues: allCases.map { tool in
+            (
+                tool,
+                Bundle.main.url(forResource: tool.rawValue, withExtension: "png", subdirectory: "ProviderIcons")
+                    .flatMap(NSImage.init(contentsOf:))
+            )
+        })
 }
 
 enum AgentState: String {
-    case working, needsYou = "needs_you", done, idle
+    case working
+    case needsYou = "needs_you"
+    case done, idle
 
     var label: String { self == .needsYou ? "needs you" : rawValue }
+
+    /// The Notchi that stands in for a session in this state.
+    var mood: NotchiMood {
+        switch self {
+        case .working: return .busy
+        case .needsYou: return .alert
+        case .done: return .happy
+        case .idle: return .sleepy
+        }
+    }
 }
 
 struct AgentSession: Identifiable, Equatable {
@@ -42,6 +59,8 @@ struct AgentSession: Identifiable, Equatable {
     var state: AgentState
     var updatedAt: Date
     var message: String?
+    /// Full working directory, when the log or hook reported one; `project` is its last component.
+    var cwd = ""
 }
 
 /// A Claude Code, Codex, Antigravity, or 9router connection to read usage (and agent status) from.
@@ -59,7 +78,10 @@ struct AIAccount: Codable, Hashable, Identifiable {
         case name, tool, dir, connectionId, email, priority, isActive
     }
 
-    init(id: UUID = UUID(), name: String, tool: AgentTool, dir: String, connectionId: String? = nil, email: String? = nil, priority: Int? = nil, isActive: Bool = true) {
+    init(
+        id: UUID = UUID(), name: String, tool: AgentTool, dir: String, connectionId: String? = nil,
+        email: String? = nil, priority: Int? = nil, isActive: Bool = true
+    ) {
         self.id = id
         self.name = name
         self.tool = tool
