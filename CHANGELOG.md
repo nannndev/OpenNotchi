@@ -4,6 +4,24 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.16.0] - 2026-10-27
+
+### Added
+- **Closed-pill timer (Windows)**: a running timer or Pomodoro now shows in the closed pill, like on macOS: a ring that empties as time runs out, the countdown with a blinking colon, Pomodoro session dots, green breaks, and an orange pulse in the last minute.
+
+### Changed
+- **Ask AI (Windows)**: the AI tab opens taller, so chat messages have room above the composer.
+- **Header actions (Windows)**: the buttons on the right follow the tab: lyrics, share and full-screen player on Music, keep awake on Notes.
+- The pill no longer has a drop shadow around it (Windows).
+
+### Fixed
+- The Windows timer keeps running when you switch tabs; it used to stop.
+- Saving, copying and sharing a lyric card (Windows) failed whenever the accent came from the album cover.
+- The Windows pill no longer opens when the cursor only passes near it, and it now closes reliably when the cursor leaves.
+- Opening the full-screen player (Windows) could freeze every other pill action until restart.
+- The Windows pill no longer slides out of view or closes by itself when opening Ask AI or the Mirror.
+- Browser music (Windows) shows the song's cover instead of sometimes keeping the browser's icon.
+
 ## [0.15.0] - 2026-10-27
 
 ### Added
