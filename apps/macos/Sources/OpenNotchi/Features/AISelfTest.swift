@@ -155,6 +155,15 @@ enum AISelfTest {
         check((try? ClaudeHooks.apply(dir: tmp, install: true)) == nil, "invalid JSON is left alone")
         try? FileManager.default.removeItem(at: tmp)
 
+        print("Analytics period change")
+        check(AnalyticsSection.change(120, 100) == "▲ 20%", "increase")
+        check(AnalyticsSection.change(60, 100) == "▼ 40%", "decrease")
+        check(AnalyticsSection.change(5, 0) == "new", "nothing before")
+        check(AnalyticsSection.change(0, 0) == "–", "nothing either time")
+        check(AnalyticsSection.change(5, nil) == nil, "no previous period (All)")
+        let refDate = ISO8601DateFormatter().date(from: "2026-10-27T12:00:00Z")!
+        check(AnalyticsSection.dateKey(daysAgo: 6, from: refDate) == "2026-10-21", "7D window starts 6 days back")
+
         print("9router quotas")
         func quota(_ name: String, _ pct: Double) -> NineRouterQuota {
             NineRouterQuota(name: name, used: 0, total: 1000, remaining: 0, remainingPercentage: pct, resetAt: nil, unlimited: false)
