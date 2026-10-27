@@ -21,7 +21,9 @@ struct NotchRootView: View {
     private var showActivity: Bool {
         guard !vm.isOpen else { return false }
         if vm.peek != nil || airDrop.isTransferring { return true }
-        return settings.showLiveActivity && (timer.isActive || (media.info?.isPlaying ?? false) || isNetworkSpeedVisible || isAIMeterVisible || isMascotVisible)
+        return settings.showLiveActivity
+            && (timer.isActive || (media.info?.isPlaying ?? false) || isNetworkSpeedVisible || isAIMeterVisible
+                || isMascotVisible)
     }
 
     /// Notchi fills the slot only when nothing else would: no music, timer, network or AI meter.
@@ -35,19 +37,33 @@ struct NotchRootView: View {
         var size = vm.notchSize
         if showActivity, vm.peek?.isBanner == true {
             // Banners grow below the notch with room for a title and a button.
-            return CGSize(width: max(size.width + 2 * (size.height + 40), 400), height: size.height + BannerView.contentHeight)
+            return CGSize(
+                width: max(size.width + 2 * (size.height + 40), 400), height: size.height + BannerView.contentHeight)
         }
         if showActivity, vm.peek?.isDeviceCard == true {
             // AirPods & Bluetooth cards drop down into an elegant Dynamic Island card
-            return CGSize(width: max(size.width + 2 * (size.height + 48), 380), height: size.height + DeviceBannerView.contentHeight)
+            return CGSize(
+                width: max(size.width + 2 * (size.height + 48), 380),
+                height: size.height + DeviceBannerView.contentHeight)
         }
         if showActivity {
             // HUD peeks need room for a level bar on the right. Network speed needs room for text.
-            let isNetOnly = (isNetworkSpeedVisible || isAIMeterVisible || isMascotVisible) && !timer.isActive && !(media.info?.isPlaying ?? false) && vm.peek == nil && !airDrop.isTransferring
-            let extraForSleeve: CGFloat = (settings.artworkStyle == .vinylSleeve && (media.info?.isPlaying ?? false)) ? 6 : 0
+            let isNetOnly =
+                (isNetworkSpeedVisible || isAIMeterVisible || isMascotVisible) && !timer.isActive
+                && !(media.info?.isPlaying ?? false) && vm.peek == nil && !airDrop.isTransferring
+            let extraForSleeve: CGFloat =
+                (settings.artworkStyle == .vinylSleeve && (media.info?.isPlaying ?? false)) ? 6 : 0
             // Notchi only needs a square on each side, like music artwork; text-heavy activities need more.
             let notchiOnly = isMascotVisible && !isNetworkSpeedVisible && !isAIMeterVisible
-            let side = vm.peek?.isHUD == true ? size.height + 76 : notchiOnly && isNetOnly ? size.height + 12 : isNetOnly ? size.height + 44 : size.height + 8 + extraForSleeve
+            // The timer's countdown ("24:55") is text, wider than an artwork square; keep it clear of the camera.
+            let isTimerOnly = timer.isActive && vm.peek == nil && !airDrop.isTransferring
+            let side =
+                vm.peek?.isHUD == true
+                ? size.height + 76
+                : isTimerOnly
+                    ? size.height + 28
+                    : notchiOnly && isNetOnly
+                        ? size.height + 12 : isNetOnly ? size.height + 44 : size.height + 8 + extraForSleeve
             size.width += 2 * side
         }
         return size
@@ -130,7 +146,8 @@ struct NotchRootView: View {
             } else {
                 // CLASSIC 2D STAGE: Fluid, Bouncy, Waterfall, Snappy, Pop, Gentle
                 let shape = NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, isIsland: isIsland)
-                let borderShape = NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, closed: false, isIsland: isIsland)
+                let borderShape = NotchShape(
+                    topRadius: topRadius, bottomRadius: bottomRadius, closed: false, isIsland: isIsland)
 
                 ZStack(alignment: .top) {
                     if vm.isOpen {
@@ -146,7 +163,9 @@ struct NotchRootView: View {
                 }
                 .frame(width: bodySize.width + (isIsland ? 0 : 2 * topRadius), height: bodySize.height, alignment: .top)
                 .background {
-                    NotchBackground(theme: settings.theme, isOpen: vm.isOpen, shape: shape, artwork: media.artwork, palette: media.palette)
+                    NotchBackground(
+                        theme: settings.theme, isOpen: vm.isOpen, shape: shape, artwork: media.artwork,
+                        palette: media.palette)
                 }
                 .clipShape(shape)
                 .overlay {
@@ -167,7 +186,10 @@ struct NotchRootView: View {
                     }
                 }
                 .contentShape(shape)
-                .shadow(color: .black.opacity(vm.isOpen ? 0.45 : (isIsland ? 0.32 : 0)), radius: isIsland ? 10 : 14, y: isIsland ? 3 : 4)
+                .shadow(
+                    color: .black.opacity(vm.isOpen ? 0.45 : (isIsland ? 0.32 : 0)), radius: isIsland ? 10 : 14,
+                    y: isIsland ? 3 : 4
+                )
                 .padding(.top, isIsland ? 8 : 0)
                 .animation(settings.openAnimation.springAnimation, value: vm.isOpen)
                 .animation(vm.isResizing ? nil : settings.openAnimation.springAnimation, value: vm.openSize.height)
@@ -196,7 +218,8 @@ struct NotchRootView: View {
 
     private func expandedCard3D(accent: ResolvedAccent) -> some View {
         let shape = NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, isIsland: isIsland)
-        let borderShape = NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, closed: false, isIsland: isIsland)
+        let borderShape = NotchShape(
+            topRadius: topRadius, bottomRadius: bottomRadius, closed: false, isIsland: isIsland)
 
         return VStack(spacing: 0) {
             ExpandedView()
@@ -205,7 +228,8 @@ struct NotchRootView: View {
         }
         .frame(width: vm.openSize.width + (isIsland ? 0 : 2 * topRadius), height: vm.openSize.height, alignment: .top)
         .background {
-            NotchBackground(theme: settings.theme, isOpen: true, shape: shape, artwork: media.artwork, palette: media.palette)
+            NotchBackground(
+                theme: settings.theme, isOpen: true, shape: shape, artwork: media.artwork, palette: media.palette)
         }
         .clipShape(shape)
         .overlay {
@@ -223,7 +247,7 @@ struct NotchRootView: View {
                 colors: [
                     .white.opacity(0.35),
                     .white.opacity(0.08),
-                    .clear
+                    .clear,
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -247,7 +271,8 @@ struct NotchRootView: View {
         }
         .frame(width: bodySize.width + (isIsland ? 0 : 2 * topRadius), height: bodySize.height, alignment: .top)
         .background {
-            NotchBackground(theme: settings.theme, isOpen: false, shape: shape, artwork: media.artwork, palette: media.palette)
+            NotchBackground(
+                theme: settings.theme, isOpen: false, shape: shape, artwork: media.artwork, palette: media.palette)
         }
         .clipShape(shape)
         .overlay {
