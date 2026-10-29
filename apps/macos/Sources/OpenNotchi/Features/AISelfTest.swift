@@ -190,6 +190,29 @@ enum AISelfTest {
         check(ChatAttachment.load(bin) == nil, "binary file rejected")
         try? FileManager.default.removeItem(at: attachDir)
 
+        print("Notch gestures")
+        let allOn = (skip: true, volume: true, brightness: true, tabs: true)
+        func g(open: Bool = false, x: CGFloat = 0, top: CGFloat = 10, dx: CGFloat = 0, dy: CGFloat = 0,
+               _ on: (skip: Bool, volume: Bool, brightness: Bool, tabs: Bool) = allOn) -> NotchScreenManager.NotchGesture {
+            NotchScreenManager.gesture(
+                isOpen: open, offsetFromMidX: x, distFromTop: top, dx: dx, dy: dy, notchWidth: 190, notchHeight: 32,
+                openWidth: 680, openHeaderHeight: 62, settings: on)
+        }
+        check(g(x: -60, dy: 3) == .volume && g(x: 60, dy: 3) == .brightness, "closed: left volume, right brightness")
+        check(g(x: 60, dx: 8, dy: 1) == .skipTrack, "closed: horizontal skips track")
+        check(g(x: 60, dx: 5, dy: 4) == .brightness, "closed: diagonal counts as vertical, not a skip")
+        check(g(x: 300, dy: 3) == .passThrough, "closed: menu bar beside the notch is left alone")
+        check(g(x: 0, top: 45, dy: 3) == .passThrough, "closed: below the notch is left alone")
+        check(g(x: 60, dy: 3, (skip: true, volume: true, brightness: false, tabs: true)) == .none,
+              "brightness off: right side does nothing, not volume")
+        check(g(x: 60, dx: 8, (skip: false, volume: true, brightness: true, tabs: true)) == .none,
+              "skip off: horizontal does nothing")
+        check(g(open: true, x: 0, top: 30, dx: 8) == .switchTab, "open: horizontal in the header switches tabs")
+        check(g(open: true, x: 0, top: 150, dx: 8) == .passThrough, "open: horizontal in content scrolls the content")
+        check(g(open: true, x: 0, top: 30, dy: 8) == .passThrough, "open: vertical always scrolls the content")
+        check(g(open: true, x: 0, top: 30, dx: 8, (skip: true, volume: true, brightness: true, tabs: false)) == .passThrough,
+              "tabs off: header swipe goes to the view")
+
         print("Live crypto")
         check(MarketManager.binancePair(for: "BTC-USD") == "BTCUSDT", "BTC-USD → BTCUSDT")
         check(MarketManager.binancePair(for: "BBCA.JK") == nil && MarketManager.binancePair(for: "^JKSE") == nil,

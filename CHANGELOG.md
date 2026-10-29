@@ -4,6 +4,23 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.17.0] - 2026-10-29
+
+### Added
+- **Dev tab on Windows**: localhost ports with their process (open a dev server in the browser, or stop it), CPU, RAM and network speed, and the latest GitHub Actions runs of any public repo.
+- **CI builds (macOS)**: GitHub Actions runs in Dev tools, a banner when a workflow passes or fails, and local builds (xcodebuild, swift build, cargo, web builds) beside the closed notch.
+- **Focus soundscapes (macOS)**: rain, brown noise, vinyl crackle and a hearth, mixed to taste, and started automatically with a focus session.
+- **Notchi grows up (macOS)**: new moods for focus, caffeine, snacks and being poked too much, and accessories to wear: ears, a sprout, a crown, glasses or a halo.
+- **Gesture settings (macOS)**: skip tracks, volume, brightness and tab switching can each be turned on or off.
+
+### Changed
+- **Gestures (macOS)** only work on the notch itself: scrolling in the menu bar beside it, or inside a tab's lists and carousels, is no longer taken over. A gesture you turn off no longer acts as another one.
+- **Settings › Features (macOS)** is split into tabs, and each settings pane has a header.
+- The battery is hidden in the open notch by default, since the menu bar already shows it. Turn it back on in Settings › General.
+
+### Fixed
+- The app no longer freezes when swiping quickly through tabs (macOS).
+
 ## [0.16.0] - 2026-10-27
 
 ### Added

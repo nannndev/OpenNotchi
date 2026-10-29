@@ -6572,3 +6572,68 @@ button:focus-visible {
   font-weight: 500;
   opacity: 0.65;
 }
+
+/* ==========================================================================
+   Dev tab: ports, system stats, CI runs
+   ========================================================================== */
+
+.dev { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+.dev-sections { display: flex; gap: 4px; flex-shrink: 0; }
+.dev-sections button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+.dev-sections button.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.dev-list { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; scrollbar-width: thin; min-height: 0; flex: 1; }
+.dev-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+.dev-row:hover { background: rgba(255, 255, 255, 0.08); }
+.dev-row button { display: grid; place-items: center; min-width: 20px; height: 20px; border-radius: 6px; color: var(--muted); }
+.dev-row button:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.dev-row button.danger { padding: 0 6px; font-size: 9.5px; font-weight: 700; color: #fff; background: #d6453d; }
+.dev-port { font: 600 11px ui-monospace, "Cascadia Code", Consolas, monospace; color: var(--accent); min-width: 48px; }
+.dev-proc { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dev-dim { font-size: 9.5px; color: var(--muted); white-space: nowrap; }
+.dev-empty { margin: auto; font-size: 11px; }
+.dev-error { padding: 5px 8px; border-radius: 8px; font-size: 10.5px; color: var(--orange); background: rgba(255, 154, 60, 0.12); }
+.dev-stats { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
+.dev-meter > div:first-child, .dev-net > div { display: flex; justify-content: space-between; align-items: baseline; font-size: 11.5px; }
+.dev-bar { margin-top: 4px; height: 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.dev-bar i { display: block; height: 100%; border-radius: inherit; transition: width 0.4s ease; }
+.dev-net { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dev-net b, .dev-meter b { font-variant-numeric: tabular-nums; }
+.dev-ci { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+.dev-ci-head { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.dev-ci-head select,
+.dev-ci-head input {
+  font: inherit;
+  font-size: 10.5px;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+}
+.dev-ci-head select { max-width: 170px; }
+.dev-ci-head input { flex: 1; min-width: 0; }
+.dev-ci-head button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: var(--muted); }
+.dev-ci-head button:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.dev-run { width: 100%; }
+.dev-spin { animation: dev-spin 1.2s linear infinite; }
+@keyframes dev-spin { to { transform: rotate(360deg); } }

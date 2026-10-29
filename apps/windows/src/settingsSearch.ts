@@ -146,6 +146,13 @@ export const SETTING_ITEMS: SettingItem[] = [
     section: "tabs",
     keywords: ["mirror", "photobox", "camera", "selfie", "filters", "strip", "cermin", "kamera", "foto"],
   },
+  {
+    id: "tab-dev",
+    title: "Dev",
+    subtitle: "Localhost ports, CPU, RAM and network, and GitHub Actions runs",
+    section: "tabs",
+    keywords: ["dev", "developer", "port", "localhost", "server", "kill", "cpu", "ram", "network", "ci", "github", "actions", "build"],
+  },
 
   // Cross-feature keywords for search (features parity with macOS)
   {

@@ -37,6 +37,55 @@ final class NotchViewModel: ObservableObject {
     @Published var notchSize: CGSize = CGSize(width: 190, height: 32)
     @Published var hasPhysicalNotch = false
 
+    enum TabTransitionDirection {
+        case forward
+        case backward
+    }
+    @Published var tabTransitionDirection: TabTransitionDirection = .forward
+
+    func selectTab(_ newTab: NotchTab) {
+        guard newTab != tab else { return }
+        let tabs = settings.visibleTabs
+        let oldIdx = tabs.firstIndex(of: tab) ?? 0
+        let newIdx = tabs.firstIndex(of: newTab) ?? 0
+        tabTransitionDirection = newIdx >= oldIdx ? .forward : .backward
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+            tab = newTab
+        }
+    }
+
+    /// Swiping through tabs fast built and tore down each tab (camera, CoreAudio, port scans) faster than it could
+    /// settle and froze the app. One switch per 0.35 s, the length of the slide animation.
+    private var lastTabSwitch: Date = .distantPast
+    private func claimTabSwitch() -> Bool {
+        let now = Date()
+        guard now.timeIntervalSince(lastTabSwitch) >= 0.35 else { return false }
+        lastTabSwitch = now
+        return true
+    }
+
+    func nextTab() {
+        let tabs = settings.visibleTabs
+        guard !tabs.isEmpty, claimTabSwitch() else { return }
+        let currentIdx = tabs.firstIndex(of: tab) ?? 0
+        let nextIdx = (currentIdx + 1) % tabs.count
+        tabTransitionDirection = .forward
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+            tab = tabs[nextIdx]
+        }
+    }
+
+    func previousTab() {
+        let tabs = settings.visibleTabs
+        guard !tabs.isEmpty, claimTabSwitch() else { return }
+        let currentIdx = tabs.firstIndex(of: tab) ?? 0
+        let prevIdx = (currentIdx - 1 + tabs.count) % tabs.count
+        tabTransitionDirection = .backward
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+            tab = tabs[prevIdx]
+        }
+    }
+
     @Published var isDropTargeted = false {
         didSet {
             guard isDropTargeted != oldValue else { return }
@@ -68,7 +117,7 @@ final class NotchViewModel: ObservableObject {
         } else if tab == .prompter && settings.prompterTabEnabled {
             height = min(max(settings.prompterHeight, 240), Self.maxOpenHeight)
         } else if tab == .dev {
-            height = 230
+            height = 264
         } else if tab == .ai {
             height = isAiExpanded ? 460 : 340
         } else if tab == .smarthome {
@@ -90,13 +139,22 @@ final class NotchViewModel: ObservableObject {
     private let settings: AppSettings
     private var isHovering = false
     private var pending: DispatchWorkItem?
+    private var gestureSuppressUntil: Date = .distantPast
+    private(set) var lastHoverOpenTime: Date = .distantPast
 
     /// True while the pointer is on Notchi: hovering it is for playing with it, not for opening the notch.
     /// Moving on to the rest of the notch opens it as usual.
     var isOverMascot = false {
         didSet {
             guard isOverMascot != oldValue else { return }
-            if isOverMascot { pending?.cancel() } else if isHovering, !isOpen { hoverChanged(true) }
+            if isOverMascot {
+                pending?.cancel()
+                if isOpen && Date().timeIntervalSince(lastHoverOpenTime) < 0.45 {
+                    isOpen = false
+                }
+            } else if isHovering, !isOpen {
+                hoverChanged(true)
+            }
         }
     }
 
@@ -125,15 +183,26 @@ final class NotchViewModel: ObservableObject {
             return
         }
         if inside {
-            guard !isOverMascot else { return }
+            guard !isOverMascot, Date() >= gestureSuppressUntil else { return }
             let work = DispatchWorkItem { [weak self] in
-                guard let self, !self.isOverMascot else { return }
+                guard let self, !self.isOverMascot, Date() >= self.gestureSuppressUntil else { return }
+                self.lastHoverOpenTime = Date()
                 self.open()
             }
             pending = work
             DispatchQueue.main.asyncAfter(deadline: .now() + settings.hoverDelay, execute: work)
         } else if !isDropTargeted && !staysOpenOnHoverExit {
             scheduleClose(after: 0.12)
+        }
+    }
+
+    /// Cancels any pending hover-open and collapses the notch if it just opened, keeping it closed for HUD gestures.
+    func suppressOpenForGesture(duration: TimeInterval = 1.0) {
+        pending?.cancel()
+        gestureSuppressUntil = Date().addingTimeInterval(duration)
+        if isOpen {
+            isOpen = false
+            musicSearchOpen = false
         }
     }
 

@@ -25,9 +25,28 @@ final class NotchPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// Hosting view that reacts to the first click even when the panel isn't key.
+/// Hosting view that reacts to the first click even when the panel isn't key,
+/// and forwards closed-notch scroll & swipe gestures to NotchScreenManager.
 final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    weak var viewModel: NotchViewModel?
+    weak var media: MediaManager?
+    weak var settings: AppSettings?
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func scrollWheel(with event: NSEvent) {
+        if AppDelegate.shared?.screenManager?.handleNotchScroll(event) == true {
+            return
+        }
+        super.scrollWheel(with: event)
+    }
+
+    override func swipe(with event: NSEvent) {
+        if AppDelegate.shared?.screenManager?.handleNotchSwipe(event) == true {
+            return
+        }
+        super.swipe(with: event)
+    }
 }
 
 extension NSScreen {

@@ -37,10 +37,24 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .about: return .indigo
         }
     }
+
+    var subtitle: String {
+        switch self {
+        case .general: return "Startup, multi-monitor behavior, closed-notch gestures & global shortcut"
+        case .appearance: return "Themes, dynamic accent colors, borders & 2D/3D open animations"
+        case .features: return "Notch tabs, live activities, lyrics, weather, prayer times & markets"
+        case .media: return "Apple Music, Spotify Connect, browser YouTube & turntable vinyl styles"
+        case .mirror: return "Webcam preview, ring light, hand gestures & Photobox Deco Studio"
+        case .smarthome: return "Home Assistant & Apple Shortcuts climate, lighting and scenes"
+        case .ai: return "Token quota gauges, coding agent monitors & Ask AI providers"
+        case .about: return "Version information, automatic updates & project links"
+        }
+    }
 }
 
 struct SettingsView: View {
     @AppStorage("settingsPane") private var pane: SettingsPane = .general
+    @AppStorage("featuresSubTab") private var featuresSubTab: FeaturesSubTab = .tabs
     @State private var searchText = ""
 
     private var filteredItems: [SettingItem] {
@@ -127,12 +141,20 @@ struct SettingsView: View {
                             ForEach(filteredItems) { item in
                                 Button {
                                     pane = item.pane
+                                    if let sub = item.featuresSubTab {
+                                        featuresSubTab = sub
+                                    }
                                 } label: {
                                     HStack(spacing: 4) {
                                         Image(systemName: item.icon ?? item.pane.icon)
                                             .font(.system(size: 9))
                                         Text(item.title)
                                             .font(.system(size: 11, weight: pane == item.pane ? .bold : .medium))
+                                        if let sub = item.featuresSubTab {
+                                            Text("· \(sub.rawValue)")
+                                                .font(.system(size: 9.5))
+                                                .opacity(0.75)
+                                        }
                                     }
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3.5)
@@ -166,6 +188,10 @@ struct SettingsView: View {
                 }
 
                 if searchText.isEmpty || !filteredItems.isEmpty {
+                    if pane != .features {
+                        paneHeader(for: pane)
+                        Divider()
+                    }
                     Group {
                         switch pane {
                         case .general: GeneralPane()
@@ -183,6 +209,28 @@ struct SettingsView: View {
                 }
             }
         }
-        .frame(width: 720, height: 580)
+        .frame(width: 760, height: 600)
+    }
+
+    private func paneHeader(for item: SettingsPane) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: item.icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(RoundedRectangle(cornerRadius: 7).fill(item.tint.gradient))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.rawValue)
+                    .font(.system(size: 14, weight: .bold))
+                Text(item.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(Color.primary.opacity(0.02))
     }
 }

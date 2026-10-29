@@ -5,6 +5,7 @@ import SwiftUI
 /// The last minute turns orange and pulses; a paused timer dims and blinks its time.
 struct ClosedTimerView: View {
     @EnvironmentObject private var timer: TimerManager
+    @EnvironmentObject private var settings: AppSettings
     @Environment(\.notchAccent) private var accent
     let height: CGFloat
 
@@ -29,10 +30,14 @@ struct ClosedTimerView: View {
             let beat = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1)
 
             HStack {
-                ring(progress: 1 - timer.progress(at: context.date), tint: tint)
-                    .frame(width: height - 12, height: height - 12)
-                    .scaleEffect(urgent ? 1 + 0.08 * (1 - beat) : 1)
-                    .frame(width: height - 10)
+                if settings.showMascot {
+                    NotchiLive(size: height - 4)
+                } else {
+                    ring(progress: 1 - timer.progress(at: context.date), tint: tint)
+                        .frame(width: height - 12, height: height - 12)
+                        .scaleEffect(urgent ? 1 + 0.08 * (1 - beat) : 1)
+                        .frame(width: height - 10)
+                }
 
                 Spacer()
 
@@ -42,7 +47,6 @@ struct ClosedTimerView: View {
                 }
             }
         }
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
     }
 

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MirrorPane: View {
     @EnvironmentObject private var settings: AppSettings
+    @State private var cameras: [AVCaptureDevice] = []
 
     var body: some View {
         Form {
@@ -12,7 +13,7 @@ struct MirrorPane: View {
             Section("Mirror") {
                 Picker("Camera Device", selection: $settings.mirrorCameraID) {
                     Text("Automatic (Default)").tag("")
-                    ForEach(CameraPreview.cameras, id: \.uniqueID) { camera in
+                    ForEach(cameras, id: \.uniqueID) { camera in
                         Text(camera.localizedName).tag(camera.uniqueID)
                     }
                 }
@@ -50,5 +51,6 @@ struct MirrorPane: View {
                 .foregroundStyle(.secondary)
             }
         }
+        .task { cameras = await Task.detached { CameraPreview.cameras }.value }
     }
 }

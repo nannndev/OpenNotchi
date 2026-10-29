@@ -10,6 +10,8 @@ struct ClosedActivityView: View {
     @EnvironmentObject private var stats: SystemStatsManager
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var aiUsage: AIUsageManager
+    @EnvironmentObject private var ciMonitor: CIBuildMonitor
+    @EnvironmentObject private var ambient: AmbientSoundManager
     @Environment(\.notchAccent) private var accent
     let height: CGFloat
 
@@ -49,6 +51,52 @@ struct ClosedActivityView: View {
                 .frame(width: height - 14, height: height - 14)
             } else if timer.isActive {
                 ClosedTimerView(height: height)
+            } else if settings.ciLiveActivity,
+                !(media.info?.isPlaying ?? false),
+                let ciSummary = ciMonitor.closedActivitySummary
+            {
+                HStack(spacing: 4) {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .scaleEffect(0.75)
+                    Text(ciSummary.leftLabel)
+                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.orange)
+                        .lineLimit(1)
+                }
+                .frame(width: height + 36, alignment: .leading)
+
+                Spacer()
+
+                HStack(spacing: 3) {
+                    Image(systemName: ciSummary.isLocal ? "hammer.fill" : "arrow.triangle.branch")
+                        .font(.system(size: 8.5, weight: .bold))
+                        .foregroundStyle(.orange)
+                    Text(ciSummary.rightLabel)
+                        .font(.system(size: 9.5, weight: .bold).monospacedDigit())
+                        .foregroundStyle(.white)
+                }
+                .frame(width: height + 36, alignment: .trailing)
+            } else if ambient.isPlaying && !(media.info?.isPlaying ?? false) {
+                HStack(spacing: 3) {
+                    Image(systemName: ambient.activeSounds.first?.icon ?? "waveform")
+                        .font(.system(size: height * 0.42, weight: .semibold))
+                        .foregroundStyle(accent.highlight)
+                }
+                .frame(width: height - 10)
+                .contentShape(Rectangle())
+                .onTapGesture { ambient.toggleMuteAll() }
+                .help("Pause Focus Soundscapes")
+                Spacer()
+                if settings.showMascot {
+                    NotchiLive(size: height - 4)
+                } else {
+                    WaveformView(isPlaying: true, barCount: 4, maxHeight: height - 16, color: accent.color)
+                        .frame(width: height - 10)
+                        .contentShape(Rectangle())
+                        .onTapGesture { ambient.toggleMuteAll() }
+                        .help("Pause Focus Soundscapes")
+                }
             } else if settings.networkLiveActivity && stats.isNetworkActive && !(media.info?.isPlaying ?? false) {
                 HStack(spacing: 3) {
                     Image(systemName: "arrow.down")
@@ -109,18 +157,16 @@ struct ClosedActivityView: View {
                 .onTapGesture { media.playPause() }
                 .help(isPlaying ? "Pause music" : "Play music")
                 Spacer()
-                Group {
-                    // Notchi puts its headphones on and bops along instead of the waveform.
-                    if settings.showMascot && isPlaying {
-                        NotchiLive(size: height - 4)
-                    } else {
-                        WaveformView(isPlaying: isPlaying, barCount: 4, maxHeight: height - 16, color: accent.color)
-                    }
+                if settings.showMascot && isPlaying {
+                    // Notchi puts its headphones on, bops along, and stays fully interactive on the right!
+                    NotchiLive(size: height - 4)
+                } else {
+                    WaveformView(isPlaying: isPlaying, barCount: 4, maxHeight: height - 16, color: accent.color)
+                        .frame(width: height - 10)
+                        .contentShape(Rectangle())
+                        .onTapGesture { media.playPause() }
+                        .help(isPlaying ? "Pause music" : "Play music")
                 }
-                .frame(width: height - 10)
-                .contentShape(Rectangle())
-                .onTapGesture { media.playPause() }
-                .help(isPlaying ? "Pause music" : "Play music")
             }
         }
         .frame(height: height)

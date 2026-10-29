@@ -9,9 +9,16 @@ struct NotchRootView: View {
     @EnvironmentObject private var airDrop: AirDropService
     @EnvironmentObject private var stats: SystemStatsManager
     @EnvironmentObject private var aiUsage: AIUsageManager
+    @EnvironmentObject private var ciMonitor: CIBuildMonitor
+    @EnvironmentObject private var ambient: AmbientSoundManager
+    @ObservedObject private var companion = NotchiCompanionStore.shared
 
     private var isNetworkSpeedVisible: Bool {
         settings.showLiveActivity && settings.networkLiveActivity && stats.isNetworkActive
+    }
+
+    private var isCIBuildVisible: Bool {
+        settings.showLiveActivity && settings.ciLiveActivity && ciMonitor.hasActiveBuild
     }
 
     private var isAIMeterVisible: Bool {
@@ -22,14 +29,14 @@ struct NotchRootView: View {
         guard !vm.isOpen else { return false }
         if vm.peek != nil || airDrop.isTransferring { return true }
         return settings.showLiveActivity
-            && (timer.isActive || (media.info?.isPlaying ?? false) || isNetworkSpeedVisible || isAIMeterVisible
-                || isMascotVisible)
+            && (timer.isActive || (media.info?.isPlaying ?? false) || ambient.isPlaying || isCIBuildVisible
+                || isNetworkSpeedVisible || isAIMeterVisible || isMascotVisible)
     }
 
-    /// Notchi fills the slot only when nothing else would: no music, timer, network or AI meter.
+    /// Notchi fills the slot only when nothing else would: no music, timer, CI build, network or AI meter.
     private var isMascotVisible: Bool {
         settings.showLiveActivity && settings.showMascot && !timer.isActive && !(media.info?.isPlaying ?? false)
-            && !isNetworkSpeedVisible && !isAIMeterVisible
+            && !ambient.isPlaying && !isCIBuildVisible && !isNetworkSpeedVisible && !isAIMeterVisible
     }
 
     private var bodySize: CGSize {
@@ -47,14 +54,14 @@ struct NotchRootView: View {
                 height: size.height + DeviceBannerView.contentHeight)
         }
         if showActivity {
-            // HUD peeks need room for a level bar on the right. Network speed needs room for text.
+            // HUD peeks need room for a level bar on the right. Network speed / CI build needs room for text.
             let isNetOnly =
-                (isNetworkSpeedVisible || isAIMeterVisible || isMascotVisible) && !timer.isActive
-                && !(media.info?.isPlaying ?? false) && vm.peek == nil && !airDrop.isTransferring
+                (isCIBuildVisible || isNetworkSpeedVisible || isAIMeterVisible || isMascotVisible) && !timer.isActive
+                && !(media.info?.isPlaying ?? false) && !ambient.isPlaying && vm.peek == nil && !airDrop.isTransferring
             let extraForSleeve: CGFloat =
                 (settings.artworkStyle == .vinylSleeve && (media.info?.isPlaying ?? false)) ? 6 : 0
-            // Notchi only needs a square on each side, like music artwork; text-heavy activities need more.
-            let notchiOnly = isMascotVisible && !isNetworkSpeedVisible && !isAIMeterVisible
+            // Notchi only needs a square on each side unless it's speaking a speech bubble; text-heavy activities need more.
+            let notchiOnly = isMascotVisible && companion.speechBubble == nil && !isCIBuildVisible && !isNetworkSpeedVisible && !isAIMeterVisible
             // The timer's countdown ("24:55") is text, wider than an artwork square; keep it clear of the camera.
             let isTimerOnly = timer.isActive && vm.peek == nil && !airDrop.isTransferring
             let side =
@@ -71,28 +78,16 @@ struct NotchRootView: View {
 
     private var isIsland: Bool { !vm.hasPhysicalNotch }
 
-    /// Notchi sits in the closed notch's left slot and can be hovered and petted.
-    private var isNotchiInteractive: Bool {
-        showActivity && isMascotVisible && vm.peek == nil && !airDrop.isTransferring
-    }
-
-    /// Catches the pointer a little above the closed notch so it opens easily. Over Notchi it leaves a gap,
-    /// so Notchi itself gets the hover and clicks instead of the notch opening.
+    /// Catches the pointer in the center camera housing so the notch opens easily, while leaving both
+    /// the left and right Live Activity wings uncovered so Notchi and player controls receive clicks directly.
     private var hoverStrip: some View {
-        let catcher = Color.clear
+        Color.clear
             .contentShape(Rectangle())
             .onHover { inside in
                 if inside { vm.hoverChanged(true) }
             }
-        return HStack(spacing: 0) {
-            if isNotchiInteractive {
-                catcher.frame(width: isIsland ? 12 : topRadius + 6)
-                Color.clear.frame(width: vm.notchSize.height + 6).allowsHitTesting(false)
-            }
-            catcher
-        }
-        .frame(width: bodySize.width + (isIsland ? 0 : 2 * topRadius), height: isIsland ? 28 : vm.notchSize.height + 4)
-        .offset(y: isIsland ? -8 : 0)
+            .frame(width: max(80, vm.notchSize.width - 16), height: isIsland ? 28 : vm.notchSize.height + 4)
+            .offset(y: isIsland ? -8 : 0)
     }
 
     private var topRadius: CGFloat {

@@ -16,6 +16,11 @@ struct DeviceBatteryInfo: Equatable {
     }
 }
 
+enum TrackSkipDirection: Equatable {
+    case next
+    case previous
+}
+
 /// A short-lived event shown beside or below the closed notch.
 enum Peek: Equatable {
     case charging(level: Int)
@@ -23,6 +28,7 @@ enum Peek: Equatable {
     case volume(level: Float, muted: Bool)
     case brightness(level: Float)
     case micMute(muted: Bool)
+    case trackSkip(direction: TrackSkipDirection, title: String?)
     /// Some app just started using the camera and/or microphone.
     case privacy(camera: Bool, mic: Bool)
     /// A reminder that grows below the notch, with an optional action button.
@@ -34,6 +40,7 @@ enum Peek: Equatable {
         case .charging: return 3.2
         case .device: return 3.8
         case .volume, .brightness, .micMute: return 1.8
+        case .trackSkip: return 1.5
         case .privacy: return 3
         case .banner(let banner): return banner.duration
         }
@@ -42,7 +49,7 @@ enum Peek: Equatable {
     /// HUD peeks show a fluid level bar and need a wider pill.
     var isHUD: Bool {
         switch self {
-        case .volume, .brightness, .micMute, .charging, .privacy: return true
+        case .volume, .brightness, .micMute, .trackSkip, .charging, .privacy: return true
         default: return false
         }
     }

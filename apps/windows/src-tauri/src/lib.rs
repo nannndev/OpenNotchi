@@ -1,4 +1,5 @@
 mod ai;
+mod devtools;
 mod media;
 mod ninerouter;
 mod system;
@@ -419,6 +420,10 @@ pub fn run() {
             system::set_keep_awake,
             system::privacy_state,
             system::idle_seconds,
+            devtools::listening_ports,
+            devtools::kill_process,
+            devtools::system_stats,
+            devtools::ci_runs,
             open_now_playing,
             close_now_playing,
             system::get_autostart,

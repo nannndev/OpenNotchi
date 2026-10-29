@@ -131,7 +131,7 @@ struct CameraPreview: NSViewRepresentable {
     }
 
     /// Cameras to choose from, built-in first.
-    static var cameras: [AVCaptureDevice] {
+    nonisolated static var cameras: [AVCaptureDevice] {
         AVCaptureDevice.DiscoverySession(
             deviceTypes: [.builtInWideAngleCamera, .continuityCamera, .external],
             mediaType: .video,

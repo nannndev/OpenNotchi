@@ -3,6 +3,7 @@ import SwiftUI
 enum DevViewMode: String, CaseIterable, Identifiable {
     case overview = "Overview"
     case ports = "Ports"
+    case ci = "CI / Builds"
     case system = "System"
     case tools = "Tools"
 
@@ -12,6 +13,7 @@ enum DevViewMode: String, CaseIterable, Identifiable {
         switch self {
         case .overview: return "square.grid.2x2"
         case .ports: return "network"
+        case .ci: return "checkmark.seal.fill"
         case .system: return "speedometer"
         case .tools: return "hammer"
         }
@@ -23,6 +25,7 @@ struct DevToolsView: View {
     @EnvironmentObject private var colorPicker: ColorPickerManager
     @EnvironmentObject private var audioDevice: AudioDeviceManager
     @EnvironmentObject private var stats: SystemStatsManager
+    @EnvironmentObject private var ciMonitor: CIBuildMonitor
     @Environment(\.notchAccent) private var accent
 
     @AppStorage("devViewMode") private var selectedMode: DevViewMode = .overview
@@ -55,6 +58,10 @@ struct DevToolsView: View {
                                         .padding(.horizontal, 3.5)
                                         .padding(.vertical, 0.5)
                                         .background(Capsule().fill(.white.opacity(0.2)))
+                                } else if mode == .ci && ciMonitor.hasActiveBuild {
+                                    Circle()
+                                        .fill(Color.orange)
+                                        .frame(width: 5, height: 5)
                                 }
                             }
                             .padding(.horizontal, 7)
@@ -110,6 +117,8 @@ struct DevToolsView: View {
                     overviewView
                 case .ports:
                     FullPortsView()
+                case .ci:
+                    FullCIBuildsView()
                 case .system:
                     FullSystemView()
                 case .tools:
@@ -119,10 +128,16 @@ struct DevToolsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(.top, 1)
-        .onAppear {
+        .task {
+            // Wait for the tab to settle: swiping past Dev shouldn't each time start port scans, CoreAudio
+            // queries and `gh`/`ps` processes. A cancelled task (tab left) skips them.
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
             portInspector.startAutoRefresh()
             audioDevice.refreshDevices()
             stats.start()
+            ciMonitor.refresh()
+            ciMonitor.scanLocalBuilds()
         }
         .onDisappear {
             portInspector.stopAutoRefresh()
