@@ -6,6 +6,7 @@ import {
   Coffee,
   Mic,
   ScrollText,
+  Terminal,
   Video,
   Music2,
   Pause,
@@ -29,6 +30,7 @@ import { filterRecentAgentStates, notchiMood, playPetPopSound, type NotchiMood }
 import { useAccent } from "./palette"
 import { resolveAccentColor, useSettings } from "./settings"
 import { AITab, useAgents, useUsage } from "./tabs/AITab"
+import { DevTab } from "./tabs/DevTab"
 import { useIdleNowPlaying } from "./NowPlayingScreen"
 import { ClipboardTab } from "./tabs/ClipboardTab"
 import { MirrorTab } from "./tabs/MirrorTab"
@@ -57,7 +59,7 @@ const REVEAL_STRIP = 4
 const PEEK_MS = 3000
 
 type Privacy = { camera: boolean; mic: boolean }
-type TabKey = "music" | "clipboard" | "timer" | "notes" | "prompter" | "mirror" | "ai"
+type TabKey = "music" | "clipboard" | "timer" | "notes" | "prompter" | "mirror" | "dev" | "ai"
 
 export function Pill() {
   const np = useNowPlaying()
@@ -304,6 +306,7 @@ export function Pill() {
     notes: settings.tabNotes,
     prompter: settings.tabPrompter,
     mirror: settings.tabMirror,
+    dev: settings.tabDev,
     ai: settings.aiEnabled,
   }
   const currentTabSafe: TabKey = enabledTabs[activeTab]
@@ -495,6 +498,16 @@ export function Pill() {
                   <span>Mirror</span>
                 </button>
               )}
+              {settings.tabDev && (
+                <button
+                  className={`tab-nav-btn ${currentTabSafe === "dev" ? "active" : ""}`}
+                  onClick={() => setActiveTab("dev")}
+                  title="Ports, system stats and CI builds"
+                >
+                  <Terminal size={12} />
+                  <span>Dev</span>
+                </button>
+              )}
               {settings.aiEnabled && (
                 <button
                   className={`tab-nav-btn ${currentTabSafe === "ai" ? "active" : ""}`}
@@ -615,6 +628,7 @@ export function Pill() {
             {/* Mounted only while open so the camera light goes off when the pill closes. */}
             {currentTabSafe === "mirror" && open && <MirrorTab onBusy={setMirrorBusy} />}
 
+            {currentTabSafe === "dev" && <DevTab />}
             {currentTabSafe === "ai" && (
               <AITab
                 sessions={agents}

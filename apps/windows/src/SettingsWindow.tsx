@@ -18,6 +18,7 @@ import {
   Sparkles,
   ScrollText,
   Timer,
+  Terminal,
   Video,
   Wand2,
   Bot,
@@ -568,6 +569,20 @@ export function SettingsWindow() {
                   className="switch"
                   checked={settings.tabMirror}
                   onChange={(e) => setSettings({ tabMirror: e.target.checked })}
+                />
+              </div>
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">
+                    <Terminal size={16} /> Dev
+                  </div>
+                  <div className="toggle-desc">Localhost ports (open or stop a dev server), CPU, RAM and network, and GitHub Actions runs.</div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={settings.tabDev}
+                  onChange={(e) => setSettings({ tabDev: e.target.checked })}
                 />
               </div>
             </div>

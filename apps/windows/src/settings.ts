@@ -71,6 +71,7 @@ export interface AppSettings {
   tabNotes: boolean
   tabPrompter: boolean
   tabMirror: boolean
+  tabDev: boolean
   // Teleprompter
   prompterScript: string
   /** Scroll speed in px/s. */
@@ -195,6 +196,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tabNotes: true,
   tabPrompter: true,
   tabMirror: true,
+  tabDev: true,
   prompterScript:
     "Hi everyone, thanks for joining today.\n\nKeep your eyes on this line, right under the camera, and your gaze looks natural.\n\nPress Edit to paste your own script. Scroll with the mouse wheel to jump around, and change the speed with the plus and minus buttons.",
   prompterSpeed: 28,
