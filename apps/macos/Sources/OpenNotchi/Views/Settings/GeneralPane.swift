@@ -34,6 +34,19 @@ struct GeneralPane: View {
             Section("Behavior") {
                 Toggle("Haptic feedback when opening", isOn: $settings.hapticsEnabled)
                 Toggle("Show live activity beside the notch", isOn: $settings.showLiveActivity)
+                Toggle("Show battery in the open notch (the menu bar already shows it)", isOn: $settings.showHeaderBattery)
+                Toggle("Trackpad gestures on the notch", isOn: $settings.closedNotchGesturesEnabled)
+                Group {
+                    Toggle("Swipe sideways on the closed notch to skip tracks", isOn: $settings.gestureSkipTrack)
+                    Toggle("Scroll on the left of the closed notch for volume", isOn: $settings.gestureVolume)
+                    Toggle("Scroll on the right of the closed notch for brightness", isOn: $settings.gestureBrightness)
+                    Toggle("Swipe sideways on the open notch's tab bar to switch tabs", isOn: $settings.gestureSwitchTabs)
+                }
+                .padding(.leading, 18)
+                .disabled(!settings.closedNotchGesturesEnabled)
+                Text("Gestures only work on the notch itself, so the menu bar and scrolling inside a tab stay normal.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 LabeledContent("Hover delay") {
                     HStack {
                         Slider(value: $settings.hoverDelay, in: 0...1, step: 0.05)

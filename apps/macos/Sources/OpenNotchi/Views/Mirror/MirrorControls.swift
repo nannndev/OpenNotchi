@@ -1,8 +1,10 @@
+import AVFoundation
 import SwiftUI
 
 /// Looks, portrait blur, ring light, gestures and the camera picker, shown while the pointer is over the mirror.
 struct MirrorControls: View {
     @EnvironmentObject private var settings: AppSettings
+    @State private var cameras: [AVCaptureDevice] = []
 
     var body: some View {
         HStack(spacing: 6) {
@@ -60,7 +62,6 @@ struct MirrorControls: View {
             toggle(isOn: $settings.mirrorRingLight, on: "light.max", off: "light.min", tint: .yellow, help: "Ring light")
             toggle(isOn: $settings.mirrorGestures, on: "hand.raised.fill", off: "hand.raised.slash", tint: .green, help: "Hand gestures: ✌️ photo, 👍 confetti, ✋ ring light")
 
-            let cameras = CameraPreview.cameras
             if cameras.count > 1 {
                 Menu {
                     ForEach(cameras, id: \.uniqueID) { camera in
@@ -88,6 +89,8 @@ struct MirrorControls: View {
         .padding(.vertical, 6)
         .background(Capsule().fill(.black.opacity(0.55)))
         .background(Capsule().fill(.ultraThinMaterial))
+        // Listing cameras can block for seconds inside CoreMediaIO; on the main thread that froze the whole notch.
+        .task { cameras = await Task.detached { CameraPreview.cameras }.value }
     }
 
     private func toggle(isOn: Binding<Bool>, on: String, off: String, tint: Color, help: String) -> some View {

@@ -9,8 +9,26 @@ final class NotchScreenManager: ObservableObject {
 
     private(set) var controllers: [NotchWindowController] = []
     private var clickOutsideMonitor: Any?
+    private var globalScrollMonitor: Any?
+    private var localScrollMonitor: Any?
     private var cursorCheckTimer: Timer?
     private var lastCursorScreenID: CGDirectDisplayID?
+
+    // Closed-notch gesture state
+    private var lastProcessedScrollTimestamp: TimeInterval = 0
+    private var lastScrollEventTime: Date = .distantPast
+    private var swipeDeltaX: CGFloat = 0
+    private var hasTriggeredSwipe = false
+    private var lastSwipeTriggerTime: Date = .distantPast
+
+    // Open-notch tab swipe gesture state
+    private var lastProcessedTabScrollTimestamp: TimeInterval = 0
+    private var lastTabScrollEventTime: Date = .distantPast
+    private var openTabSwipeDeltaX: CGFloat = 0
+    private var hasTriggeredOpenTabSwipe = false
+    private var lastTabSwipeTriggerTime: Date = .distantPast
+    private var globalSwipeMonitor: Any?
+    private var localSwipeMonitor: Any?
 
     private let media: MediaManager
     private let tray: TrayStore
@@ -66,6 +84,28 @@ final class NotchScreenManager: ObservableObject {
             self?.clickedOutside()
         }
 
+        // Two-finger scroll & swipe gestures on the notch (works both when OpenNotchi is in background and foreground).
+        globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            _ = self?.handleNotchScroll(event)
+        }
+        localScrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            if self?.handleNotchScroll(event) == true {
+                return nil
+            }
+            return event
+        }
+
+        // Three-finger swipe gestures on the notch
+        globalSwipeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .swipe) { [weak self] event in
+            _ = self?.handleNotchSwipe(event)
+        }
+        localSwipeMonitor = NSEvent.addLocalMonitorForEvents(matching: .swipe) { [weak self] event in
+            if self?.handleNotchSwipe(event) == true {
+                return nil
+            }
+            return event
+        }
+
         DistributedNotificationCenter.default().addObserver(
             self,
             selector: #selector(handleCommand(_:)),
@@ -78,6 +118,18 @@ final class NotchScreenManager: ObservableObject {
 
     deinit {
         if let monitor = clickOutsideMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = globalScrollMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = localScrollMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = globalSwipeMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = localSwipeMonitor {
             NSEvent.removeMonitor(monitor)
         }
         cursorCheckTimer?.invalidate()
@@ -191,6 +243,264 @@ final class NotchScreenManager: ObservableObject {
         for controller in controllers {
             controller.clickedOutside()
         }
+    }
+
+    /// What a scroll over the notch does. One answer per event, so gestures never overlap.
+    enum NotchGesture: Equatable {
+        case none
+        /// Not ours: let the app or the view under the pointer have it.
+        case passThrough
+        case switchTab, skipTrack, volume, brightness
+    }
+
+    /// Picks the gesture for a scroll at `offsetFromMidX` / `distFromTop` (points) over a notch of `notchWidth`.
+    /// - Open notch: only a clearly horizontal swipe inside the header row switches tabs; everything else
+    ///   (vertical, or lower down where carousels and lyrics scroll) goes to the view.
+    /// - Closed notch: only the notch itself and its live-activity wings count, not the menu bar beside them.
+    ///   Horizontal skips tracks; vertical is volume on the left, brightness on the right.
+    static func gesture(
+        isOpen: Bool, offsetFromMidX: CGFloat, distFromTop: CGFloat, dx: CGFloat, dy: CGFloat,
+        notchWidth: CGFloat, notchHeight: CGFloat, openWidth: CGFloat, openHeaderHeight: CGFloat,
+        settings: (skip: Bool, volume: Bool, brightness: Bool, tabs: Bool)
+    ) -> NotchGesture {
+        let horizontal = abs(dx) > abs(dy) * 1.5
+        if isOpen {
+            let inHeader = distFromTop >= -4 && distFromTop <= openHeaderHeight && abs(offsetFromMidX) <= openWidth / 2
+            guard settings.tabs, inHeader, horizontal, abs(dx) > 0.4 else { return .passThrough }
+            return .switchTab
+        }
+        // The closed notch plus a wing each side for the live activity; the rest of the menu bar is the user's.
+        let reach = notchWidth / 2 + notchHeight + 40
+        guard distFromTop >= -4, distFromTop <= notchHeight + 6, abs(offsetFromMidX) <= reach else { return .passThrough }
+        if horizontal { return settings.skip ? .skipTrack : .none }
+        guard abs(dy) > 0.05 else { return .none }
+        if offsetFromMidX < 0 { return settings.volume ? .volume : .none }
+        return settings.brightness ? .brightness : .none
+    }
+
+    private var gestureSettings: (skip: Bool, volume: Bool, brightness: Bool, tabs: Bool) {
+        (settings.gestureSkipTrack, settings.gestureVolume, settings.gestureBrightness, settings.gestureSwitchTabs)
+    }
+
+    /// Handles two-finger swipe / scroll:
+    /// - When notch is OPEN: Two-finger horizontal swipe switches tabs with smooth animations.
+    ///   Vertical scrolling is passed through to the subview content (lyrics, logs, timers).
+    /// - When notch is CLOSED: Two-finger horizontal swipe skips track; two-finger vertical scroll
+    ///   adjusts system volume (left side) or screen brightness (right side) with fluid Peek HUD.
+    @discardableResult
+    func handleNotchScroll(_ event: NSEvent) -> Bool {
+        guard settings.closedNotchGesturesEnabled else { return false }
+
+        let mouseLoc = NSEvent.mouseLocation
+        guard let controller = controllers.first(where: {
+            guard let s = $0.targetScreen else { return false }
+            return NSMouseInRect(mouseLoc, s.frame, false)
+        }), let screen = controller.targetScreen else {
+            return false
+        }
+
+        let vm = controller.viewModel
+        let distFromTop = screen.frame.maxY - mouseLoc.y
+        let offsetFromMidX = mouseLoc.x - screen.frame.midX
+        let dx = event.scrollingDeltaX
+        let dy = event.scrollingDeltaY
+        let gesture = Self.gesture(
+            isOpen: vm.isOpen, offsetFromMidX: offsetFromMidX, distFromTop: distFromTop, dx: dx, dy: dy,
+            notchWidth: vm.notchSize.width, notchHeight: vm.notchSize.height, openWidth: vm.openSize.width,
+            openHeaderHeight: vm.notchSize.height + 30, settings: gestureSettings)
+        if gesture == .passThrough { return false }
+
+        // ==========================================
+        // 1. NOTCH IS OPEN: TAB SWITCHING GESTURES
+        // ==========================================
+        if vm.isOpen {
+            // Deduplicate if both local and global monitors observe the same event
+            guard event.timestamp != lastProcessedTabScrollTimestamp else { return true }
+            lastProcessedTabScrollTimestamp = event.timestamp
+            guard event.momentumPhase == [] else { return true }
+
+            let now = Date()
+            guard now.timeIntervalSince(lastTabSwipeTriggerTime) > 0.28 else { return true }
+
+            if event.phase == .began || now.timeIntervalSince(lastTabScrollEventTime) > 0.3 {
+                openTabSwipeDeltaX = 0
+                hasTriggeredOpenTabSwipe = false
+            }
+            lastTabScrollEventTime = now
+            openTabSwipeDeltaX += dx
+
+            if !hasTriggeredOpenTabSwipe && abs(openTabSwipeDeltaX) >= 12 {
+                hasTriggeredOpenTabSwipe = true
+                lastTabSwipeTriggerTime = now
+
+                // Trackpad scroll: swipe left moves to next tab, swipe right moves to previous tab
+                let goNext = event.isDirectionInvertedFromDevice ? (openTabSwipeDeltaX < 0) : (openTabSwipeDeltaX > 0)
+                if goNext {
+                    vm.nextTab()
+                } else {
+                    vm.previousTab()
+                }
+
+                if settings.hapticsEnabled {
+                    NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    self?.hasTriggeredOpenTabSwipe = false
+                    self?.openTabSwipeDeltaX = 0
+                }
+            }
+            return true
+        }
+
+        // ==========================================
+        // 2. NOTCH IS CLOSED: PEEK HUD GESTURES
+        // ==========================================
+        // Deduplicate if both local and global monitors observe the same event
+        guard event.timestamp != lastProcessedScrollTimestamp else { return true }
+        lastProcessedScrollTimestamp = event.timestamp
+
+        // Suppress hover-open while scrolling closed notch
+        vm.suppressOpenForGesture(duration: 1.0)
+
+        let now = Date()
+        if event.phase == .began || event.phase == .ended || event.phase == .cancelled || now.timeIntervalSince(lastScrollEventTime) > 0.35 {
+            swipeDeltaX = 0
+            if event.phase == .began || now.timeIntervalSince(lastScrollEventTime) > 0.35 {
+                hasTriggeredSwipe = false
+            }
+        }
+        lastScrollEventTime = now
+
+        // A gesture that's turned off still claims the scroll, so it doesn't fall through as another one.
+        if gesture == .none { return true }
+
+        // Closed-Notch 1. Horizontal swipe -> Next / Previous track
+        if gesture == .skipTrack {
+            guard event.momentumPhase == [] else { return true }
+            guard now.timeIntervalSince(lastSwipeTriggerTime) > 0.38 else { return true }
+
+            swipeDeltaX += dx
+            if !hasTriggeredSwipe && abs(swipeDeltaX) >= 18 {
+                hasTriggeredSwipe = true
+                lastSwipeTriggerTime = now
+
+                let goNext = event.isDirectionInvertedFromDevice ? (swipeDeltaX < 0) : (swipeDeltaX > 0)
+                let direction: TrackSkipDirection = goNext ? .next : .previous
+
+                if goNext {
+                    media.nextTrack()
+                } else {
+                    media.previousTrack()
+                }
+
+                if settings.hapticsEnabled {
+                    NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+                }
+
+                controller.showPeek(.trackSkip(direction: direction, title: nil))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) { [weak self, weak controller] in
+                    guard let self, let controller, case .trackSkip(let dir, _) = controller.viewModel.peek else { return }
+                    if let title = self.media.info?.title, !title.isEmpty {
+                        controller.showPeek(.trackSkip(direction: dir, title: title))
+                    }
+                }
+            }
+            return true
+        }
+
+        // Closed-Notch 2. Two-finger vertical scroll -> Left half: System Volume, Right half: Display Brightness
+        let stepMultiplier: Float = event.hasPreciseScrollingDeltas ? 0.0038 : 0.038
+        let rawDelta = Float(event.isDirectionInvertedFromDevice ? -dy : dy) * stepMultiplier
+
+        if gesture == .volume {
+            guard var volume = SystemAudio.volume else { return true }
+            let previous = volume
+            volume = min(max(volume + rawDelta, 0), 1)
+            SystemAudio.volume = volume
+            if volume > 0 && SystemAudio.isMuted {
+                SystemAudio.isMuted = false
+            } else if volume == 0 && !SystemAudio.isMuted {
+                SystemAudio.isMuted = true
+            }
+            if settings.hapticsEnabled && ((previous > 0 && volume == 0) || (previous < 1 && volume == 1)) {
+                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+            }
+            controller.showPeek(.volume(level: volume, muted: SystemAudio.isMuted))
+        } else {
+            if var brightness = DisplayBrightness.level {
+                let previous = brightness
+                brightness = min(max(brightness + rawDelta, 0), 1)
+                DisplayBrightness.level = brightness
+                if settings.hapticsEnabled && ((previous > 0 && brightness == 0) || (previous < 1 && brightness == 1)) {
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                }
+                controller.showPeek(.brightness(level: brightness))
+            }
+            // No fallback to volume: on a display without brightness control the right side does nothing,
+            // instead of quietly becoming a second volume knob.
+        }
+        return true
+    }
+
+    /// Handles 3-finger horizontal swipe gesture:
+    /// - When notch is OPEN: switches tabs left or right.
+    /// - When notch is CLOSED: skips next/previous track.
+    @discardableResult
+    func handleNotchSwipe(_ event: NSEvent) -> Bool {
+        guard settings.closedNotchGesturesEnabled else { return false }
+
+        let mouseLoc = NSEvent.mouseLocation
+        guard let controller = controllers.first(where: {
+            guard let s = $0.targetScreen else { return false }
+            return NSMouseInRect(mouseLoc, s.frame, false)
+        }), let screen = controller.targetScreen else {
+            return false
+        }
+
+        let vm = controller.viewModel
+        let distFromTop = screen.frame.maxY - mouseLoc.y
+        let offsetFromMidX = mouseLoc.x - screen.frame.midX
+        // Same zones and switches as the two-finger scroll; a three-finger swipe is always horizontal.
+        let gesture = Self.gesture(
+            isOpen: vm.isOpen, offsetFromMidX: offsetFromMidX, distFromTop: distFromTop, dx: -event.deltaX, dy: 0,
+            notchWidth: vm.notchSize.width, notchHeight: vm.notchSize.height, openWidth: vm.openSize.width,
+            openHeaderHeight: vm.notchSize.height + 30, settings: gestureSettings)
+        guard gesture == .switchTab || gesture == .skipTrack else { return gesture == .none }
+
+        if vm.isOpen {
+            // 3-finger swipe: deltaX < 0 is swipe left (next tab), deltaX > 0 is swipe right (previous tab)
+            if event.deltaX < 0 {
+                vm.nextTab()
+                if settings.hapticsEnabled {
+                    NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+                }
+                return true
+            } else if event.deltaX > 0 {
+                vm.previousTab()
+                if settings.hapticsEnabled {
+                    NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+                }
+                return true
+            }
+        } else {
+            if event.deltaX < 0 {
+                media.nextTrack()
+                if settings.hapticsEnabled {
+                    NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+                }
+                controller.showPeek(.trackSkip(direction: .next, title: nil))
+                return true
+            } else if event.deltaX > 0 {
+                media.previousTrack()
+                if settings.hapticsEnabled {
+                    NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+                }
+                controller.showPeek(.trackSkip(direction: .previous, title: nil))
+                return true
+            }
+        }
+        return false
     }
 
     func previewAnimation() {

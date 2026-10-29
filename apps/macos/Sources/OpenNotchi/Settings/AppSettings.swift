@@ -15,6 +15,16 @@ final class AppSettings: ObservableObject {
         }
     }
     @Published var hapticsEnabled: Bool { didSet { defaults.set(hapticsEnabled, forKey: "hapticsEnabled") } }
+    @Published var closedNotchGesturesEnabled: Bool { didSet { defaults.set(closedNotchGesturesEnabled, forKey: "closedNotchGesturesEnabled") } }
+    /// Each notch gesture on its own; `closedNotchGesturesEnabled` still turns them all off at once.
+    @Published var gestureSkipTrack: Bool { didSet { defaults.set(gestureSkipTrack, forKey: "gestureSkipTrack") } }
+    @Published var gestureVolume: Bool { didSet { defaults.set(gestureVolume, forKey: "gestureVolume") } }
+    @Published var gestureBrightness: Bool { didSet { defaults.set(gestureBrightness, forKey: "gestureBrightness") } }
+    @Published var gestureSwitchTabs: Bool { didSet { defaults.set(gestureSwitchTabs, forKey: "gestureSwitchTabs") } }
+    /// Off by default: the menu bar already shows the battery right beside the open notch.
+    @Published var showHeaderBattery: Bool { didSet { defaults.set(showHeaderBattery, forKey: "showHeaderBattery") } }
+    @Published var ciLiveActivity: Bool { didSet { defaults.set(ciLiveActivity, forKey: "ciLiveActivity") } }
+    @Published var ciNotifyBanner: Bool { didSet { defaults.set(ciNotifyBanner, forKey: "ciNotifyBanner") } }
     @Published var showLiveActivity: Bool { didSet { defaults.set(showLiveActivity, forKey: "showLiveActivity") } }
     @Published var showMenuBarIcon: Bool {
         didSet {
@@ -240,6 +250,14 @@ final class AppSettings: ObservableObject {
             "displayTarget": DisplayTarget.builtIn.rawValue,
             "hoverDelay": 0.15,
             "hapticsEnabled": true,
+            "closedNotchGesturesEnabled": true,
+            "gestureSkipTrack": true,
+            "gestureVolume": true,
+            "gestureBrightness": true,
+            "gestureSwitchTabs": true,
+            "showHeaderBattery": false,
+            "ciLiveActivity": true,
+            "ciNotifyBanner": true,
             "showLiveActivity": true,
             "showMenuBarIcon": true,
             "spotifyEnabled": true,
@@ -358,6 +376,14 @@ final class AppSettings: ObservableObject {
         hoverDelay = defaults.double(forKey: "hoverDelay")
         displayTarget = DisplayTarget(rawValue: defaults.string(forKey: "displayTarget") ?? "") ?? .builtIn
         hapticsEnabled = defaults.bool(forKey: "hapticsEnabled")
+        closedNotchGesturesEnabled = defaults.object(forKey: "closedNotchGesturesEnabled") as? Bool ?? true
+        gestureSkipTrack = defaults.object(forKey: "gestureSkipTrack") as? Bool ?? true
+        gestureVolume = defaults.object(forKey: "gestureVolume") as? Bool ?? true
+        gestureBrightness = defaults.object(forKey: "gestureBrightness") as? Bool ?? true
+        gestureSwitchTabs = defaults.object(forKey: "gestureSwitchTabs") as? Bool ?? true
+        showHeaderBattery = defaults.bool(forKey: "showHeaderBattery")
+        ciLiveActivity = defaults.object(forKey: "ciLiveActivity") as? Bool ?? true
+        ciNotifyBanner = defaults.object(forKey: "ciNotifyBanner") as? Bool ?? true
         showLiveActivity = defaults.bool(forKey: "showLiveActivity")
         showMenuBarIcon = defaults.bool(forKey: "showMenuBarIcon")
         spotifyEnabled = defaults.bool(forKey: "spotifyEnabled")

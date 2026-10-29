@@ -111,6 +111,21 @@ struct PeekView: View {
                     .font(.system(size: 10, weight: .heavy, design: .monospaced))
                     .foregroundStyle(muted ? .red : Color(red: 1.0, green: 0.6, blue: 0.2))
 
+            case .trackSkip(let direction, let title):
+                Image(systemName: direction == .next ? "forward.end.fill" : "backward.end.fill")
+                    .font(.system(size: height * 0.44, weight: .bold))
+                    .foregroundStyle(accent.highlight)
+                    .shadow(color: accent.color.opacity(0.5), radius: 4)
+                    .frame(width: height - 4, alignment: .leading)
+
+                Spacer()
+
+                Text(title?.isEmpty == false ? title! : (direction == .next ? "NEXT" : "PREV"))
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .frame(maxWidth: 96, alignment: .trailing)
+
             case .privacy(let camera, let mic):
                 HStack(spacing: 4) {
                     if camera { Image(systemName: "video.fill").foregroundStyle(.green) }

@@ -8,6 +8,22 @@ struct SettingItem: Identifiable {
     let keywords: [String]
     let icon: String?
 
+    /// Automatically maps Features items to their corresponding sub-tab so search jumps straight there.
+    var featuresSubTab: FeaturesSubTab? {
+        guard pane == .features else { return nil }
+        let hay = ([title, subtitle] + keywords).joined(separator: " ").lowercased()
+        if hay.contains("lyric") || hay.contains("full-screen") || hay.contains("fullscreen") || hay.contains("audio deck") || hay.contains("calendar widget") {
+            return .homeLyrics
+        }
+        if hay.contains("weather") || hay.contains("prayer") || hay.contains("market") || hay.contains("meeting") || hay.contains("location") {
+            return .widgets
+        }
+        if hay.contains("peek") || hay.contains("hud") || hay.contains("network") || hay.contains("mascot") || hay.contains("download") || hay.contains("charger") || hay.contains("camera or mic") || hay.contains("notification") || hay.contains("ci ") || hay.contains("github") {
+            return .liveActivities
+        }
+        return .tabs
+    }
+
     /// Every word of the query must appear in the title, subtitle, pane or keywords, in any order.
     func matches(_ query: String) -> Bool {
         let words = query.split(whereSeparator: \.isWhitespace)
@@ -37,6 +53,15 @@ struct SettingItem: Identifiable {
         SettingItem(
             title: "Hover delay", subtitle: "Sensitivity & delay before notch expands on hover", pane: .general,
             keywords: ["sensitivity", "speed", "hover", "delay"], icon: "cursorarrow.motionlines"),
+        SettingItem(
+            title: "Battery in the open notch", subtitle: "Off by default; the menu bar already shows it",
+            pane: .general, keywords: ["battery", "charge", "percent", "power"], icon: "battery.75percent"),
+        SettingItem(
+            title: "Trackpad gestures on the notch",
+            subtitle: "Skip tracks, volume, brightness and tab switching, each on or off",
+            pane: .general,
+            keywords: ["gesture", "scroll", "swipe", "volume", "brightness", "skip", "trackpad", "tab", "conflict"],
+            icon: "hand.draw.fill"),
         SettingItem(
             title: "Global shortcut", subtitle: "Global keyboard hotkey to toggle notch open/closed", pane: .general,
             keywords: ["hotkey", "keyboard", "shortcut", "toggle"], icon: "command"),
@@ -98,6 +123,11 @@ struct SettingItem: Identifiable {
         SettingItem(
             title: "Volume & brightness HUD", subtitle: "Notch replacement for macOS volume and display brightness HUD",
             pane: .features, keywords: ["hud", "volume", "brightness", "sound"], icon: "speaker.wave.3.fill"),
+        SettingItem(
+            title: "GitHub CI & local build status",
+            subtitle: "Live activity spinner beside closed notch and completion banners for GitHub Actions",
+            pane: .features, keywords: ["ci", "github", "actions", "build", "workflow", "banner", "dev"],
+            icon: "checkmark.seal.fill"),
 
         // Media
         SettingItem(

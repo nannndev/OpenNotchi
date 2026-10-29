@@ -128,6 +128,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.screenManager.showPeek(.privacy(camera: camera, mic: mic))
         }
 
+        CIBuildMonitor.shared.onBanner = { [weak self] banner in
+            self?.screenManager.showPeek(.banner(banner))
+        }
+        CIBuildMonitor.shared.startMonitoring()
+
         downloads.onFinish = { [weak self] url in
             self?.screenManager.showPeek(.banner(Banner(
                 icon: "arrow.down.circle.fill",

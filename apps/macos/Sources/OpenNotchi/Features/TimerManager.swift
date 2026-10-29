@@ -111,6 +111,7 @@ final class TimerManager: ObservableObject {
         pausedRemaining = nil
         schedule()
         requestNotificationPermission()
+        AmbientSoundManager.shared.handleTimerStart(isFocusPhase: !pomodoro || phase == .focus)
     }
 
     func pause() {
@@ -118,6 +119,7 @@ final class TimerManager: ObservableObject {
         pausedRemaining = max(0, endDate.timeIntervalSinceNow)
         self.endDate = nil
         finishTimer?.invalidate()
+        AmbientSoundManager.shared.handleTimerPauseOrEnd()
     }
 
     func reset() {
@@ -125,6 +127,7 @@ final class TimerManager: ObservableObject {
         endDate = nil
         pausedRemaining = nil
         didFinish = false
+        AmbientSoundManager.shared.handleTimerPauseOrEnd()
     }
 
     private func schedule() {
@@ -145,6 +148,7 @@ final class TimerManager: ObservableObject {
             advance(countFocus: true)
         } else {
             didFinish = true
+            AmbientSoundManager.shared.handleTimerPauseOrEnd()
         }
         onFinish?()
     }

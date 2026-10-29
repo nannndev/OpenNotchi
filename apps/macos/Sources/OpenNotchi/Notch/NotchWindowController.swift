@@ -54,8 +54,13 @@ final class NotchWindowController: NSObject {
             .environmentObject(SmarthomeManager.shared)
             .environmentObject(AgentMonitor.shared)
             .environmentObject(AIUsageManager.shared)
+            .environmentObject(CIBuildMonitor.shared)
+            .environmentObject(AmbientSoundManager.shared)
 
         let hosting = FirstMouseHostingView(rootView: root)
+        hosting.viewModel = viewModel
+        hosting.media = media
+        hosting.settings = settings
         hosting.frame = NSRect(origin: .zero, size: Self.windowSize)
         panel.contentView = hosting
         super.init()
