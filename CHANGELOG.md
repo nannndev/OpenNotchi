@@ -4,6 +4,23 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.18.0] - 2026-10-30
+
+### Fixed
+- **Spotify Connect & Remote Sync (macOS)**:
+  - Fixed infinite spinning button during Spotify login by ensuring authentication window presentation anchors properly and handling session start failures.
+  - Added safety timeouts and cancelled stale authentication sessions.
+  - Prevented premature account logout during temporary network reconnections or wake from sleep (retains refresh tokens safely).
+  - Resolved playback state and artwork synchronization conflict between local macOS Spotify and remote Spotify Web API (phone, speaker, TV).
+  - Automatically refreshes tokens upon receiving HTTP 401 Unauthorized responses.
+- **Settings Stability & Search (macOS)**:
+  - Fixed application freeze when opening Settings, searching preferences, or switching between panes by maintaining a stable sidebar list and preventing selection loops.
+  - Eliminated high-frequency background accessibility polling timers on the main runloop.
+- **DevTools UI Freeze (Windows)**:
+  - Fixed freeze when opening the Dev tab on Windows by converting polling to non-overlapping sequential execution with active unmount cancellation.
+  - Eliminated redundant `netstat` process spawns and removed invalid `TCPv6` protocol flag calls in the Rust backend.
+  - Added `Stdio::null()` and resilient mutex handling to prevent background process hangs and threadpool starvation.
+
 ## [0.17.0] - 2026-10-29
 
 ### Added

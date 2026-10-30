@@ -56,7 +56,10 @@ struct FeaturesPane: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
+        .onAppear {
+            accessibilityGranted = MediaKeyInterceptor.isTrusted
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             accessibilityGranted = MediaKeyInterceptor.isTrusted
         }
     }

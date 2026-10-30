@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var screenManager: NotchScreenManager!
     private var statusItem: NSStatusItem?
     private var toggleMenuItem: NSMenuItem?
-    private var settingsWindow: NSWindow?
+    private(set) var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         screenManager = NotchScreenManager(

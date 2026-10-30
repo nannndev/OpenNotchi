@@ -123,9 +123,13 @@ final class MediaManager: ObservableObject {
     }
 
     private func apply(_ results: [NowPlayingInfo]) {
-        let chosen = results.first(where: \.isPlaying)
-            ?? results.first(where: { $0.sourceID == activeProviderID })
-            ?? results.first
+        // If local Spotify is running and active, prefer it over SpotifyWebProvider to avoid out-of-sync states
+        let hasLocalSpotify = results.contains { $0.sourceID == SpotifyProvider.bundleID && $0.isPlaying }
+        let filtered = hasLocalSpotify ? results.filter { $0.sourceID != SpotifyWebProvider.providerID } : results
+
+        let chosen = filtered.first(where: \.isPlaying)
+            ?? filtered.first(where: { $0.sourceID == activeProviderID })
+            ?? filtered.first
         activeProviderID = chosen?.sourceID
         info = chosen
 

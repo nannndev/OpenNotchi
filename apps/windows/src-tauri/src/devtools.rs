@@ -171,6 +171,7 @@ mod imp {
     fn run(cmd: &str, args: &[&str]) -> String {
         Command::new(cmd)
             .args(args)
+            .stdin(std::process::Stdio::null())
             .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
@@ -178,9 +179,14 @@ mod imp {
     }
 
     pub fn listening_ports() -> Vec<ListeningPort> {
-        let names = parse_tasklist(&run("tasklist", &["/FO", "CSV", "/NH"]));
-        let mut rows = parse_netstat(&run("netstat", &["-ano", "-p", "TCP"]));
-        rows.extend(parse_netstat(&run("netstat", &["-ano", "-p", "TCPv6"])));
+        // Run netstat once: -ano outputs all IPv4 and IPv6 TCP listening ports without name resolution delays.
+        let rows = parse_netstat(&run("netstat", &["-ano"]));
+        let names = if rows.is_empty() {
+            std::collections::HashMap::new()
+        } else {
+            parse_tasklist(&run("tasklist", &["/FO", "CSV", "/NH"]))
+        };
+
         let mut ports: Vec<ListeningPort> = Vec::new();
         for (address, port, pid) in rows {
             // IPv4 and IPv6 listeners on the same port are one server.
@@ -261,7 +267,7 @@ mod imp {
             mem_total_bytes: mem.ullTotalPhys,
             ..Default::default()
         };
-        let mut last = LAST.lock().unwrap();
+        let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(prev) = last.as_ref() {
             let dt = now.at.duration_since(prev.at).as_secs_f64().max(0.001);
             let busy = (total - prev.total).saturating_sub(idle - prev.idle);

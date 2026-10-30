@@ -68,15 +68,22 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
             URLQueryItem(name: "state", value: state),
         ]
 
+        // Cancel any previous hanging session
+        session?.cancel()
+        session = nil
+
         let session = ASWebAuthenticationSession(url: components.url!, callbackURLScheme: "opennotchi") { [weak self] url, error in
             DispatchQueue.main.async {
-                self?.isAuthorizing = false
                 guard let self else { return }
-                if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin { return }
+                if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+                    self.isAuthorizing = false
+                    return
+                }
                 let items = url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems } ?? []
                 let value = { (name: String) in items.first { $0.name == name }?.value }
                 guard value("state") == state, let code = value("code") else {
-                    self.lastError = value("error").map { "Spotify said: \($0)" } ?? "Login didn't finish."
+                    self.isAuthorizing = false
+                    self.lastError = value("error").map { "Spotify said: \($0)" } ?? (error != nil ? error?.localizedDescription : "Login didn't finish.")
                     return
                 }
                 self.exchange(code: code, verifier: verifier)
@@ -85,11 +92,37 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
         session.presentationContextProvider = self
         self.session = session
         isAuthorizing = true
-        session.start()
+
+        let started = session.start()
+        if !started {
+            isAuthorizing = false
+            lastError = "Could not open Spotify login window. Please make sure OpenNotchi Settings is active."
+            return
+        }
+
+        // Safety timeout: reset isAuthorizing if user abandons or session stalls
+        DispatchQueue.main.asyncAfter(deadline: .now() + 90) { [weak self] in
+            if self?.isAuthorizing == true {
+                self?.isAuthorizing = false
+                self?.session?.cancel()
+                self?.session = nil
+                if self?.lastError == nil {
+                    self?.lastError = "Login timed out. Please try again."
+                }
+            }
+        }
     }
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        NSApp.keyWindow ?? NSApp.windows.first { $0.isVisible && $0.canBecomeKey } ?? NSWindow()
+        if let key = NSApp.keyWindow { return key }
+        if let settings = AppDelegate.shared?.settingsWindow, settings.isVisible {
+            settings.makeKeyAndOrderFront(nil)
+            return settings
+        }
+        if let visible = NSApp.windows.first(where: { $0.isVisible && $0.canBecomeKey }) {
+            return visible
+        }
+        return NSApp.windows.first(where: { $0.isVisible }) ?? NSWindow()
     }
 
     func disconnect() {
@@ -101,27 +134,32 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
     }
 
     private func exchange(code: String, verifier: String) {
+        isAuthorizing = true
         postToken([
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": Self.redirectURI,
             "client_id": clientID,
             "code_verifier": verifier,
-        ]) { [weak self] tokens in
+        ]) { [weak self] tokens, isRevoked in
             guard let self else { return }
+            self.isAuthorizing = false
             guard let tokens else {
-                self.lastError = "Couldn't finish signing in. Check the Client ID and the redirect URI."
+                if self.lastError == nil {
+                    self.lastError = "Couldn't finish signing in. Check your Client ID and redirect URI."
+                }
                 return
             }
             self.store(tokens)
             self.loadProfile()
+            AppDelegate.shared?.media.refresh()
         }
     }
 
     private func loadProfile() {
         withAccessToken { token in
             guard let token else { return }
-            var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me")!)
+            var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me")!, timeoutInterval: 10)
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             // SpotifyAuth is a singleton, so capturing self strongly is fine.
             URLSession.shared.dataTask(with: request) { data, _, _ in
@@ -136,6 +174,16 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
     }
 
     // MARK: - Tokens
+
+    /// Forces a refresh on the next request, e.g. after receiving a 401 Unauthorized from Spotify API.
+    func forceRefreshToken(completion: ((String?) -> Void)? = nil) {
+        lock.lock()
+        tokens?.expires = .distantPast
+        lock.unlock()
+        withAccessToken { token in
+            completion?(token)
+        }
+    }
 
     /// Calls back with a valid access token (refreshing it when needed), or nil when logged out.
     func withAccessToken(_ completion: @escaping (String?) -> Void) {
@@ -153,19 +201,19 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
         lock.unlock()
         guard !alreadyRefreshing else { return }
 
-        postToken(["grant_type": "refresh_token", "refresh_token": current.refresh, "client_id": clientID]) { [weak self] refreshed in
+        postToken(["grant_type": "refresh_token", "refresh_token": current.refresh, "client_id": clientID]) { [weak self] refreshed, isRevoked in
             guard let self else { return }
             if let refreshed {
                 self.store(refreshed)
-            } else {
-                // Revoked or expired for good: sign out so Settings shows Connect again.
+            } else if isRevoked {
+                // Only disconnect if Spotify explicitly confirmed the refresh token is revoked/invalid.
                 self.disconnect()
             }
             self.lock.lock()
             let waiting = self.pendingRefresh
             self.pendingRefresh = []
             self.lock.unlock()
-            waiting.forEach { $0(refreshed?.access) }
+            waiting.forEach { $0(refreshed?.access ?? (isRevoked ? nil : current.access)) }
         }
     }
 
@@ -175,9 +223,9 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
         DispatchQueue.main.async { self.isLoggedIn = true }
     }
 
-    /// Posts to the token endpoint; calls back on the main thread.
-    private func postToken(_ form: [String: String], completion: @escaping (Tokens?) -> Void) {
-        var request = URLRequest(url: URL(string: "https://accounts.spotify.com/api/token")!)
+    /// Posts to the token endpoint; calls back on the main thread with (tokens, isRevoked).
+    private func postToken(_ form: [String: String], completion: @escaping (Tokens?, Bool) -> Void) {
+        var request = URLRequest(url: URL(string: "https://accounts.spotify.com/api/token")!, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         var body = URLComponents()
@@ -185,16 +233,29 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
         request.httpBody = body.percentEncodedQuery?.data(using: .utf8)
 
         let previousRefresh = lock.withLock { tokens?.refresh }
-        URLSession.shared.dataTask(with: request) { data, response, _ in
+        URLSession.shared.dataTask(with: request) { data, response, error in
             var result: Tokens?
-            if (response as? HTTPURLResponse)?.statusCode == 200,
-               let json = data.flatMap({ try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }),
+            var isRevoked = false
+            let http = response as? HTTPURLResponse
+            let json = data.flatMap({ try? JSONSerialization.jsonObject(with: $0) as? [String: Any] })
+
+            if http?.statusCode == 200,
+               let json,
                let access = json["access_token"] as? String {
                 let refresh = json["refresh_token"] as? String ?? previousRefresh ?? ""
                 let expiresIn = json["expires_in"] as? Double ?? 3600
                 result = Tokens(access: access, refresh: refresh, expires: Date().addingTimeInterval(expiresIn))
+            } else {
+                if let err = json?["error"] as? String, err == "invalid_grant" {
+                    isRevoked = true
+                }
+                if let desc = json?["error_description"] as? String ?? json?["error"] as? String {
+                    DispatchQueue.main.async {
+                        SpotifyAuth.shared.lastError = "Spotify: \(desc)"
+                    }
+                }
             }
-            DispatchQueue.main.async { completion(result) }
+            DispatchQueue.main.async { completion(result, isRevoked) }
         }.resume()
     }
 

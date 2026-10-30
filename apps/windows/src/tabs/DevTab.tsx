@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 import { CheckCircle2, CircleDashed, Cpu, ExternalLink, Network, Plus, RefreshCw, Square, Trash2, XCircle } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { formatBytes, formatRate, isLocalWebPort } from "../devtools"
 
 type Port = { port: number; pid: number; process: string; address: string }
@@ -31,12 +31,28 @@ const loadRepos = (): string[] => {
 
 const openUrl = (url: string) => invoke("open_external_url", { url }).catch(() => {})
 
-/** Repeats `fn` every `ms` while mounted; the Dev tab only polls while it's the visible tab. */
-function usePoll(fn: () => void, ms: number, deps: unknown[] = []) {
+/** Runs `fn` once immediately, then schedules the next run `ms` after the previous finishes.
+ * Cancels cleanly when unmounted to prevent worker thread exhaustion and UI freezes. */
+function usePoll(fn: () => Promise<unknown> | void, ms: number, deps: unknown[] = []) {
   useEffect(() => {
-    fn()
-    const id = setInterval(fn, ms)
-    return () => clearInterval(id)
+    let active = true
+    let timer: number | null = null
+
+    const tick = async () => {
+      if (!active) return
+      try {
+        await fn()
+      } catch {}
+      if (active) {
+        timer = window.setTimeout(tick, ms)
+      }
+    }
+
+    tick()
+    return () => {
+      active = false
+      if (timer !== null) clearTimeout(timer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
 }
@@ -69,8 +85,21 @@ function Ports() {
   const [ports, setPorts] = useState<Port[] | null>(null)
   const [confirm, setConfirm] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const load = () => invoke<Port[]>("listening_ports").then(setPorts).catch(() => setPorts([]))
-  usePoll(load, 4000)
+  const inFlightRef = useRef(false)
+
+  const load = async () => {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
+    try {
+      const res = await invoke<Port[]>("listening_ports")
+      setPorts(res)
+    } catch {
+      setPorts((prev) => prev ?? [])
+    } finally {
+      inFlightRef.current = false
+    }
+  }
+  usePoll(load, 5000)
 
   const kill = (p: Port) => {
     if (confirm !== p.pid) return setConfirm(p.pid)
@@ -116,9 +145,21 @@ function Ports() {
 
 function System() {
   const [s, setS] = useState<Stats | null>(null)
-  usePoll(() => {
-    invoke<Stats>("system_stats").then(setS).catch(() => {})
-  }, 2000)
+  const inFlightRef = useRef(false)
+
+  const load = async () => {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
+    try {
+      const res = await invoke<Stats>("system_stats")
+      setS(res)
+    } catch {
+    } finally {
+      inFlightRef.current = false
+    }
+  }
+  usePoll(load, 2500)
+
   const mem = s && s.memTotalBytes ? s.memUsedBytes / s.memTotalBytes : 0
   return (
     <div className="dev-stats">

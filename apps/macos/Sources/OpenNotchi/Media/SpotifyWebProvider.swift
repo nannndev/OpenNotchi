@@ -55,6 +55,10 @@ final class SpotifyWebProvider: MediaProvider {
                     // Assume the reported progress was measured halfway through the request.
                     let measuredAt = started.addingTimeInterval(Date().timeIntervalSince(started) / 2)
                     self.finish(with: Self.parse(data, measuredAt: measuredAt))
+                } else if status == 401 {
+                    // Token expired or invalidated: force a refresh so next poll has a valid token
+                    self.lock.withLock { self.inFlight = false }
+                    self.auth.forceRefreshToken()
                 } else {
                     self.lock.withLock { self.inFlight = false }
                 }
@@ -112,7 +116,7 @@ final class SpotifyWebProvider: MediaProvider {
     private func send(_ method: String, _ path: String) {
         auth.withAccessToken { [weak self] token in
             guard let token else { return }
-            var request = URLRequest(url: URL(string: "https://api.spotify.com/v1\(path)")!)
+            var request = URLRequest(url: URL(string: "https://api.spotify.com/v1\(path)")!, timeoutInterval: 10)
             request.httpMethod = method
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             URLSession.shared.dataTask(with: request) { _, response, _ in
@@ -120,6 +124,10 @@ final class SpotifyWebProvider: MediaProvider {
                 self?.needsPremium = status == 403
                 // Pick up the change sooner than the next scheduled poll.
                 self?.lock.withLock { self?.lastRequest = .distantPast }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    self?.refreshIfNeeded()
+                    AppDelegate.shared?.media.refresh()
+                }
             }.resume()
         }
     }

@@ -62,12 +62,6 @@ struct SettingsView: View {
         return SettingItem.all.filter { $0.matches(searchText) }
     }
 
-    private var matchingPanes: [SettingsPane] {
-        guard !searchText.isEmpty else { return SettingsPane.allCases }
-        let matched = Set(filteredItems.map(\.pane))
-        return SettingsPane.allCases.filter { matched.contains($0) }
-    }
-
     var body: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
@@ -98,7 +92,7 @@ struct SettingsView: View {
                 .padding(.bottom, 6)
 
                 List(selection: $pane) {
-                    ForEach(matchingPanes) { item in
+                    ForEach(SettingsPane.allCases) { item in
                         let matchCount = filteredItems.filter { $0.pane == item }.count
                         HStack {
                             Label {
@@ -125,6 +119,14 @@ struct SettingsView: View {
                     }
                 }
                 .listStyle(.sidebar)
+                .onChange(of: searchText) { _, newValue in
+                    if !newValue.isEmpty, let firstMatch = filteredItems.first {
+                        pane = firstMatch.pane
+                        if let sub = firstMatch.featuresSubTab {
+                            featuresSubTab = sub
+                        }
+                    }
+                }
             }
             .frame(width: 200)
 
