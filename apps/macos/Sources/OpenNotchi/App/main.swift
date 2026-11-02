@@ -7,6 +7,12 @@ if let i = CommandLine.arguments.firstIndex(of: "--ai-selftest") {
 if let i = CommandLine.arguments.firstIndex(of: "--strip-snapshot") {
     StripSnapshot.run(Array(CommandLine.arguments[(i + 1)...]))
 }
+if CommandLine.arguments.contains("--calc-selftest") {
+    Calculator.selfCheck()
+    MainActor.assumeIsolated { NoteStore.selfCheck() }
+    print("calculator & notes ok")
+    exit(0)
+}
 #endif
 
 let app = NSApplication.shared

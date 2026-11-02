@@ -20,19 +20,31 @@ final class SpotifyWebProvider: MediaProvider {
     private var cached: NowPlayingInfo?
     private var lastRequest = Date.distantPast
     private var inFlight = false
+    /// When Spotify last answered; a cached state older than `staleAfter` is dropped.
+    private var lastAnswer = Date.distantPast
+    /// Pushed forward by a 429 so we stop polling until Spotify allows it again.
+    private var retryAfter = Date.distantPast
+
+    static let staleAfter: TimeInterval = 20
 
     /// Returns the latest known state right away and refreshes it in the background,
     /// so a slow network never holds up the other players.
     func fetch() -> NowPlayingInfo? {
         refreshIfNeeded()
-        return lock.withLock { cached }
+        return lock.withLock { Self.fresh(cached, lastAnswer: lastAnswer, now: Date()) }
+    }
+
+    /// Without this, a dropped connection or rate limit left the last track "playing" forever,
+    /// so the notch stuck on it no matter what was played after.
+    static func fresh(_ info: NowPlayingInfo?, lastAnswer: Date, now: Date) -> NowPlayingInfo? {
+        now.timeIntervalSince(lastAnswer) > staleAfter ? nil : info
     }
 
     func fetchArtwork() -> NSImage? { nil }
 
     private func refreshIfNeeded() {
         let shouldStart: Bool = lock.withLock {
-            guard !inFlight, Date().timeIntervalSince(lastRequest) > 2.5 else { return false }
+            guard !inFlight, Date().timeIntervalSince(lastRequest) > 2.5, Date() > retryAfter else { return false }
             inFlight = true
             lastRequest = Date()
             return true
@@ -59,6 +71,12 @@ final class SpotifyWebProvider: MediaProvider {
                     // Token expired or invalidated: force a refresh so next poll has a valid token
                     self.lock.withLock { self.inFlight = false }
                     self.auth.forceRefreshToken()
+                } else if status == 429 {
+                    let wait = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 10
+                    self.lock.withLock {
+                        self.retryAfter = Date().addingTimeInterval(min(wait, 120))
+                        self.inFlight = false
+                    }
                 } else {
                     self.lock.withLock { self.inFlight = false }
                 }
@@ -70,6 +88,7 @@ final class SpotifyWebProvider: MediaProvider {
         lock.withLock {
             cached = info
             inFlight = false
+            lastAnswer = Date()
         }
     }
 

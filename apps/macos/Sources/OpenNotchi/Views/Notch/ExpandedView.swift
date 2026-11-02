@@ -40,6 +40,7 @@ struct ExpandedView: View {
         case .markets: MarketsView()
         case .dev: DevToolsView()
         case .notes: NotesView()
+        case .calc: CalculatorView()
         case .smarthome: SmarthomeView()
         case .ai: AIView()
         }

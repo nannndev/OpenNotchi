@@ -112,7 +112,7 @@ final class AppSettings: ObservableObject {
     @Published var devToolsEnabled: Bool { didSet { defaults.set(devToolsEnabled, forKey: "devToolsEnabled") } }
     @Published var smarthomeEnabled: Bool { didSet { defaults.set(smarthomeEnabled, forKey: "smarthomeEnabled") } }
     @Published var notesTabEnabled: Bool { didSet { defaults.set(notesTabEnabled, forKey: "notesTabEnabled") } }
-    @Published var notesText: String { didSet { defaults.set(notesText, forKey: "notesText") } }
+    @Published var calcTabEnabled: Bool { didSet { defaults.set(calcTabEnabled, forKey: "calcTabEnabled") } }
     @Published var lyricsOverlayEnabled: Bool {
         didSet {
             defaults.set(lyricsOverlayEnabled, forKey: "lyricsOverlayEnabled")
@@ -299,7 +299,7 @@ final class AppSettings: ObservableObject {
             "mirrorTabEnabled": false,
             "devToolsEnabled": true,
             "notesTabEnabled": true,
-            "notesText": "",
+            "calcTabEnabled": true,
             "lyricsOverlayEnabled": false,
             "nowPlayingScreenEnabled": true,
             "nowPlayingScreenIdleMinutes": 2.0,
@@ -431,7 +431,7 @@ final class AppSettings: ObservableObject {
         mirrorTabEnabled = defaults.bool(forKey: "mirrorTabEnabled")
         devToolsEnabled = defaults.bool(forKey: "devToolsEnabled")
         notesTabEnabled = defaults.bool(forKey: "notesTabEnabled")
-        notesText = defaults.string(forKey: "notesText") ?? ""
+        calcTabEnabled = defaults.bool(forKey: "calcTabEnabled")
         lyricsOverlayEnabled = defaults.bool(forKey: "lyricsOverlayEnabled")
         nowPlayingScreenEnabled = defaults.bool(forKey: "nowPlayingScreenEnabled")
         nowPlayingScreenIdleMinutes = defaults.double(forKey: "nowPlayingScreenIdleMinutes")
@@ -533,6 +533,7 @@ final class AppSettings: ObservableObject {
             case .markets: return marketsEnabled
             case .dev: return devToolsEnabled
             case .notes: return notesTabEnabled
+            case .calc: return calcTabEnabled
             case .smarthome: return smarthomeEnabled
             case .ai: return aiEnabled
             }

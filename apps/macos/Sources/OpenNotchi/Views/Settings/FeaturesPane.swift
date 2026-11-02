@@ -193,6 +193,13 @@ struct FeaturesPane: View {
                         tint: .yellow,
                         isOn: $settings.notesTabEnabled
                     )
+                    FeatureModuleCard(
+                        title: "Smart Calculator",
+                        subtitle: "Math, % & live currency conversion",
+                        icon: "plusminus.circle.fill",
+                        tint: .orange,
+                        isOn: $settings.calcTabEnabled
+                    )
                 }
 
                 HStack(spacing: 8) {
@@ -399,6 +406,7 @@ struct FeaturesPane: View {
         settings.smarthomeEnabled = enabled
         settings.marketsEnabled = enabled
         settings.notesTabEnabled = enabled
+        settings.calcTabEnabled = enabled
     }
 }
 

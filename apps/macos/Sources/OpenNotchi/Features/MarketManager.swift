@@ -176,7 +176,7 @@ final class MarketManager: ObservableObject {
         return request
     }
 
-    private static func fetch(_ symbol: String, completion: @escaping (Quote?) -> Void) {
+    static func fetch(_ symbol: String, completion: @escaping (Quote?) -> Void) {
         let encoded =
             symbol.addingPercentEncoding(
                 withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "=^"))) ?? symbol

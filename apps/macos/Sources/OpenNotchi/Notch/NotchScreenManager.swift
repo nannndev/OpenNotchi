@@ -21,6 +21,9 @@ final class NotchScreenManager: ObservableObject {
     private var hasTriggeredSwipe = false
     private var lastSwipeTriggerTime: Date = .distantPast
 
+    /// Keeps one scroll on one gesture from start to finish.
+    private var scrollLock = GestureLock()
+
     // Open-notch tab swipe gesture state
     private var lastProcessedTabScrollTimestamp: TimeInterval = 0
     private var lastTabScrollEventTime: Date = .distantPast
@@ -245,7 +248,36 @@ final class NotchScreenManager: ObservableObject {
         }
     }
 
-    /// What a scroll over the notch does. One answer per event, so gestures never overlap.
+    /// Decides a scroll's gesture once, from its first few points of travel, and keeps it until the fingers lift
+    /// (momentum included). A volume scroll that drifts sideways never skips a track or switches tabs, and a
+    /// tab swipe that drifts down never changes the volume.
+    struct GestureLock {
+        private(set) var locked: NotchGesture?
+        private var dx: CGFloat = 0, dy: CGFloat = 0
+        private var isOpen = false
+        private var lastEvent: Date = .distantPast
+
+        /// The gesture for this scroll, or nil while the direction isn't clear yet.
+        mutating func resolve(
+            began: Bool, isOpen: Bool, precise: Bool, now: Date, dx: CGFloat, dy: CGFloat,
+            classify: (CGFloat, CGFloat) -> NotchGesture
+        ) -> NotchGesture? {
+            if began || isOpen != self.isOpen || now.timeIntervalSince(lastEvent) > 0.35 {
+                locked = nil
+                (self.dx, self.dy, self.isOpen) = (0, 0, isOpen)
+            }
+            lastEvent = now
+            if let locked { return locked }
+            self.dx += dx
+            self.dy += dy
+            // A mouse wheel tick is already a clear direction; a trackpad needs a little travel first.
+            guard !precise || hypot(self.dx, self.dy) >= 6 else { return nil }
+            locked = classify(self.dx, self.dy)
+            return locked
+        }
+    }
+
+    /// What a scroll over the notch does. One answer per scroll (see `GestureLock`), so gestures never overlap.
     enum NotchGesture: Equatable {
         case none
         /// Not ours: let the app or the view under the pointer have it.
@@ -304,10 +336,22 @@ final class NotchScreenManager: ObservableObject {
         let offsetFromMidX = mouseLoc.x - screen.frame.midX
         let dx = event.scrollingDeltaX
         let dy = event.scrollingDeltaY
-        let gesture = Self.gesture(
-            isOpen: vm.isOpen, offsetFromMidX: offsetFromMidX, distFromTop: distFromTop, dx: dx, dy: dy,
-            notchWidth: vm.notchSize.width, notchHeight: vm.notchSize.height, openWidth: vm.openSize.width,
-            openHeaderHeight: vm.notchSize.height + 30, settings: gestureSettings)
+        let classify = { (dx: CGFloat, dy: CGFloat) in
+            Self.gesture(
+                isOpen: vm.isOpen, offsetFromMidX: offsetFromMidX, distFromTop: distFromTop, dx: dx, dy: dy,
+                notchWidth: vm.notchSize.width, notchHeight: vm.notchSize.height, openWidth: vm.openSize.width,
+                openHeaderHeight: vm.notchSize.height + 30, settings: self.gestureSettings)
+        }
+        guard
+            let gesture = scrollLock.resolve(
+                began: event.phase == .began, isOpen: vm.isOpen, precise: event.hasPreciseScrollingDeltas,
+                now: Date(), dx: dx, dy: dy, classify: classify)
+        else {
+            // Direction not clear yet: hold the event (and the hover-open) instead of guessing.
+            let instant = classify(dx, dy)
+            if !vm.isOpen && instant != .passThrough { vm.suppressOpenForGesture(duration: 1.0) }
+            return instant != .passThrough
+        }
         if gesture == .passThrough { return false }
 
         // ==========================================

@@ -113,6 +113,7 @@ struct HeaderView: View {
                     Toggle("Markets", isOn: $settings.marketsEnabled)
                     Toggle("Dev Tools", isOn: $settings.devToolsEnabled)
                     Toggle("Notes", isOn: $settings.notesTabEnabled)
+                    Toggle("Calculator", isOn: $settings.calcTabEnabled)
                 }
                 Toggle("Desktop Lyrics", isOn: $settings.lyricsOverlayEnabled)
                     .disabled(!settings.lyricsEnabled)

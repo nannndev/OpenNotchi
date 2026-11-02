@@ -106,6 +106,7 @@ enum NotchiBrain {
         bool("devTab", \.devToolsEnabled, "Dev tools tab (ports, color picker)"),
         bool("smarthomeTab", \.smarthomeEnabled, "Smarthome tab"),
         bool("notesTab", \.notesTabEnabled, "Notes tab"),
+        bool("calcTab", \.calcTabEnabled, "Calculator & currency converter tab"),
         bool("prompterTab", \.prompterTabEnabled, "Teleprompter tab"),
         bool("aiAgents", \.aiAgents, "Show coding agent status"),
         bool("aiNotify", \.aiNotify, "Peek when an agent finishes or needs you"),

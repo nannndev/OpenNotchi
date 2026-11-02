@@ -12,6 +12,7 @@ enum NotchTab: String, CaseIterable {
     case markets = "Markets"
     case dev = "Dev"
     case notes = "Notes"
+    case calc = "Calc"
     case ai = "AI"
 
     var icon: String {
@@ -26,6 +27,7 @@ enum NotchTab: String, CaseIterable {
         case .markets: return "chart.line.uptrend.xyaxis"
         case .dev: return "terminal.fill"
         case .notes: return "note.text"
+        case .calc: return "plusminus.circle.fill"
         case .ai: return "sparkles"
         }
     }
@@ -122,6 +124,8 @@ final class NotchViewModel: ObservableObject {
             height = isAiExpanded ? 460 : 340
         } else if tab == .smarthome {
             height = 240
+        } else if tab == .calc {
+            height = 280
         } else {
             height = Self.defaultOpenHeight
         }

@@ -47,6 +47,8 @@ extension MediaProvider {
     @discardableResult
     func tell(_ body: String) -> NSAppleEventDescriptor? {
         guard isRunning else { return nil }
-        return AppleScriptRunner.run("tell application id \"\(id)\"\n\(body)\nend tell")
+        // A busy or hung app would otherwise block the shared script queue for AppleScript's default 2 minutes,
+        // freezing every player (and the buttons) until it gives up.
+        return AppleScriptRunner.run("with timeout of 3 seconds\ntell application id \"\(id)\"\n\(body)\nend tell\nend timeout")
     }
 }

@@ -213,6 +213,35 @@ enum AISelfTest {
         check(g(open: true, x: 0, top: 30, dx: 8, (skip: true, volume: true, brightness: true, tabs: false)) == .passThrough,
               "tabs off: header swipe goes to the view")
 
+        print("Gesture lock")
+        let t0 = Date()
+        func at(_ ms: Double) -> Date { t0.addingTimeInterval(ms / 1000) }
+        let byDirection = { (dx: CGFloat, dy: CGFloat) in g(x: -60, dx: dx, dy: dy) } // left side: volume or skip
+        var lock = NotchScreenManager.GestureLock()
+        check(lock.resolve(began: true, isOpen: false, precise: true, now: at(0), dx: 0, dy: 2, classify: byDirection) == nil,
+              "trackpad: waits for a little travel before deciding")
+        check(lock.resolve(began: false, isOpen: false, precise: true, now: at(16), dx: 0.5, dy: 5, classify: byDirection) == .volume,
+              "vertical start locks volume")
+        check(lock.resolve(began: false, isOpen: false, precise: true, now: at(32), dx: 9, dy: 0, classify: byDirection) == .volume,
+              "sideways drift mid-scroll stays volume, no track skip")
+        check(lock.resolve(began: true, isOpen: false, precise: true, now: at(100), dx: 8, dy: 0, classify: byDirection) == .skipTrack,
+              "new scroll decides again")
+        check(lock.resolve(began: false, isOpen: false, precise: true, now: at(600), dx: 0, dy: 8, classify: byDirection) == .volume,
+              "a pause ends the old scroll")
+        check(lock.resolve(began: false, isOpen: true, precise: true, now: at(616), dx: 8, dy: 0, classify: byDirection) == .skipTrack,
+              "opening the notch ends the old scroll")
+        var wheel = NotchScreenManager.GestureLock()
+        check(wheel.resolve(began: false, isOpen: false, precise: false, now: at(0), dx: 0, dy: 1, classify: byDirection) == .volume,
+              "mouse wheel decides on the first tick")
+
+        print("Spotify on other devices")
+        let remote = NowPlayingInfo(title: "Song", artist: "A", album: "B", duration: 200, position: 10, isPlaying: true,
+                                    sourceID: SpotifyWebProvider.providerID)
+        check(SpotifyWebProvider.fresh(remote, lastAnswer: now.addingTimeInterval(-5), now: now) == remote,
+              "recent answer is shown")
+        check(SpotifyWebProvider.fresh(remote, lastAnswer: now.addingTimeInterval(-30), now: now) == nil,
+              "no answer for 30s: stale track dropped, not stuck playing")
+
         print("Live crypto")
         check(MarketManager.binancePair(for: "BTC-USD") == "BTCUSDT", "BTC-USD → BTCUSDT")
         check(MarketManager.binancePair(for: "BBCA.JK") == nil && MarketManager.binancePair(for: "^JKSE") == nil,

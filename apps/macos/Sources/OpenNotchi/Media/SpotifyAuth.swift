@@ -41,6 +41,9 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
         if AppSettings.shared.spotifyRemoteEnabled {
             tokens = Keychain.load()
             isLoggedIn = tokens != nil
+            if tokens == nil, UserDefaults.standard.string(forKey: "spotifyAccountName") != nil {
+                NSLog("OpenNotchi Spotify: account name saved but no tokens in the Keychain")
+            }
         }
         accountName = UserDefaults.standard.string(forKey: "spotifyAccountName")
     }
@@ -207,6 +210,7 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
                 self.store(refreshed)
             } else if isRevoked {
                 // Only disconnect if Spotify explicitly confirmed the refresh token is revoked/invalid.
+                NSLog("OpenNotchi Spotify: refresh token rejected (invalid_grant), disconnecting")
                 self.disconnect()
             }
             self.lock.lock()
@@ -286,11 +290,14 @@ final class SpotifyAuth: NSObject, ObservableObject, ASWebAuthenticationPresenta
         static func save(_ tokens: Tokens) {
             guard let data = try? JSONEncoder().encode(tokens) else { return }
             let attributes = [kSecValueData as String: data]
-            if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecItemNotFound {
+            var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+            if status == errSecItemNotFound {
                 var q = query
                 q[kSecValueData as String] = data
-                SecItemAdd(q as CFDictionary, nil)
+                status = SecItemAdd(q as CFDictionary, nil)
             }
+            // A failed save used to be silent: connected until the next launch, then quietly logged out.
+            if status != errSecSuccess { NSLog("OpenNotchi Spotify: Keychain save failed (\(status))") }
         }
 
         static func delete() {

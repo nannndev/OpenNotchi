@@ -4,6 +4,20 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.19.0] - 2026-11-02
+
+### Added
+- **Smart Calculator tab (macOS)**: type math or everyday phrases and get the answer as you type. Handles percent phrases ("15% dari 200rb", "diskon 30% dari 1,5jt", "200rb + ppn 11%"), Indonesian shorthand (rb, jt, m), and live currency conversion ("100 usd to idr") with a live rate board against IDR. Also converts units (length, weight, temperature, data, time, volume, speed, area) and does date maths ("hari sampai 25 des", "30 hari lagi", "umur 1999-05-10"). Comes with a Basic / Scientific keypad.
+- **Proper notes (macOS)**: the Notes tab now holds many notes, with search, pinning and delete. Notes are saved to Application Support, and the old scratchpad is moved over automatically.
+
+### Changed
+- `200 + 10%` in the calculator now gives 220, the same as a phone calculator.
+
+### Fixed
+- **Notch gestures (macOS)**: one scroll now does one thing. A volume or brightness scroll that drifts sideways no longer skips the track or switches tabs, and a tab swipe that drifts down no longer changes the volume.
+- **Now playing stuck (macOS)**: Spotify on other devices no longer keeps showing the last track forever after a dropped connection or rate limit, and polling backs off when Spotify asks it to. A busy or hung music app can no longer freeze every player and the playback buttons for up to two minutes.
+- **Spotify login diagnostics (macOS)**: a failed Keychain save or an automatic sign-out is now written to the log instead of passing silently.
+
 ## [0.18.0] - 2026-10-30
 
 ### Fixed
