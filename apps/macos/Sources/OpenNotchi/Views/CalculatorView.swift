@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// Type math ("2jt*12%", "sqrt(2)") or a conversion ("100 usd to idr"); the answer updates as you type.

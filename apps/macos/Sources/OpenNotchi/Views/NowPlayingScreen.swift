@@ -4,7 +4,7 @@ import IOKit.pwr_mgt
 import SwiftUI
 
 enum NowPlayingBackground: String, CaseIterable, Identifiable {
-    case blur, aurora, gradient, vinyl, black
+    case blur, aurora, gradient, vinyl, mirror, black
     var id: String { rawValue }
     var icon: String {
         switch self {
@@ -12,6 +12,7 @@ enum NowPlayingBackground: String, CaseIterable, Identifiable {
         case .aurora: return "sparkles"
         case .gradient: return "circle.lefthalf.filled"
         case .vinyl: return "opticaldisc"
+        case .mirror: return "video.fill"
         case .black: return "moon.fill"
         }
     }
@@ -26,9 +27,15 @@ enum NowPlayingBackground: String, CaseIterable, Identifiable {
         case .aurora: return "Aurora (moving album colors)"
         case .gradient: return "Album color gradient"
         case .vinyl: return "Spinning record"
+        case .mirror: return "Live camera mirror"
         case .black: return "Black"
         }
     }
+}
+
+extension Notification.Name {
+    static let toggleNowPlayingMirror = Notification.Name("io.github.opennotchi.toggleNowPlayingMirror")
+    static let captureNowPlayingPhoto = Notification.Name("io.github.opennotchi.captureNowPlayingPhoto")
 }
 
 /// Full-screen "now playing": blurred artwork backdrop, big cover, synced lyrics with optional translation.
@@ -107,9 +114,24 @@ final class NowPlayingScreenController {
         IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn),
                                     "OpenNotchi full-screen player" as CFString, &displayAssertion)
 
-        // Space / arrows control playback, T translation, L lyrics, B background, any other key (Esc) closes.
+        // Space / arrows control playback, T translation, L lyrics, B background, M mirror, C capture, any other key (Esc) closes.
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+            if let chars = event.charactersIgnoringModifiers?.lowercased() {
+                switch chars {
+                case " ": self.media.playPause(); return nil
+                case "t": self.settings.lyricsTranslate.toggle(); return nil
+                case "l": self.settings.nowPlayingScreenLyrics.toggle(); return nil
+                case "b": self.settings.nowPlayingScreenBackground = self.settings.nowPlayingScreenBackground.next; return nil
+                case "m":
+                    NotificationCenter.default.post(name: .toggleNowPlayingMirror, object: nil)
+                    return nil
+                case "c":
+                    NotificationCenter.default.post(name: .captureNowPlayingPhoto, object: nil)
+                    return nil
+                default: break
+                }
+            }
             switch event.keyCode {
             case 49: self.media.playPause()            // Space
             case 124: self.media.nextTrack()           // →
@@ -117,6 +139,8 @@ final class NowPlayingScreenController {
             case 17: self.settings.lyricsTranslate.toggle() // T
             case 37: self.settings.nowPlayingScreenLyrics.toggle() // L
             case 11: self.settings.nowPlayingScreenBackground = self.settings.nowPlayingScreenBackground.next // B
+            case 46: NotificationCenter.default.post(name: .toggleNowPlayingMirror, object: nil) // M
+            case 8:  NotificationCenter.default.post(name: .captureNowPlayingPhoto, object: nil) // C
             default: self.hide()
             }
             return nil
@@ -147,6 +171,9 @@ private struct NowPlayingScreenView: View {
     let onClose: () -> Void
     @State private var controlsVisible = true
     @State private var hideControls: Task<Void, Never>?
+    @State private var isFlashing = false
+    @State private var toastMessage: String?
+    @State private var showMirrorBar = false
 
     private var tint: Color { media.palette?.accent ?? .white }
 
@@ -184,6 +211,40 @@ private struct NowPlayingScreenView: View {
                     .padding(.trailing, 44)
                     .frame(width: size.width, height: size.height, alignment: .topTrailing)
             }
+
+            // Floating mirror adjustment & capture bar
+            if showMirrorBar || (controlsVisible && (settings.nowPlayingCoverMirror || settings.nowPlayingScreenBackground == .mirror)) {
+                mirrorBar
+                    .padding(.bottom, 26)
+                    .frame(width: size.width, height: size.height, alignment: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            // White shutter flash effect on capture
+            if isFlashing {
+                Color.white
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+
+            // Top notification pill for capture & actions
+            if let toast = toastMessage {
+                HStack(spacing: 8) {
+                    Image(systemName: "camera.fill")
+                        .foregroundStyle(tint)
+                    Text(toast)
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 1))
+                .shadow(color: .black.opacity(0.4), radius: 14, y: 6)
+                .padding(.top, 40)
+                .frame(width: size.width, height: size.height, alignment: .top)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
         .frame(width: size.width, height: size.height)
         .background { backdrop.frame(width: size.width, height: size.height).clipped() }
@@ -191,10 +252,18 @@ private struct NowPlayingScreenView: View {
         .contentShape(Rectangle())
         .onContinuousHover { _ in poke() }
         .onAppear(perform: poke)
+        .onReceive(NotificationCenter.default.publisher(for: .toggleNowPlayingMirror)) { _ in
+            toggleMirrorMode()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .captureNowPlayingPhoto)) { _ in
+            capturePhoto()
+        }
         .animation(.easeInOut(duration: 0.4), value: controlsVisible)
         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: showLyrics)
         .animation(.easeInOut(duration: 0.4), value: settings.nowPlayingScreenClock)
         .animation(.easeInOut(duration: 0.8), value: settings.nowPlayingScreenBackground)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showMirrorBar)
+        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: toastMessage)
     }
 
     /// Cover, title, progress and controls, centered as one column.
@@ -245,6 +314,45 @@ private struct NowPlayingScreenView: View {
                 LinearGradient(colors: [primary.opacity(0.85), secondary.opacity(0.7), .black], startPoint: .topLeading, endPoint: .bottomTrailing)
             case .vinyl:
                 vinylBackdrop(primary)
+            case .mirror:
+                ZStack {
+                    CameraPreview(
+                        effect: .natural,
+                        ringLight: false,
+                        background: .none,
+                        cameraID: settings.mirrorCameraID
+                    )
+                    .blur(radius: CGFloat(settings.nowPlayingMirrorBlur))
+                    .scaleEffect(settings.nowPlayingMirrorBlur > 0 ? 1.06 : 1.0)
+                    .clipped()
+
+                    if settings.nowPlayingCoverSilhouette, let art = media.artwork {
+                        GeometryReader { g in
+                            let d = min(g.size.width, g.size.height) * 0.72
+                            ZStack {
+                                Image(nsImage: art)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: d, height: d)
+                                    .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+                                    .blur(radius: 14)
+                                    .opacity(0.22)
+                                    .blendMode(.plusLighter)
+
+                                Circle()
+                                    .strokeBorder(Color.white.opacity(0.06), lineWidth: 1.5)
+                                    .frame(width: d * 1.08, height: d * 1.08)
+                            }
+                            .position(x: g.size.width * (settings.nowPlayingScreenLyrics ? 0.38 : 0.5), y: g.size.height * 0.5)
+                        }
+                    }
+
+                    LinearGradient(
+                        colors: [primary.opacity(0.35), .black.opacity(0.55), .black.opacity(0.72)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
             case .black:
                 EmptyView()
             }
@@ -295,7 +403,40 @@ private struct NowPlayingScreenView: View {
 
     private func cover(size: CGFloat) -> some View {
         Group {
-            if let art = media.artwork {
+            if settings.nowPlayingCoverMirror {
+                ZStack(alignment: .bottomTrailing) {
+                    CameraPreview(
+                        effect: .natural,
+                        ringLight: false,
+                        background: .none,
+                        cameraID: settings.mirrorCameraID
+                    )
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.18), lineWidth: 1.5)
+                    )
+
+                    if let art = media.artwork {
+                        HStack(spacing: 5) {
+                            Image(nsImage: art)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 28, height: 28)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            Image(systemName: "music.note")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(5)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 0.8))
+                        .shadow(color: .black.opacity(0.35), radius: 5)
+                        .padding(12)
+                    }
+                }
+            } else if let art = media.artwork {
                 Image(nsImage: art).resizable().aspectRatio(contentMode: .fill)
             } else {
                 ZStack { Color.white.opacity(0.08); Image(systemName: "music.note").font(.system(size: 60)).foregroundStyle(.white.opacity(0.4)) }
@@ -306,7 +447,7 @@ private struct NowPlayingScreenView: View {
         .shadow(color: .black.opacity(0.5), radius: 40, y: 20)
         .scaleEffect(media.info?.isPlaying == true ? 1 : 0.92)
         .animation(.spring(response: 0.6, dampingFraction: 0.7), value: media.info?.isPlaying)
-        .id(media.info?.trackKey)
+        .id(settings.nowPlayingCoverMirror ? "mirror-cover" : (media.info?.trackKey ?? "default"))
         .transition(.scale(scale: 0.9).combined(with: .opacity))
     }
 
@@ -344,17 +485,36 @@ private struct NowPlayingScreenView: View {
                     .help("Next (→)")
             }
             // Extras fade out when the mouse rests, the transport stays.
-            HStack(spacing: 22) {
+            HStack(spacing: 20) {
                 button("shuffle", 15, on: info.isShuffled ?? false) { media.toggleShuffle() }
                     .help("Shuffle")
                 button("quote.bubble", 15, on: settings.nowPlayingScreenLyrics) { settings.nowPlayingScreenLyrics.toggle() }
-                    .help("Lyrics")
+                    .help("Lyrics (L)")
                 button("character.bubble", 15, on: settings.lyricsTranslate) { settings.lyricsTranslate.toggle() }
                     .help("Translate lyrics (T)")
                 button(settings.nowPlayingScreenBackground.icon, 15) {
                     withAnimation(.easeInOut(duration: 0.8)) { settings.nowPlayingScreenBackground = settings.nowPlayingScreenBackground.next }
                 }
                 .help("Background: \(settings.nowPlayingScreenBackground.displayName) (B)")
+
+                // Mirror mode toggle & options (Cover / Background)
+                button(
+                    settings.nowPlayingCoverMirror ? "person.crop.square.fill" : (settings.nowPlayingScreenBackground == .mirror ? "video.fill" : "video"),
+                    15,
+                    on: settings.nowPlayingCoverMirror || settings.nowPlayingScreenBackground == .mirror
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        showMirrorBar.toggle()
+                    }
+                }
+                .help("Mirror mode options: Cover & Background (M)")
+
+                // Capture photo button
+                button("camera.fill", 15) {
+                    capturePhoto()
+                }
+                .help("Capture photo (C)")
+
                 button("repeat", 15, on: info.isRepeating ?? false) { media.toggleRepeat() }
                     .help("Repeat")
                 button("xmark", 14) { onClose() }
@@ -363,6 +523,203 @@ private struct NowPlayingScreenView: View {
             .opacity(controlsVisible ? 0.9 : 0)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var mirrorBar: some View {
+        HStack(spacing: 14) {
+            // Mode selector chips
+            HStack(spacing: 4) {
+                mirrorModeChip(
+                    title: "Off",
+                    icon: "camera.badge.ellipsis",
+                    active: !settings.nowPlayingCoverMirror && settings.nowPlayingScreenBackground != .mirror
+                ) {
+                    withAnimation(.spring(response: 0.3)) {
+                        settings.nowPlayingCoverMirror = false
+                        if settings.nowPlayingScreenBackground == .mirror {
+                            settings.nowPlayingScreenBackground = .blur
+                        }
+                    }
+                }
+                mirrorModeChip(
+                    title: "Cover Mirror",
+                    icon: "person.crop.square",
+                    active: settings.nowPlayingCoverMirror
+                ) {
+                    withAnimation(.spring(response: 0.3)) {
+                        settings.nowPlayingCoverMirror.toggle()
+                        if settings.nowPlayingCoverMirror && settings.nowPlayingScreenBackground == .mirror {
+                            settings.nowPlayingScreenBackground = .blur
+                        }
+                    }
+                }
+                mirrorModeChip(
+                    title: "Background Mirror",
+                    icon: "video.fill",
+                    active: settings.nowPlayingScreenBackground == .mirror
+                ) {
+                    withAnimation(.spring(response: 0.3)) {
+                        if settings.nowPlayingScreenBackground == .mirror {
+                            settings.nowPlayingScreenBackground = .blur
+                        } else {
+                            settings.nowPlayingScreenBackground = .mirror
+                            settings.nowPlayingCoverMirror = false
+                        }
+                    }
+                }
+            }
+
+            if settings.nowPlayingScreenBackground == .mirror {
+                Divider().frame(height: 16).background(.white.opacity(0.25))
+
+                // Blur settings
+                HStack(spacing: 6) {
+                    Text("Blur:").font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.65))
+                    ForEach([0.0, 15.0, 30.0, 60.0], id: \.self) { b in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                settings.nowPlayingMirrorBlur = b
+                            }
+                        } label: {
+                            Text("\(Int(b))px")
+                                .font(.system(size: 11, weight: settings.nowPlayingMirrorBlur == b ? .bold : .medium))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(
+                                    settings.nowPlayingMirrorBlur == b ? tint.opacity(0.35) : .white.opacity(0.08),
+                                    in: RoundedRectangle(cornerRadius: 6)
+                                )
+                                .foregroundStyle(settings.nowPlayingMirrorBlur == b ? .white : .white.opacity(0.8))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Divider().frame(height: 16).background(.white.opacity(0.25))
+
+                // Silhouette toggle
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        settings.nowPlayingCoverSilhouette.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: settings.nowPlayingCoverSilhouette ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 11))
+                        Text("Siluet Cover")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(settings.nowPlayingCoverSilhouette ? tint.opacity(0.2) : .white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+                    .foregroundStyle(settings.nowPlayingCoverSilhouette ? tint : .white.opacity(0.75))
+                }
+                .buttonStyle(.plain)
+            }
+
+            Divider().frame(height: 16).background(.white.opacity(0.25))
+
+            // Shutter capture button
+            Button {
+                capturePhoto()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("Capture (C)")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(tint, in: Capsule())
+                .foregroundStyle(.black)
+                .shadow(color: tint.opacity(0.4), radius: 6, y: 2)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1))
+        .shadow(color: .black.opacity(0.45), radius: 14, y: 7)
+    }
+
+    private func mirrorModeChip(title: String, icon: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                Text(title)
+                    .font(.system(size: 11, weight: active ? .bold : .medium))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3.5)
+            .background(active ? tint.opacity(0.3) : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .foregroundStyle(active ? .white : .white.opacity(0.75))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggleMirrorMode() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            if !settings.nowPlayingCoverMirror && settings.nowPlayingScreenBackground != .mirror {
+                settings.nowPlayingCoverMirror = true
+            } else if settings.nowPlayingCoverMirror {
+                settings.nowPlayingCoverMirror = false
+                settings.nowPlayingScreenBackground = .mirror
+            } else {
+                settings.nowPlayingCoverMirror = false
+                settings.nowPlayingScreenBackground = .blur
+            }
+        }
+    }
+
+    @MainActor
+    private func capturePhoto() {
+        NSSound(named: "Glass")?.play()
+
+        withAnimation(.easeOut(duration: 0.1)) { isFlashing = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+            withAnimation(.easeOut(duration: 0.3)) { isFlashing = false }
+        }
+
+        guard let window = NSApp.windows.first(where: { $0 is NowPlayingWindow }) else { return }
+        let windowID = CGWindowID(window.windowNumber)
+
+        var capturedImage: CGImage? = CGWindowListCreateImage(
+            .null,
+            .optionIncludingWindow,
+            windowID,
+            [.boundsIgnoreFraming, .bestResolution]
+        )
+
+        if capturedImage == nil, let contentView = window.contentView {
+            let bounds = contentView.bounds
+            if let rep = contentView.bitmapImageRepForCachingDisplay(in: bounds) {
+                contentView.cacheDisplay(in: bounds, to: rep)
+                capturedImage = rep.cgImage
+            }
+        }
+
+        guard let cg = capturedImage else { return }
+
+        let songTitle = media.info?.title ?? "Music"
+        if let _ = MirrorPhotos.save(cg, name: "NowPlaying – \(songTitle)") {
+            let nsImage = NSImage(cgImage: cg, size: window.frame.size)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.writeObjects([nsImage])
+
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                toastMessage = "📸 Photo saved & copied to clipboard!"
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    if toastMessage == "📸 Photo saved & copied to clipboard!" {
+                        toastMessage = nil
+                    }
+                }
+            }
+        }
     }
 
     private func button(_ icon: String, _ size: CGFloat, on: Bool = false, action: @escaping () -> Void) -> some View {

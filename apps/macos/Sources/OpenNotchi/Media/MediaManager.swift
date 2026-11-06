@@ -9,19 +9,25 @@ final class MediaManager: ObservableObject {
     }
     @Published private(set) var palette: ArtworkPalette?
 
+    private let appleMusicProvider = AppleMusicProvider()
+    private let spotifyProvider = SpotifyProvider()
+    private let spotifyWebProvider = SpotifyWebProvider()
+
     // Order matters: when several report the same state, the earlier one wins.
-    let providers: [MediaProvider] = [AppleMusicProvider(), SpotifyProvider()] + BrowserYouTubeProvider.all + [SpotifyWebProvider()]
+    lazy var providers: [MediaProvider] = [appleMusicProvider, spotifyProvider] + BrowserYouTubeProvider.all + [spotifyWebProvider]
 
     private let settings: AppSettings
     private var timer: Timer?
     private var isRefreshing = false
+    private var lastRefreshStarted: Date?
     private var activeProviderID: String?
     private var artworkKey: String?
 
     init(settings: AppSettings) {
         self.settings = settings
 
-        for provider in providers {
+        let allProviders: [MediaProvider] = [appleMusicProvider, spotifyProvider] + BrowserYouTubeProvider.all + [spotifyWebProvider]
+        for provider in allProviders {
             guard let name = provider.notificationName else { continue }
             DistributedNotificationCenter.default().addObserver(
                 self,
@@ -52,7 +58,9 @@ final class MediaManager: ObservableObject {
     }
 
     @objc private func playerStateChanged() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.refresh() }
+        // Break any pending lock so track transitions and notifications are never missed
+        isRefreshing = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.refresh() }
     }
 
     /// Demo content for screenshots and recordings (no real cover art or tracks).
@@ -106,18 +114,63 @@ final class MediaManager: ObservableObject {
 
     func refresh() {
         guard !isDemo else { return }
-        guard !isRefreshing else { return }
-        let candidates = providers.filter { settings.isProviderEnabled($0.id) && $0.isRunning }
-        guard !candidates.isEmpty else {
+        if isRefreshing {
+            // Watchdog: break lock if refresh has been running for > 2.5 seconds
+            if let started = lastRefreshStarted, Date().timeIntervalSince(started) > 2.5 {
+                isRefreshing = false
+            } else {
+                return
+            }
+        }
+
+        let nativeProviders: [MediaProvider] = [spotifyProvider, appleMusicProvider]
+        let enabledNative = nativeProviders.filter {
+            settings.isProviderEnabled($0.id) && $0.isRunning
+        }
+        let enabledBrowsers: [MediaProvider] = BrowserYouTubeProvider.all.filter {
+            settings.isProviderEnabled($0.id) && $0.isRunning
+        }
+        let webRunning = settings.isProviderEnabled(spotifyWebProvider.id) && spotifyWebProvider.isRunning
+
+        guard !enabledNative.isEmpty || !enabledBrowsers.isEmpty || webRunning else {
             apply([])
             return
         }
+
         isRefreshing = true
+        lastRefreshStarted = Date()
+
         AppleScriptRunner.queue.async { [weak self] in
-            let results = candidates.compactMap { $0.fetch() }
+            guard let self else { return }
+            var results: [NowPlayingInfo] = []
+
+            // FAST PATH: Query native desktop music apps (Spotify and Apple Music) first
+            for native in enabledNative {
+                if let info = native.fetch() {
+                    results.append(info)
+                }
+            }
+
+            // If a native player is already playing, skip browser tabs entirely to prevent hangs and lag
+            let hasActiveNative = results.contains(where: \.isPlaying)
+            if !hasActiveNative {
+                for browser in enabledBrowsers {
+                    if let info = browser.fetch() {
+                        results.append(info)
+                    }
+                }
+            }
+
+            // Check Spotify Web (other devices) if local Spotify isn't playing
+            if webRunning && !hasActiveNative {
+                if let webInfo = self.spotifyWebProvider.fetch() {
+                    results.append(webInfo)
+                }
+            }
+
             DispatchQueue.main.async {
-                self?.isRefreshing = false
-                self?.apply(results)
+                self.isRefreshing = false
+                self.apply(results)
             }
         }
     }

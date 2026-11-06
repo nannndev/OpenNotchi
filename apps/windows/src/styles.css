@@ -6637,3 +6637,201 @@ button:focus-visible {
 .dev-run { width: 100%; }
 .dev-spin { animation: dev-spin 1.2s linear infinite; }
 @keyframes dev-spin { to { transform: rotate(360deg); } }
+
+/* ==========================================================================
+   Full-screen player Mirror Mode & Capture (#nowplaying)
+   ========================================================================== */
+
+.np-cover-mirror {
+  position: relative;
+  background: #000;
+}
+.np-cover-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  border-radius: 22px;
+}
+.np-cover-badge {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.4);
+}
+.np-cover-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.np-backdrop-mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.np-backdrop-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1) scale(1.06);
+  transition: filter 0.3s ease;
+}
+
+.np-silhouette {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.np-silhouette-img {
+  width: min(72vw, 72vh);
+  height: min(72vw, 72vh);
+  object-fit: cover;
+  border-radius: 42px;
+  opacity: 0.22;
+  filter: blur(18px);
+  mix-blend-mode: plus-lighter;
+  transform: translateX(-15%);
+}
+
+.np-mirror-bar {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(18, 18, 22, 0.82);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  animation: np-bar-slide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes np-bar-slide {
+  from { opacity: 0; transform: translate(-50%, 14px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.np-mirror-chips,
+.np-blur-chips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.np-blur-chips span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-right: 2px;
+}
+
+.np-mirror-chip,
+.np-blur-chip {
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  border-radius: 6px;
+  background: transparent;
+  transition: all 0.15s ease;
+}
+.np-mirror-chip:hover,
+.np-blur-chip:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+.np-mirror-chip.active,
+.np-blur-chip.active {
+  color: #fff;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--np-accent) 35%, transparent);
+}
+
+.np-mirror-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.np-silhouette-toggle {
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  transition: all 0.15s ease;
+}
+.np-silhouette-toggle.active {
+  color: var(--np-accent);
+  background: color-mix(in srgb, var(--np-accent) 20%, transparent);
+}
+
+.np-capture-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #000;
+  background: var(--np-accent, #fff);
+  border-radius: 999px;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--np-accent) 40%, transparent);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.np-capture-btn:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+.np-flash {
+  position: fixed;
+  inset: 0;
+  background: #ffffff;
+  pointer-events: none;
+  z-index: 9999;
+  animation: np-flash-anim 0.22s ease-out forwards;
+}
+@keyframes np-flash-anim {
+  from { opacity: 0.9; }
+  to { opacity: 0; }
+}
+
+.np-toast {
+  position: fixed;
+  top: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(20, 20, 24, 0.88);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: np-toast-anim 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes np-toast-anim {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

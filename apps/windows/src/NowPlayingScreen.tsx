@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core"
-import { Captions, Languages, Pause, Play, SkipBack, SkipForward, X } from "lucide-react"
+import { Camera, Captions, Languages, Pause, Play, SkipBack, SkipForward, Video, X } from "lucide-react"
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import { chatAi } from "./tabs/ChatPanel"
 import { currentIndex } from "./lyrics"
 import { control, formatTime, positionAt, useLyrics, useNowPlaying, useTick } from "./media"
 import { useAccent } from "./palette"
+import { savePng } from "./photobox"
 import { NOW_PLAYING_BACKGROUNDS, useSettings, type AppSettings } from "./settings"
 
 const translationCache = new Map<string, Record<string, string>>()
@@ -48,6 +49,58 @@ export function NowPlayingScreen() {
   const scroller = useRef<HTMLDivElement>(null)
   useTick(250)
 
+  const bg = settings.nowPlayingBackground
+  const showLyrics = settings.nowPlayingLyrics
+  const isMirrorActive = settings.nowPlayingCoverMirror || bg === "mirror"
+  const [stream, setStream] = useState<MediaStream | null>(null)
+  const coverVideoRef = useRef<HTMLVideoElement | null>(null)
+  const bgVideoRef = useRef<HTMLVideoElement | null>(null)
+  const [flash, setFlash] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const [showMirrorBar, setShowMirrorBar] = useState(false)
+
+  // Camera stream lifecycle
+  useEffect(() => {
+    if (!isMirrorActive) {
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop())
+        setStream(null)
+      }
+      return
+    }
+    let cancelled = false
+    const videoConstraint = settings.mirrorCameraId
+      ? { deviceId: { exact: settings.mirrorCameraId }, width: 1280, height: 720 }
+      : { width: 1280, height: 720 }
+    navigator.mediaDevices?.getUserMedia({ video: videoConstraint, audio: false })
+      .then((s) => {
+        if (cancelled) {
+          s.getTracks().forEach((t) => t.stop())
+          return
+        }
+        setStream(s)
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [isMirrorActive, settings.mirrorCameraId])
+
+  useEffect(() => {
+    if (coverVideoRef.current && stream) {
+      coverVideoRef.current.srcObject = stream
+      coverVideoRef.current.play().catch(() => {})
+    }
+  }, [stream, settings.nowPlayingCoverMirror])
+
+  useEffect(() => {
+    if (bgVideoRef.current && stream) {
+      bgVideoRef.current.srcObject = stream
+      bgVideoRef.current.play().catch(() => {})
+    }
+  }, [stream, bg])
+
   const close = () => invoke("close_now_playing").catch(() => {})
   const synced = lyrics && lyrics !== "loading" ? lyrics.synced : []
   const translations = useTranslations(np ? `${np.title}\u0000${np.artist}` : "", synced.map((l) => l.text), settings)
@@ -58,6 +111,163 @@ export function NowPlayingScreen() {
     setSettings({ nowPlayingBackground: NOW_PLAYING_BACKGROUNDS[(i + 1) % NOW_PLAYING_BACKGROUNDS.length].id })
   }
   const toggleTranslate = () => setSettings({ lyricsTranslateTarget: settings.lyricsTranslateTarget ? "" : navigator.language.split("-")[0] || "en" })
+
+  const toggleMirrorMode = () => {
+    if (!settings.nowPlayingCoverMirror && bg !== "mirror") {
+      setSettings({ nowPlayingCoverMirror: true })
+    } else if (settings.nowPlayingCoverMirror) {
+      setSettings({ nowPlayingCoverMirror: false, nowPlayingBackground: "mirror" })
+    } else {
+      setSettings({ nowPlayingCoverMirror: false, nowPlayingBackground: "blur" })
+    }
+  }
+
+  const capturePhoto = async () => {
+    setFlash(true)
+    setTimeout(() => setFlash(false), 200)
+
+    try {
+      const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+      const osc = audioCtx.createOscillator()
+      const gain = audioCtx.createGain()
+      osc.type = "sine"
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.08)
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08)
+      osc.connect(gain)
+      gain.connect(audioCtx.destination)
+      osc.start()
+      osc.stop(audioCtx.currentTime + 0.09)
+    } catch {}
+
+    const canvas = document.createElement("canvas")
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    const video = (settings.nowPlayingCoverMirror ? coverVideoRef.current : bgVideoRef.current) || coverVideoRef.current || bgVideoRef.current
+
+    if (settings.nowPlayingCoverMirror && bg !== "mirror") {
+      canvas.width = 1080
+      canvas.height = 1080
+      const grad = ctx.createLinearGradient(0, 0, 1080, 1080)
+      grad.addColorStop(0, "#18181b")
+      grad.addColorStop(1, "#09090b")
+      ctx.fillStyle = grad
+      ctx.fillRect(0, 0, 1080, 1080)
+
+      if (video && video.videoWidth) {
+        ctx.save()
+        const cx = 140, cy = 120, cw = 800, ch = 800
+        ctx.beginPath()
+        ctx.roundRect(cx, cy, cw, ch, 48)
+        ctx.clip()
+        ctx.translate(cx + cw, cy)
+        ctx.scale(-1, 1)
+        ctx.drawImage(video, 0, 0, cw, ch)
+        ctx.restore()
+
+        ctx.save()
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)"
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.roundRect(cx, cy, cw, ch, 48)
+        ctx.stroke()
+        ctx.restore()
+      }
+
+      ctx.fillStyle = "#ffffff"
+      ctx.font = "bold 44px 'Segoe UI', system-ui, sans-serif"
+      ctx.fillText(np ? np.title : "Music", 140, 980)
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.7)"
+      ctx.font = "500 28px 'Segoe UI', system-ui, sans-serif"
+      ctx.fillText(np ? np.artist : "", 140, 1024)
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.4)"
+      ctx.font = "600 22px 'Segoe UI', system-ui, sans-serif"
+      ctx.textAlign = "right"
+      ctx.fillText("OpenNotchi", 940, 1024)
+    } else {
+      canvas.width = 1920
+      canvas.height = 1080
+      ctx.fillStyle = "#000000"
+      ctx.fillRect(0, 0, 1920, 1080)
+
+      if (video && video.videoWidth) {
+        ctx.save()
+        if (settings.nowPlayingMirrorBlur > 0) {
+          ctx.filter = `blur(${settings.nowPlayingMirrorBlur * 1.5}px)`
+        }
+        ctx.translate(1920, 0)
+        ctx.scale(-1, 1)
+        ctx.drawImage(video, 0, 0, 1920, 1080)
+        ctx.restore()
+        ctx.filter = "none"
+      }
+
+      const shade = ctx.createLinearGradient(0, 0, 0, 1080)
+      shade.addColorStop(0, "rgba(0, 0, 0, 0.35)")
+      shade.addColorStop(0.7, "rgba(0, 0, 0, 0.65)")
+      shade.addColorStop(1, "rgba(0, 0, 0, 0.85)")
+      ctx.fillStyle = shade
+      ctx.fillRect(0, 0, 1920, 1080)
+
+      if (settings.nowPlayingCoverSilhouette && np?.artwork) {
+        try {
+          const img = new Image()
+          img.crossOrigin = "anonymous"
+          img.src = np.artwork
+          await new Promise((res) => { img.onload = res; img.onerror = res })
+          if (img.width) {
+            ctx.save()
+            ctx.globalAlpha = 0.22
+            ctx.filter = "blur(20px)"
+            ctx.drawImage(img, 120, 180, 720, 720)
+            ctx.restore()
+            ctx.filter = "none"
+          }
+        } catch {}
+      }
+
+      ctx.fillStyle = "#ffffff"
+      ctx.font = "bold 56px 'Segoe UI', system-ui, sans-serif"
+      ctx.fillText(np ? np.title : "", 160, 480)
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.75)"
+      ctx.font = "500 36px 'Segoe UI', system-ui, sans-serif"
+      ctx.fillText(np ? np.artist : "", 160, 545)
+
+      if (synced.length && current >= 0 && synced[current]) {
+        ctx.fillStyle = "#ffffff"
+        ctx.font = "bold 64px 'Segoe UI', system-ui, sans-serif"
+        const lineText = synced[current].text
+        ctx.fillText(lineText, 980, 520)
+
+        const trans = settings.lyricsTranslateTarget ? translations[lineText] : ""
+        if (trans) {
+          ctx.fillStyle = accent || "#38bdf8"
+          ctx.font = "600 38px 'Segoe UI', system-ui, sans-serif"
+          ctx.fillText(trans, 980, 580)
+        }
+      }
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.5)"
+      ctx.font = "600 24px 'Segoe UI', system-ui, sans-serif"
+      ctx.fillText("OpenNotchi", 160, 960)
+    }
+
+    const title = np ? np.title.replace(/[\\/:*?"<>|]/g, "") : "Music"
+    await savePng(canvas, `NowPlaying - ${title}`)
+    try {
+      canvas.toBlob((blob) => {
+        if (blob) navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+      }, "image/png")
+    } catch {}
+
+    setToast("📸 Photo saved & copied to clipboard!")
+    setTimeout(() => setToast(null), 3000)
+  }
 
   const poke = () => {
     setControlsVisible(true)
@@ -73,13 +283,15 @@ export function NowPlayingScreen() {
       else if (e.key.toLowerCase() === "t") toggleTranslate()
       else if (e.key.toLowerCase() === "l") setSettings({ nowPlayingLyrics: !settings.nowPlayingLyrics })
       else if (e.key.toLowerCase() === "b") nextBackground()
+      else if (e.key.toLowerCase() === "m") toggleMirrorMode()
+      else if (e.key.toLowerCase() === "c") capturePhoto()
       else close()
       e.preventDefault()
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings])
+  }, [settings, current, synced, translations, bg, np])
 
   // Keep the current line about a third of the way down.
   useEffect(() => {
@@ -87,8 +299,6 @@ export function NowPlayingScreen() {
     if (el && scroller.current) scroller.current.scrollTo({ top: el.offsetTop - scroller.current.clientHeight * 0.35, behavior: "smooth" })
   }, [current])
 
-  const bg = settings.nowPlayingBackground
-  const showLyrics = settings.nowPlayingLyrics
   return (
     <div className={`np-screen bg-${bg} ${showLyrics ? "" : "no-lyrics"}`} style={{ "--np-accent": accent, "--np-scale": settings.nowPlayingTextScale } as CSSProperties} onMouseMove={poke}>
       <div className="np-backdrop">
@@ -98,6 +308,29 @@ export function NowPlayingScreen() {
             {np?.artwork && <img src={np.artwork} alt="" />}
           </div>
         )}
+        {bg === "mirror" && (
+          <div className="np-backdrop-mirror">
+            <video
+              ref={(el) => {
+                bgVideoRef.current = el
+                if (el && stream && el.srcObject !== stream) {
+                  el.srcObject = stream
+                  el.play().catch(() => {})
+                }
+              }}
+              autoPlay
+              playsInline
+              muted
+              className="np-backdrop-video"
+              style={{ filter: `blur(${settings.nowPlayingMirrorBlur}px)` }}
+            />
+            {settings.nowPlayingCoverSilhouette && np?.artwork && (
+              <div className="np-silhouette">
+                <img src={np.artwork} alt="" className="np-silhouette-img" />
+              </div>
+            )}
+          </div>
+        )}
         {bg !== "black" && bg !== "vinyl" && <div className="np-glow" />}
         <div className="np-shade" />
       </div>
@@ -105,8 +338,33 @@ export function NowPlayingScreen() {
       {np ? (
         <div className="np-layout">
           <div className="np-player">
-            <div className={`np-cover ${np.isPlaying ? "" : "paused"}`}>
-              {np.artwork ? <img src={np.artwork} alt="" key={np.title} /> : <div className="np-cover-empty">♪</div>}
+            <div className={`np-cover ${settings.nowPlayingCoverMirror ? "np-cover-mirror" : ""} ${np.isPlaying ? "" : "paused"}`}>
+              {settings.nowPlayingCoverMirror ? (
+                <>
+                  <video
+                    ref={(el) => {
+                      coverVideoRef.current = el
+                      if (el && stream && el.srcObject !== stream) {
+                        el.srcObject = stream
+                        el.play().catch(() => {})
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="np-cover-video"
+                  />
+                  {np.artwork && (
+                    <div className="np-cover-badge" title={np.title}>
+                      <img src={np.artwork} alt="" />
+                    </div>
+                  )}
+                </>
+              ) : np.artwork ? (
+                <img src={np.artwork} alt="" key={np.title} />
+              ) : (
+                <div className="np-cover-empty">♪</div>
+              )}
             </div>
             <div className="np-title">{np.title}</div>
             <div className="np-artist">{np.artist}</div>
@@ -130,7 +388,18 @@ export function NowPlayingScreen() {
               <button className={showLyrics ? "on" : ""} onClick={() => setSettings({ nowPlayingLyrics: !showLyrics })} title="Lyrics (L)" aria-label="Lyrics"><Captions size={16} /></button>
               <button className={settings.lyricsTranslateTarget ? "on" : ""} onClick={toggleTranslate} title="Translate lyrics (T)" aria-label="Translate lyrics"><Languages size={16} /></button>
               <button onClick={nextBackground} title={`Background: ${NOW_PLAYING_BACKGROUNDS.find((b) => b.id === bg)?.name} (B)`} aria-label="Switch background">
-                {bg === "blur" ? "🖼" : bg === "aurora" ? "✨" : bg === "gradient" ? "◐" : bg === "vinyl" ? "💿" : "🌙"}
+                {bg === "blur" ? "🖼" : bg === "aurora" ? "✨" : bg === "gradient" ? "◐" : bg === "vinyl" ? "💿" : bg === "mirror" ? "📹" : "🌙"}
+              </button>
+              <button
+                className={settings.nowPlayingCoverMirror || bg === "mirror" ? "on" : ""}
+                onClick={() => setShowMirrorBar((v) => !v)}
+                title="Mirror mode options: Cover & Background (M)"
+                aria-label="Mirror mode"
+              >
+                <Video size={16} />
+              </button>
+              <button onClick={capturePhoto} title="Capture photo (C)" aria-label="Capture photo">
+                <Camera size={16} />
               </button>
               <button onClick={close} title="Close (Esc)" aria-label="Close"><X size={16} /></button>
             </div>
@@ -171,6 +440,70 @@ export function NowPlayingScreen() {
         </div>
       ) : (
         <div className="np-nothing">Nothing playing</div>
+      )}
+
+      {(showMirrorBar || (controlsVisible && (settings.nowPlayingCoverMirror || bg === "mirror"))) && (
+        <div className="np-mirror-bar">
+          <div className="np-mirror-chips">
+            <button
+              className={`np-mirror-chip ${!settings.nowPlayingCoverMirror && bg !== "mirror" ? "active" : ""}`}
+              onClick={() => setSettings({ nowPlayingCoverMirror: false, nowPlayingBackground: bg === "mirror" ? "blur" : bg })}
+            >
+              Off
+            </button>
+            <button
+              className={`np-mirror-chip ${settings.nowPlayingCoverMirror ? "active" : ""}`}
+              onClick={() => setSettings({ nowPlayingCoverMirror: !settings.nowPlayingCoverMirror, nowPlayingBackground: bg === "mirror" ? "blur" : bg })}
+            >
+              Cover Mirror
+            </button>
+            <button
+              className={`np-mirror-chip ${bg === "mirror" ? "active" : ""}`}
+              onClick={() => setSettings({ nowPlayingCoverMirror: false, nowPlayingBackground: bg === "mirror" ? "blur" : "mirror" })}
+            >
+              Background Mirror
+            </button>
+          </div>
+
+          {bg === "mirror" && (
+            <>
+              <div className="np-mirror-divider" />
+              <div className="np-blur-chips">
+                <span>Blur:</span>
+                {[0, 15, 30, 60].map((b) => (
+                  <button
+                    key={b}
+                    className={`np-blur-chip ${settings.nowPlayingMirrorBlur === b ? "active" : ""}`}
+                    onClick={() => setSettings({ nowPlayingMirrorBlur: b })}
+                  >
+                    {b}px
+                  </button>
+                ))}
+              </div>
+              <div className="np-mirror-divider" />
+              <button
+                className={`np-silhouette-toggle ${settings.nowPlayingCoverSilhouette ? "active" : ""}`}
+                onClick={() => setSettings({ nowPlayingCoverSilhouette: !settings.nowPlayingCoverSilhouette })}
+              >
+                Siluet Cover {settings.nowPlayingCoverSilhouette ? "✓" : ""}
+              </button>
+            </>
+          )}
+
+          <div className="np-mirror-divider" />
+          <button className="np-capture-btn" onClick={capturePhoto}>
+            <Camera size={13} />
+            <span>Capture (C)</span>
+          </button>
+        </div>
+      )}
+
+      {flash && <div className="np-flash" />}
+      {toast && (
+        <div className="np-toast">
+          <Camera size={15} />
+          <span>{toast}</span>
+        </div>
       )}
 
       {settings.nowPlayingClock && <Clock />}

@@ -128,6 +128,12 @@ final class AppSettings: ObservableObject {
     @Published var nowPlayingScreenLyrics: Bool { didSet { defaults.set(nowPlayingScreenLyrics, forKey: "nowPlayingScreenLyrics") } }
     @Published var nowPlayingScreenClock: Bool { didSet { defaults.set(nowPlayingScreenClock, forKey: "nowPlayingScreenClock") } }
     @Published var nowPlayingScreenBackground: NowPlayingBackground { didSet { defaults.set(nowPlayingScreenBackground.rawValue, forKey: "nowPlayingScreenBackground") } }
+    /// Live camera mirror in the album cover during full-screen player.
+    @Published var nowPlayingCoverMirror: Bool { didSet { defaults.set(nowPlayingCoverMirror, forKey: "nowPlayingCoverMirror") } }
+    /// Blur radius for live camera background in full-screen player (0 = crisp, up to 80).
+    @Published var nowPlayingMirrorBlur: Double { didSet { defaults.set(nowPlayingMirrorBlur, forKey: "nowPlayingMirrorBlur") } }
+    /// Ambient silhouette overlay of cover art on top of the live camera background.
+    @Published var nowPlayingCoverSilhouette: Bool { didSet { defaults.set(nowPlayingCoverSilhouette, forKey: "nowPlayingCoverSilhouette") } }
     /// Lyrics text scale, 0.8 (small) to 1.3 (large).
     @Published var nowPlayingScreenTextScale: Double { didSet { defaults.set(nowPlayingScreenTextScale, forKey: "nowPlayingScreenTextScale") } }
     /// Show automatically only on power, so a battery Mac isn't kept awake.
@@ -306,6 +312,9 @@ final class AppSettings: ObservableObject {
             "nowPlayingScreenLyrics": true,
             "nowPlayingScreenClock": true,
             "nowPlayingScreenBackground": "blur",
+            "nowPlayingCoverMirror": false,
+            "nowPlayingMirrorBlur": 24.0,
+            "nowPlayingCoverSilhouette": true,
             "nowPlayingScreenTextScale": 1.0,
             "nowPlayingScreenOnlyCharging": false,
             "nowPlayingScreenDisplay": "main",
@@ -438,6 +447,9 @@ final class AppSettings: ObservableObject {
         nowPlayingScreenLyrics = defaults.bool(forKey: "nowPlayingScreenLyrics")
         nowPlayingScreenClock = defaults.bool(forKey: "nowPlayingScreenClock")
         nowPlayingScreenBackground = NowPlayingBackground(rawValue: defaults.string(forKey: "nowPlayingScreenBackground") ?? "") ?? .blur
+        nowPlayingCoverMirror = defaults.bool(forKey: "nowPlayingCoverMirror")
+        nowPlayingMirrorBlur = defaults.object(forKey: "nowPlayingMirrorBlur") != nil ? defaults.double(forKey: "nowPlayingMirrorBlur") : 24.0
+        nowPlayingCoverSilhouette = defaults.object(forKey: "nowPlayingCoverSilhouette") != nil ? defaults.bool(forKey: "nowPlayingCoverSilhouette") : true
         nowPlayingScreenTextScale = defaults.double(forKey: "nowPlayingScreenTextScale")
         nowPlayingScreenOnlyCharging = defaults.bool(forKey: "nowPlayingScreenOnlyCharging")
         nowPlayingScreenDisplay = defaults.string(forKey: "nowPlayingScreenDisplay") ?? "main"

@@ -88,11 +88,22 @@ final class PortInspector: ObservableObject {
         autoRefreshTimer = nil
     }
 
+    private var isScanning = false
+    private let scanLock = NSLock()
+
     func refresh() {
-        guard !isLoading else { return }
+        let shouldStart: Bool = scanLock.withLock {
+            if isScanning { return false }
+            isScanning = true
+            return true
+        }
+        guard shouldStart else { return }
         isLoading = true
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            defer {
+                self?.scanLock.withLock { self?.isScanning = false }
+            }
             let parsed = self?.scanListeningPorts() ?? []
             DispatchQueue.main.async {
                 self?.ports = parsed
@@ -145,9 +156,16 @@ final class PortInspector: ObservableObject {
 
         do {
             try process.run()
-            process.waitUntilExit()
+            let watchdog = DispatchWorkItem {
+                if process.isRunning { process.terminate() }
+            }
+            DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 2.5, execute: watchdog)
 
+            // CRUCIAL: Read pipe FIRST before waiting to avoid pipe deadlock
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            watchdog.cancel()
+
             guard let output = String(data: data, encoding: .utf8) else { return [] }
 
             var results: [ListeningPort] = []

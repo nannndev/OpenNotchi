@@ -4,6 +4,15 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.20.0] - 2026-11-06
+
+### Added
+- **Live camera mirror in the full-screen player**: a new "Live camera mirror" background (macOS and Windows), with adjustable blur and an optional album-cover silhouette over the camera. The camera can also appear inside the album cover. Press M to toggle it.
+
+### Fixed
+- **Now playing (macOS)**: Spotify and Apple Music on this Mac are read first, and browser tabs and Spotify on other devices are skipped while a desktop player is playing, so the notch follows track changes faster. A stuck refresh is now released after 2.5 seconds instead of blocking updates.
+- **Dev tools (macOS)**: port scans and CI checks no longer pile up or hang. Helper commands are stopped after a few seconds, and polling runs less often.
+
 ## [0.19.0] - 2026-11-02
 
 ### Added

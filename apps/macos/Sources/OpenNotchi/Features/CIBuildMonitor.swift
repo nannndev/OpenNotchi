@@ -128,12 +128,12 @@ final class CIBuildMonitor: ObservableObject {
         scanLocalBuilds()
 
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { [weak self] _ in
             self?.refresh()
         }
 
         localPollTimer?.invalidate()
-        localPollTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
+        localPollTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             self?.scanLocalBuilds()
         }
     }
@@ -169,17 +169,26 @@ final class CIBuildMonitor: ObservableObject {
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
-            let fetchedResult = self.fetchRunsViaGH(repo: repo) ?? self.fetchRunsViaREST(repo: repo)
-            DispatchQueue.main.async {
-                self.isLoading = false
-                switch fetchedResult {
-                case .success(let newRuns):
-                    self.processRunTransitions(newRuns)
-                    self.runs = newRuns
-                    self.lastError = nil
-                case .failure(let err):
-                    self.lastError = err.localizedDescription
+            if let ghResult = self.fetchRunsViaGH(repo: repo) {
+                self.applyRunsResult(ghResult)
+            } else {
+                self.fetchRunsViaREST(repo: repo) { [weak self] restResult in
+                    self?.applyRunsResult(restResult)
                 }
+            }
+        }
+    }
+
+    private func applyRunsResult(_ result: Result<[CIWorkflowRun], Error>) {
+        DispatchQueue.main.async {
+            self.isLoading = false
+            switch result {
+            case .success(let newRuns):
+                self.processRunTransitions(newRuns)
+                self.runs = newRuns
+                self.lastError = nil
+            case .failure(let err):
+                self.lastError = err.localizedDescription
             }
         }
     }
@@ -241,8 +250,21 @@ final class CIBuildMonitor: ObservableObject {
 
     // MARK: - Local Compiler Process Detection
 
+    private static var isScanning = false
+    private static let scanLock = NSLock()
+
     func scanLocalBuilds() {
+        let shouldStart: Bool = Self.scanLock.withLock {
+            if Self.isScanning { return false }
+            Self.isScanning = true
+            return true
+        }
+        guard shouldStart else { return }
+
         DispatchQueue.global(qos: .utility).async { [weak self] in
+            defer {
+                Self.scanLock.withLock { Self.isScanning = false }
+            }
             let detected = Self.fetchLocalBuildProcesses()
             DispatchQueue.main.async {
                 self?.localBuilds = detected
@@ -260,8 +282,16 @@ final class CIBuildMonitor: ObservableObject {
 
         do {
             try proc.run()
-            proc.waitUntilExit()
+            let watchdog = DispatchWorkItem {
+                if proc.isRunning { proc.terminate() }
+            }
+            DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 2.5, execute: watchdog)
+
+            // CRUCIAL: Read data FIRST to drain the pipe buffer completely, avoiding pipe deadlock
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
+            watchdog.cancel()
+
             guard let output = String(data: data, encoding: .utf8) else { return [] }
 
             var results: [LocalBuildProcess] = []
@@ -321,9 +351,16 @@ final class CIBuildMonitor: ObservableObject {
 
         do {
             try proc.run()
-            proc.waitUntilExit()
-            guard proc.terminationStatus == 0 else { return nil }
+            let watchdog = DispatchWorkItem {
+                if proc.isRunning { proc.terminate() }
+            }
+            DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 5.0, execute: watchdog)
+
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
+            watchdog.cancel()
+
+            guard proc.terminationStatus == 0 else { return nil }
             guard let items = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return nil }
 
             let iso = ISO8601DateFormatter()
@@ -356,35 +393,30 @@ final class CIBuildMonitor: ObservableObject {
         }
     }
 
-    private func fetchRunsViaREST(repo: String) -> Result<[CIWorkflowRun], Error> {
+    private func fetchRunsViaREST(repo: String, completion: @escaping (Result<[CIWorkflowRun], Error>) -> Void) {
         guard let url = URL(string: "https://api.github.com/repos/\(repo)/actions/runs?per_page=8") else {
-            return .failure(NSError(domain: "CIBuildMonitor", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid repository slug"]))
+            completion(.failure(NSError(domain: "CIBuildMonitor", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid repository slug"])))
+            return
         }
 
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("OpenNotchi", forHTTPHeaderField: "User-Agent")
 
-        let semaphore = DispatchSemaphore(value: 0)
-        var outcome: Result<[CIWorkflowRun], Error> = .failure(
-            NSError(domain: "CIBuildMonitor", code: -2, userInfo: [NSLocalizedDescriptionKey: "Request timed out"])
-        )
-
         URLSession.shared.dataTask(with: request) { data, response, error in
-            defer { semaphore.signal() }
             if let error {
-                outcome = .failure(error)
+                completion(.failure(error))
                 return
             }
             if let http = response as? HTTPURLResponse, http.statusCode != 200 {
                 let msg = http.statusCode == 404 ? "Repo not found or private (install `gh` CLI for private repos)" : "GitHub API HTTP \(http.statusCode)"
-                outcome = .failure(NSError(domain: "CIBuildMonitor", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: msg]))
+                completion(.failure(NSError(domain: "CIBuildMonitor", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: msg])))
                 return
             }
             guard let data,
                   let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let items = root["workflow_runs"] as? [[String: Any]] else {
-                outcome = .failure(NSError(domain: "CIBuildMonitor", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid response"]))
+                completion(.failure(NSError(domain: "CIBuildMonitor", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])))
                 return
             }
 
@@ -412,11 +444,8 @@ final class CIBuildMonitor: ObservableObject {
                     updatedAt: updatedStr.flatMap { iso.date(from: $0) }
                 )
             }
-            outcome = .success(parsed)
+            completion(.success(parsed))
         }.resume()
-
-        _ = semaphore.wait(timeout: .now() + 11)
-        return outcome
     }
 
     private static func detectDefaultRepo() -> String? {
@@ -428,8 +457,15 @@ final class CIBuildMonitor: ObservableObject {
         proc.standardError = FileHandle.nullDevice
         do {
             try proc.run()
-            proc.waitUntilExit()
+            let watchdog = DispatchWorkItem {
+                if proc.isRunning { proc.terminate() }
+            }
+            DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 2.0, execute: watchdog)
+
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
+            watchdog.cancel()
+
             guard let raw = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !raw.isEmpty else { return nil }
             let slug = cleanRepoSlug(raw)

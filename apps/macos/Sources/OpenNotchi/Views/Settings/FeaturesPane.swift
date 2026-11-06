@@ -344,6 +344,20 @@ struct FeaturesPane: View {
                 Picker("Background style", selection: $settings.nowPlayingScreenBackground) {
                     ForEach(NowPlayingBackground.allCases) { Text($0.displayName).tag($0) }
                 }
+                if settings.nowPlayingScreenBackground == .mirror {
+                    HStack {
+                        Text("Mirror blur")
+                        Spacer()
+                        Slider(value: $settings.nowPlayingMirrorBlur, in: 0...60, step: 5)
+                            .frame(width: 120)
+                        Text("\(Int(settings.nowPlayingMirrorBlur)) px")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                    Toggle("Ambient cover silhouette over camera", isOn: $settings.nowPlayingCoverSilhouette)
+                }
+                Toggle("Live camera mirror in album cover", isOn: $settings.nowPlayingCoverMirror)
                 Toggle("Show synced lyrics", isOn: $settings.nowPlayingScreenLyrics)
                     .disabled(!settings.lyricsEnabled)
                 if settings.nowPlayingScreenLyrics {

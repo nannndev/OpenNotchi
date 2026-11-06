@@ -43,12 +43,13 @@ export const MIRROR_MAX_HEIGHT = 440
 
 export type NotchMode = "pinned" | "floating" | "autoHide"
 
-export type NowPlayingBackground = "blur" | "aurora" | "gradient" | "vinyl" | "black"
+export type NowPlayingBackground = "blur" | "aurora" | "gradient" | "vinyl" | "mirror" | "black"
 export const NOW_PLAYING_BACKGROUNDS: { id: NowPlayingBackground; name: string }[] = [
   { id: "blur", name: "Blurred cover" },
   { id: "aurora", name: "Aurora (moving album colors)" },
   { id: "gradient", name: "Album color gradient" },
   { id: "vinyl", name: "Spinning record" },
+  { id: "mirror", name: "Live Camera Mirror" },
   { id: "black", name: "Black" },
 ]
 
@@ -118,6 +119,9 @@ export interface AppSettings {
   nowPlayingEnabled: boolean
   nowPlayingIdleMinutes: number
   nowPlayingBackground: NowPlayingBackground
+  nowPlayingCoverMirror: boolean
+  nowPlayingMirrorBlur: number
+  nowPlayingCoverSilhouette: boolean
   nowPlayingLyrics: boolean
   nowPlayingClock: boolean
   nowPlayingTextScale: number
@@ -230,6 +234,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   nowPlayingEnabled: true,
   nowPlayingIdleMinutes: 2,
   nowPlayingBackground: "blur",
+  nowPlayingCoverMirror: false,
+  nowPlayingMirrorBlur: 24,
+  nowPlayingCoverSilhouette: true,
   nowPlayingLyrics: true,
   nowPlayingClock: true,
   nowPlayingTextScale: 1,
