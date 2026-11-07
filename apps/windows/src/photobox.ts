@@ -1,19 +1,138 @@
 /** Mirror filters and photobox strip composition (canvas only, no dependencies). Port of macOS PhotoStrip.swift. */
 
-export type MirrorEffect = "natural" | "vivid" | "warm" | "cool" | "film" | "mono" | "dreamy"
+export type MirrorEffect =
+  | "natural"
+  | "glam"
+  | "vivid"
+  | "warm"
+  | "cool"
+  | "sunset"
+  | "cyberpunk"
+  | "y2k"
+  | "matcha"
+  | "film"
+  | "vhs"
+  | "cinema"
+  | "dreamy"
+  | "mono"
+
+export interface CameraAdjustments {
+  mirrorBrightness: number
+  mirrorContrast: number
+  mirrorSaturation: number
+  mirrorWarmth: number
+  mirrorGlow: number
+  mirrorVignette: number
+  mirrorZoom: number
+  mirrorFlipped: boolean
+}
+
+export const DEFAULT_CAMERA_ADJUSTMENTS: CameraAdjustments = {
+  mirrorBrightness: 0,
+  mirrorContrast: 1,
+  mirrorSaturation: 1,
+  mirrorWarmth: 0,
+  mirrorGlow: 0,
+  mirrorVignette: 0,
+  mirrorZoom: 1,
+  mirrorFlipped: true,
+}
+
+export function isCameraAdjusted(adj: Partial<CameraAdjustments>): boolean {
+  return (
+    Math.abs(adj.mirrorBrightness ?? 0) > 0.01 ||
+    Math.abs((adj.mirrorContrast ?? 1) - 1) > 0.01 ||
+    Math.abs((adj.mirrorSaturation ?? 1) - 1) > 0.01 ||
+    Math.abs(adj.mirrorWarmth ?? 0) > 0.01 ||
+    (adj.mirrorGlow ?? 0) > 0.01 ||
+    (adj.mirrorVignette ?? 0) > 0.01 ||
+    (adj.mirrorZoom ?? 1) > 1.01 ||
+    adj.mirrorFlipped === false
+  )
+}
 
 /**
  * CSS filters approximating the macOS Core Image looks; the same string drives the live preview and the canvas.
  * Swatches are the macOS picker colors.
  */
-export const EFFECTS: Record<MirrorEffect, { name: string; filter: string; swatch: string }> = {
-  natural: { name: "Natural", filter: "none", swatch: "linear-gradient(135deg, #d9d9d9, #8c8c8c)" },
-  vivid: { name: "Vivid", filter: "saturate(1.35) contrast(1.08)", swatch: "linear-gradient(135deg, #ff2d55, #ff9500)" },
-  warm: { name: "Warm", filter: "sepia(0.18) saturate(1.15) hue-rotate(-8deg)", swatch: "linear-gradient(135deg, #ff9500, #cc6633)" },
-  cool: { name: "Cool", filter: "saturate(1.05) hue-rotate(12deg) brightness(1.02)", swatch: "linear-gradient(135deg, #32ade6, #007aff)" },
-  film: { name: "Film", filter: "sepia(0.35) contrast(1.1) saturate(0.9)", swatch: "linear-gradient(135deg, #e6cc99, #73594d)" },
-  mono: { name: "Mono", filter: "grayscale(1) contrast(1.15)", swatch: "linear-gradient(135deg, #ffffff, #000000)" },
-  dreamy: { name: "Dreamy", filter: "saturate(0.9) brightness(1.06) blur(0.6px)", swatch: "linear-gradient(135deg, #ffd9f2, #af52de)" },
+export const EFFECTS: Record<MirrorEffect, { name: string; category: string; filter: string; swatch: string; tint?: string }> = {
+  natural: { name: "Natural", category: "Popular", filter: "none", swatch: "linear-gradient(135deg, #d9d9d9, #8c8c8c)" },
+  glam: {
+    name: "Glam",
+    category: "Popular",
+    filter: "brightness(1.06) contrast(1.03) saturate(1.12)",
+    swatch: "linear-gradient(135deg, #ffbfd9, #f280ad)",
+    tint: "rgba(255, 180, 210, 0.08)",
+  },
+  vivid: { name: "Vivid", category: "Popular", filter: "saturate(1.35) contrast(1.08)", swatch: "linear-gradient(135deg, #ff2d55, #ff9500)" },
+  warm: { name: "Golden", category: "Aesthetic", filter: "sepia(0.18) saturate(1.18) hue-rotate(-8deg)", swatch: "linear-gradient(135deg, #ff9500, #cc6633)" },
+  cool: { name: "Arctic", category: "Aesthetic", filter: "saturate(1.08) hue-rotate(12deg) brightness(1.02)", swatch: "linear-gradient(135deg, #32ade6, #007aff)" },
+  sunset: {
+    name: "Sunset",
+    category: "Aesthetic",
+    filter: "sepia(0.22) saturate(1.38) hue-rotate(-14deg) contrast(1.05)",
+    swatch: "linear-gradient(135deg, #ff7359, #d9338c)",
+    tint: "rgba(255, 95, 120, 0.09)",
+  },
+  cyberpunk: {
+    name: "Cyber",
+    category: "Cinema",
+    filter: "saturate(1.45) contrast(1.16) hue-rotate(16deg)",
+    swatch: "linear-gradient(135deg, #ff1abf, #00d9ff)",
+    tint: "rgba(190, 0, 255, 0.10)",
+  },
+  y2k: {
+    name: "Y2K",
+    category: "Vintage",
+    filter: "brightness(1.08) contrast(1.16) saturate(1.26) hue-rotate(6deg)",
+    swatch: "linear-gradient(135deg, #f2a6ff, #7366f2)",
+    tint: "rgba(230, 140, 255, 0.08)",
+  },
+  matcha: {
+    name: "Matcha",
+    category: "Aesthetic",
+    filter: "sepia(0.15) saturate(0.88) hue-rotate(28deg) contrast(0.96) brightness(1.02)",
+    swatch: "linear-gradient(135deg, #9ed194, #52855c)",
+    tint: "rgba(120, 190, 130, 0.08)",
+  },
+  film: { name: "90s Film", category: "Vintage", filter: "sepia(0.35) contrast(1.1) saturate(0.9)", swatch: "linear-gradient(135deg, #e6cc99, #73594d)" },
+  vhs: {
+    name: "VHS",
+    category: "Vintage",
+    filter: "sepia(0.25) contrast(1.12) saturate(1.15) hue-rotate(-6deg)",
+    swatch: "linear-gradient(135deg, #f28c59, #594080)",
+  },
+  cinema: {
+    name: "Cinema",
+    category: "Cinema",
+    filter: "contrast(1.15) saturate(1.12) sepia(0.12) hue-rotate(-5deg)",
+    swatch: "linear-gradient(135deg, #1aa6b8, #eb7a2e)",
+  },
+  dreamy: { name: "Dreamy", category: "Popular", filter: "saturate(0.92) brightness(1.06) blur(0.6px)", swatch: "linear-gradient(135deg, #ffd9f2, #af52de)" },
+  mono: { name: "Noir", category: "Cinema", filter: "grayscale(1) contrast(1.18)", swatch: "linear-gradient(135deg, #ffffff, #000000)" },
+}
+
+/** Builds a combined CSS filter string from the preset effect + real-time adjustments. */
+export function buildCameraFilter(effect: MirrorEffect, adj?: Partial<CameraAdjustments>, extraBlurPx = 0): string {
+  const parts: string[] = []
+  const base = EFFECTS[effect]?.filter
+  if (base && base !== "none") parts.push(base)
+
+  const b = 1 + (adj?.mirrorBrightness ?? 0) * 0.85
+  const c = adj?.mirrorContrast ?? 1
+  const s = adj?.mirrorSaturation ?? 1
+  const w = adj?.mirrorWarmth ?? 0
+  const glow = adj?.mirrorGlow ?? 0
+
+  if (Math.abs(b - 1) > 0.01) parts.push(`brightness(${b.toFixed(2)})`)
+  if (Math.abs(c - 1) > 0.01) parts.push(`contrast(${c.toFixed(2)})`)
+  if (Math.abs(s - 1) > 0.01) parts.push(`saturate(${s.toFixed(2)})`)
+  if (w > 0.02) parts.push(`sepia(${(w * 0.28).toFixed(2)}) hue-rotate(${(-w * 10).toFixed(1)}deg)`)
+  else if (w < -0.02) parts.push(`hue-rotate(${(-w * 16).toFixed(1)}deg)`)
+  if (glow > 0.02) parts.push(`brightness(${(1 + glow * 0.08).toFixed(2)})`)
+  if (extraBlurPx > 0) parts.push(`blur(${extraBlurPx}px)`)
+
+  return parts.length ? parts.join(" ") : "none"
 }
 
 // MARK: - Styles and formats
@@ -214,16 +333,64 @@ export function savePng(canvas: HTMLCanvasElement, name: string): Promise<void> 
   })
 }
 
-/** Grabs the current video frame, mirrored like the preview, with the effect baked in. */
-export function captureFrame(video: HTMLVideoElement, effect: MirrorEffect): HTMLCanvasElement {
+/** Grabs the current video frame, mirrored like the preview, with the effect and adjustments baked in. */
+export function captureFrame(video: HTMLVideoElement, effect: MirrorEffect, adj?: Partial<CameraAdjustments>): HTMLCanvasElement {
   const c = document.createElement("canvas")
-  c.width = video.videoWidth
-  c.height = video.videoHeight
+  const w = video.videoWidth || 1280
+  const h = video.videoHeight || 720
+  c.width = w
+  c.height = h
   const ctx = c.getContext("2d")!
-  ctx.filter = EFFECTS[effect].filter
-  ctx.translate(c.width, 0)
-  ctx.scale(-1, 1)
-  ctx.drawImage(video, 0, 0)
+
+  const zoom = Math.min(2.5, Math.max(1, adj?.mirrorZoom ?? 1))
+  const flipped = adj?.mirrorFlipped ?? true
+  const glow = adj?.mirrorGlow ?? 0
+  const vignette = adj?.mirrorVignette ?? 0
+
+  ctx.save()
+  ctx.filter = buildCameraFilter(effect, adj)
+  if (flipped) {
+    ctx.translate(w, 0)
+    ctx.scale(-1, 1)
+  }
+  const sw = w / zoom
+  const sh = h / zoom
+  const sx = (w - sw) / 2
+  const sy = (h - sh) / 2
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h)
+  ctx.restore()
+
+  // Soft beauty bloom pass
+  if (glow > 0.02) {
+    ctx.save()
+    ctx.globalAlpha = glow * 0.38
+    ctx.globalCompositeOperation = "screen"
+    ctx.filter = `blur(${Math.round(12 + glow * 14)}px)`
+    ctx.drawImage(c, 0, 0)
+    ctx.restore()
+  }
+
+  // Preset tint overlay
+  const tint = EFFECTS[effect]?.tint
+  if (tint) {
+    ctx.save()
+    ctx.fillStyle = tint
+    ctx.fillRect(0, 0, w, h)
+    ctx.restore()
+  }
+
+  // Vignette overlay
+  if (vignette > 0.02) {
+    ctx.save()
+    const r = Math.max(w, h) * 0.72
+    const grad = ctx.createRadialGradient(w / 2, h / 2, r * 0.35, w / 2, h / 2, r)
+    grad.addColorStop(0, "rgba(0,0,0,0)")
+    grad.addColorStop(1, `rgba(0,0,0,${(vignette * 0.72).toFixed(2)})`)
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, w, h)
+    ctx.restore()
+  }
+
   return c
 }
 

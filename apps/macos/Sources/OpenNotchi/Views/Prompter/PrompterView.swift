@@ -38,8 +38,9 @@ struct PrompterView: View {
             // Optional camera rehearsal backdrop
             if settings.prompterShowCameraPreview {
                 CameraPreview(
-                    effect: .natural,
-                    ringLight: false,
+                    effect: settings.mirrorEffect,
+                    adjustments: settings.cameraAdjustments,
+                    ringLight: settings.mirrorRingLight,
                     background: .none,
                     artwork: nil,
                     musicPlaying: false,

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
 import {
   composeStrip,
+  DEFAULT_CAMERA_ADJUSTMENTS,
   stripFontsReady,
   EFFECTS,
+  isCameraAdjusted,
   samplePhotos,
   STRIP_FORMATS,
   STRIP_SHOT_CHOICES,
@@ -144,7 +146,7 @@ export function MirrorSettings() {
           >
             {(Object.keys(EFFECTS) as MirrorEffect[]).map((e) => (
               <option key={e} value={e}>
-                {EFFECTS[e].name}
+                {EFFECTS[e].name} ({EFFECTS[e].category})
               </option>
             ))}
           </select>
@@ -173,6 +175,155 @@ export function MirrorSettings() {
             onChange={(e) => setSettings({ mirrorRingLight: e.target.checked })}
           />
         </div>
+      </div>
+
+      <h2 className="section-title" style={{ marginTop: 28 }}>TikTok Camera Adjustments</h2>
+      <p className="section-desc">Fine-tune beauty glow, lighting, color temperature, vignette and zoom across all camera features.</p>
+      <div className="toggle-list">
+        <div className="toggle-row">
+          <div className="toggle-info">
+            <div className="mirror-adj-row-title">Beauty Glow</div>
+          </div>
+          <div className="mirror-settings-slider">
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.02}
+              value={settings.mirrorGlow ?? 0}
+              onChange={(e) => setSettings({ mirrorGlow: parseFloat(e.target.value) })}
+            />
+            <span>{Math.round((settings.mirrorGlow ?? 0) * 100)}%</span>
+          </div>
+        </div>
+
+        <div className="toggle-row">
+          <div className="toggle-info">
+            <div className="mirror-adj-row-title">Brightness</div>
+          </div>
+          <div className="mirror-settings-slider">
+            <input
+              type="range"
+              min={-0.35}
+              max={0.35}
+              step={0.01}
+              value={settings.mirrorBrightness ?? 0}
+              onChange={(e) => setSettings({ mirrorBrightness: parseFloat(e.target.value) })}
+            />
+            <span>{`${(settings.mirrorBrightness ?? 0) >= 0 ? "+" : ""}${Math.round((settings.mirrorBrightness ?? 0) * 100)}`}</span>
+          </div>
+        </div>
+
+        <div className="toggle-row">
+          <div className="toggle-info">
+            <div className="mirror-adj-row-title">Contrast</div>
+          </div>
+          <div className="mirror-settings-slider">
+            <input
+              type="range"
+              min={0.65}
+              max={1.45}
+              step={0.01}
+              value={settings.mirrorContrast ?? 1}
+              onChange={(e) => setSettings({ mirrorContrast: parseFloat(e.target.value) })}
+            />
+            <span>{Math.round((settings.mirrorContrast ?? 1) * 100)}%</span>
+          </div>
+        </div>
+
+        <div className="toggle-row">
+          <div className="toggle-info">
+            <div className="mirror-adj-row-title">Saturation</div>
+          </div>
+          <div className="mirror-settings-slider">
+            <input
+              type="range"
+              min={0}
+              max={1.8}
+              step={0.02}
+              value={settings.mirrorSaturation ?? 1}
+              onChange={(e) => setSettings({ mirrorSaturation: parseFloat(e.target.value) })}
+            />
+            <span>{Math.round((settings.mirrorSaturation ?? 1) * 100)}%</span>
+          </div>
+        </div>
+
+        <div className="toggle-row">
+          <div className="toggle-info">
+            <div className="mirror-adj-row-title">Warmth</div>
+          </div>
+          <div className="mirror-settings-slider">
+            <input
+              type="range"
+              min={-0.5}
+              max={0.5}
+              step={0.02}
+              value={settings.mirrorWarmth ?? 0}
+              onChange={(e) => setSettings({ mirrorWarmth: parseFloat(e.target.value) })}
+            />
+            <span>{`${(settings.mirrorWarmth ?? 0) >= 0 ? "+" : ""}${Math.round((settings.mirrorWarmth ?? 0) * 100)}`}</span>
+          </div>
+        </div>
+
+        <div className="toggle-row">
+          <div className="toggle-info">
+            <div className="mirror-adj-row-title">Vignette</div>
+          </div>
+          <div className="mirror-settings-slider">
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.02}
+              value={settings.mirrorVignette ?? 0}
+              onChange={(e) => setSettings({ mirrorVignette: parseFloat(e.target.value) })}
+            />
+            <span>{Math.round((settings.mirrorVignette ?? 0) * 100)}%</span>
+          </div>
+        </div>
+
+        <div className="toggle-row">
+          <div className="toggle-info">
+            <div className="mirror-adj-row-title">Zoom</div>
+          </div>
+          <div className="mirror-settings-slider">
+            <input
+              type="range"
+              min={1}
+              max={2}
+              step={0.05}
+              value={settings.mirrorZoom ?? 1}
+              onChange={(e) => setSettings({ mirrorZoom: parseFloat(e.target.value) })}
+            />
+            <span>{(settings.mirrorZoom ?? 1).toFixed(2)}x</span>
+          </div>
+        </div>
+
+        <div className="toggle-row">
+          <div className="toggle-info">
+            <div className="mirror-adj-row-title">Flip Horizontally (Mirror View)</div>
+          </div>
+          <input
+            type="checkbox"
+            className="switch"
+            checked={settings.mirrorFlipped ?? true}
+            onChange={(e) => setSettings({ mirrorFlipped: e.target.checked })}
+          />
+        </div>
+
+        {isCameraAdjusted(settings) && (
+          <div className="toggle-row">
+            <div className="toggle-info">
+              <div className="mirror-adj-row-title">Reset Adjustments</div>
+            </div>
+            <button
+              className="check-update-btn"
+              onClick={() => setSettings(DEFAULT_CAMERA_ADJUSTMENTS)}
+            >
+              Reset to Defaults
+            </button>
+          </div>
+        )}
       </div>
       <p className="section-desc" style={{ marginTop: 8 }}>
         Nothing leaves your PC, and the camera only runs while the Mirror tab is open.

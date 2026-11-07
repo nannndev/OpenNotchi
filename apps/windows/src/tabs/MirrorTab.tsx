@@ -1,27 +1,68 @@
-import { CameraOff, Grid3x3, Lightbulb, LightbulbOff, Pin, PinOff, SwitchCamera, X } from "lucide-react"
+import {
+  CameraOff,
+  FlipHorizontal2,
+  Grid3x3,
+  Lightbulb,
+  LightbulbOff,
+  Pin,
+  PinOff,
+  RotateCcw,
+  SlidersHorizontal,
+  Sparkles,
+  SwitchCamera,
+  Timer,
+  X,
+} from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { positionAt, useNowPlaying } from "../media"
 import {
+  buildCameraFilter,
   captureFrame,
   composeStrip,
+  DEFAULT_CAMERA_ADJUSTMENTS,
   EFFECTS,
+  isCameraAdjusted,
   samplePhotos,
   savePng,
   STRIP_FORMATS,
   STRIP_SHOT_CHOICES,
   STRIP_STYLES,
   stripFontsReady,
+  type CameraAdjustments,
   type MirrorEffect,
   type StripFormat,
   type StripStyle,
 } from "../photobox"
-import { MIRROR_MAX_HEIGHT, MIRROR_MIN_HEIGHT, useSettings } from "../settings"
+import { MIRROR_MAX_HEIGHT, MIRROR_MIN_HEIGHT, useSettings, type AppSettings } from "../settings"
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+type AdjKey = "brightness" | "glow" | "contrast" | "saturation" | "warmth" | "vignette" | "zoom"
+
+interface AdjDef {
+  key: AdjKey
+  settingKey: keyof AppSettings
+  label: string
+  min: number
+  max: number
+  step: number
+  defaultVal: number
+  format: (v: number) => string
+}
+
+const ADJ_DEFS: AdjDef[] = [
+  { key: "brightness", settingKey: "mirrorBrightness", label: "Bright", min: -0.35, max: 0.35, step: 0.01, defaultVal: 0, format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v * 100)}` },
+  { key: "glow", settingKey: "mirrorGlow", label: "Glow", min: 0, max: 1, step: 0.02, defaultVal: 0, format: (v) => `${Math.round(v * 100)}%` },
+  { key: "contrast", settingKey: "mirrorContrast", label: "Contrast", min: 0.65, max: 1.45, step: 0.01, defaultVal: 1, format: (v) => `${Math.round(v * 100)}%` },
+  { key: "saturation", settingKey: "mirrorSaturation", label: "Color", min: 0, max: 1.8, step: 0.02, defaultVal: 1, format: (v) => `${Math.round(v * 100)}%` },
+  { key: "warmth", settingKey: "mirrorWarmth", label: "Warmth", min: -0.5, max: 0.5, step: 0.02, defaultVal: 0, format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v * 100)}` },
+  { key: "vignette", settingKey: "mirrorVignette", label: "Vignette", min: 0, max: 1, step: 0.02, defaultVal: 0, format: (v) => `${Math.round(v * 100)}%` },
+  { key: "zoom", settingKey: "mirrorZoom", label: "Zoom", min: 1, max: 2, step: 0.05, defaultVal: 1, format: (v) => `${v.toFixed(1)}x` },
+]
+
 /**
  * Same layout as the macOS mirror: the camera fills the tab, and controls only appear while the pointer
- * is over it (shutter + photobox on the right, a capsule of looks and toggles along the bottom).
+ * is over it (shutter + photobox + timer + zoom on the right, TikTok-style filter strip & adjustments along the bottom).
  */
 export function MirrorTab({ onBusy }: { onBusy: (busy: boolean) => void }) {
   const [settings, setSettings] = useSettings()
@@ -30,6 +71,9 @@ export function MirrorTab({ onBusy }: { onBusy: (busy: boolean) => void }) {
   const [error, setError] = useState<string | null>(null)
   const [hovering, setHovering] = useState(false)
   const [choosingStrip, setChoosingStrip] = useState(false)
+  const [showAdjust, setShowAdjust] = useState(false)
+  const [selectedAdj, setSelectedAdj] = useState<AdjKey>("brightness")
+  const [filterBanner, setFilterBanner] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [flash, setFlash] = useState(false)
   const [shotsTaken, setShotsTaken] = useState<number | null>(null)
@@ -38,6 +82,39 @@ export function MirrorTab({ onBusy }: { onBusy: (busy: boolean) => void }) {
   const busy = countdown !== null || shotsTaken !== null
 
   const effect = settings.mirrorEffect
+
+  const adj: CameraAdjustments = useMemo(
+    () => ({
+      mirrorBrightness: settings.mirrorBrightness ?? 0,
+      mirrorContrast: settings.mirrorContrast ?? 1,
+      mirrorSaturation: settings.mirrorSaturation ?? 1,
+      mirrorWarmth: settings.mirrorWarmth ?? 0,
+      mirrorGlow: settings.mirrorGlow ?? 0,
+      mirrorVignette: settings.mirrorVignette ?? 0,
+      mirrorZoom: settings.mirrorZoom ?? 1,
+      mirrorFlipped: settings.mirrorFlipped ?? true,
+    }),
+    [
+      settings.mirrorBrightness,
+      settings.mirrorContrast,
+      settings.mirrorSaturation,
+      settings.mirrorWarmth,
+      settings.mirrorGlow,
+      settings.mirrorVignette,
+      settings.mirrorZoom,
+      settings.mirrorFlipped,
+    ]
+  )
+  const hasCustomAdj = isCameraAdjusted(adj)
+
+  // Show filter banner HUD when switching filters
+  useEffect(() => {
+    const info = EFFECTS[effect]
+    if (!info) return
+    setFilterBanner(`${info.name} · ${info.category}`)
+    const t = setTimeout(() => setFilterBanner(null), 1300)
+    return () => clearTimeout(t)
+  }, [effect])
 
   // The camera only runs while this tab is mounted, so the light goes off when the pill closes.
   useEffect(() => {
@@ -81,7 +158,7 @@ export function MirrorTab({ onBusy }: { onBusy: (busy: boolean) => void }) {
     setCountdown(null)
     setFlash(true)
     setTimeout(() => setFlash(false), 180)
-    return captureFrame(videoRef.current!, effect)
+    return captureFrame(videoRef.current!, effect, adj)
   }
 
   const keep = async (canvas: HTMLCanvasElement, name: string) => {
@@ -95,7 +172,8 @@ export function MirrorTab({ onBusy }: { onBusy: (busy: boolean) => void }) {
 
   const takePhoto = async () => {
     if (busy || !videoRef.current?.videoWidth) return
-    await keep(await shoot(3), `OpenNotchi Photo ${stamp()}`).catch(() => {})
+    const timerSec = settings.mirrorTimer ?? 3
+    await keep(await shoot(timerSec), `OpenNotchi Photo ${stamp()}`).catch(() => {})
   }
 
   const startPhotobox = async () => {
@@ -134,7 +212,25 @@ export function MirrorTab({ onBusy }: { onBusy: (busy: boolean) => void }) {
     setSettings({ mirrorCameraId: cameras[(i + 1) % cameras.length].deviceId })
   }
 
+  const cycleTimer = () => {
+    const cur = settings.mirrorTimer ?? 3
+    const next = cur === 0 ? 3 : cur === 3 ? 5 : 0
+    setSettings({ mirrorTimer: next })
+  }
+
+  const cycleZoom = () => {
+    const z = settings.mirrorZoom ?? 1
+    const next = z < 1.2 ? 1.25 : z < 1.45 ? 1.5 : z < 1.9 ? 2.0 : 1.0
+    setSettings({ mirrorZoom: next })
+  }
+
+  const resetAllAdj = () => {
+    setSettings(DEFAULT_CAMERA_ADJUSTMENTS)
+  }
+
   const showControls = hovering && !busy && !choosingStrip
+  const activeAdjDef = ADJ_DEFS.find((d) => d.key === selectedAdj) ?? ADJ_DEFS[0]
+  const activeAdjVal = Number(settings[activeAdjDef.settingKey] ?? activeAdjDef.defaultVal)
 
   return (
     <div className="tab-mirror">
@@ -153,10 +249,40 @@ export function MirrorTab({ onBusy }: { onBusy: (busy: boolean) => void }) {
             </span>
           </div>
         ) : (
-          <video ref={videoRef} autoPlay muted playsInline style={{ filter: EFFECTS[effect].filter }} />
+          <>
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              style={{
+                filter: buildCameraFilter(effect, adj),
+                transform: `scaleX(${adj.mirrorFlipped ? -1 : 1}) scale(${adj.mirrorZoom})`,
+              }}
+            />
+            {EFFECTS[effect]?.tint && (
+              <div className="mirror-tint-overlay" style={{ background: EFFECTS[effect].tint }} />
+            )}
+            {adj.mirrorVignette > 0.01 && (
+              <div
+                className="mirror-vignette-overlay"
+                style={{
+                  background: `radial-gradient(circle, transparent 42%, rgba(0,0,0,${(adj.mirrorVignette * 0.72).toFixed(2)}) 100%)`,
+                }}
+              />
+            )}
+          </>
         )}
 
         {settings.mirrorGrid && <div className="mirror-grid" />}
+
+        {filterBanner && !busy && (
+          <div className="mirror-filter-banner" key={filterBanner}>
+            <Sparkles size={11} />
+            <span>{filterBanner}</span>
+          </div>
+        )}
+
         {countdown !== null && <div className="mirror-countdown" key={countdown}>{countdown}</div>}
         {flash && <div className="mirror-flash" />}
 
@@ -180,30 +306,108 @@ export function MirrorTab({ onBusy }: { onBusy: (busy: boolean) => void }) {
 
         {!error && (
           <div className={`mirror-right ${showControls ? "show" : ""}`}>
-            <button className="mirror-shutter" onClick={takePhoto} title="Take a photo" aria-label="Take a photo" />
+            <button
+              className="mirror-shutter"
+              onClick={takePhoto}
+              title={settings.mirrorTimer > 0 ? `Take photo (${settings.mirrorTimer}s timer)` : "Take a photo"}
+              aria-label="Take a photo"
+            />
             <button className="mirror-booth-btn" onClick={() => setChoosingStrip(true)} title="Photobox" aria-label="Photobox">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="7" width="18" height="14" rx="2" />
                 <path d="M7 3h10M5 5h14" />
                 <circle cx="9" cy="12" r="1.5" />
                 <path d="m21 17-5-5-8 9" />
               </svg>
             </button>
+            <button
+              className={`mirror-rail-pill ${settings.mirrorTimer > 0 ? "active-yellow" : ""}`}
+              onClick={cycleTimer}
+              title="Self-timer (Off / 3s / 5s)"
+            >
+              <Timer size={11} />
+              <span>{settings.mirrorTimer > 0 ? `${settings.mirrorTimer}s` : "0s"}</span>
+            </button>
+            <button
+              className={`mirror-rail-pill ${adj.mirrorZoom > 1.01 ? "active-cyan" : ""}`}
+              onClick={cycleZoom}
+              title="Camera Zoom (1.0x / 1.25x / 1.5x / 2.0x)"
+            >
+              <span>{adj.mirrorZoom.toFixed(adj.mirrorZoom === 1.25 ? 2 : 1)}x</span>
+            </button>
+          </div>
+        )}
+
+        {showAdjust && showControls && (
+          <div className="mirror-adj-drawer">
+            <div className="mirror-adj-pills">
+              {ADJ_DEFS.map((d) => {
+                const val = Number(settings[d.settingKey] ?? d.defaultVal)
+                const modified = Math.abs(val - d.defaultVal) > 0.01
+                return (
+                  <button
+                    key={d.key}
+                    className={`mirror-adj-pill ${selectedAdj === d.key ? "active" : ""}`}
+                    onClick={() => setSelectedAdj(d.key)}
+                  >
+                    <span>{d.label}</span>
+                    {modified && <i className="mirror-adj-dot" />}
+                  </button>
+                )
+              })}
+              {hasCustomAdj && (
+                <button className="mirror-adj-reset" onClick={resetAllAdj} title="Reset all adjustments">
+                  <RotateCcw size={10} />
+                  <span>Reset</span>
+                </button>
+              )}
+            </div>
+            <div className="mirror-adj-slider-row">
+              <span className="mirror-adj-label">{activeAdjDef.label}</span>
+              <input
+                type="range"
+                min={activeAdjDef.min}
+                max={activeAdjDef.max}
+                step={activeAdjDef.step}
+                value={activeAdjVal}
+                onChange={(e) => setSettings({ [activeAdjDef.settingKey]: parseFloat(e.target.value) })}
+              />
+              <span className="mirror-adj-val">{activeAdjDef.format(activeAdjVal)}</span>
+              {Math.abs(activeAdjVal - activeAdjDef.defaultVal) > 0.01 && (
+                <button
+                  className="mirror-adj-single-reset"
+                  onClick={() => setSettings({ [activeAdjDef.settingKey]: activeAdjDef.defaultVal })}
+                  title={`Reset ${activeAdjDef.label}`}
+                >
+                  <RotateCcw size={10} />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
         <div className={`mirror-capsule ${showControls ? "show" : ""}`}>
-          {(Object.keys(EFFECTS) as MirrorEffect[]).map((e) => (
-            <button
-              key={e}
-              className={`mirror-swatch ${effect === e ? "active" : ""}`}
-              style={{ background: EFFECTS[e].swatch }}
-              onClick={() => setSettings({ mirrorEffect: e })}
-              title={EFFECTS[e].name}
-            />
-          ))}
-          <span className="mirror-effect-name">{EFFECTS[effect].name}</span>
+          <div className="mirror-filter-strip">
+            {(Object.keys(EFFECTS) as MirrorEffect[]).map((e) => (
+              <button
+                key={e}
+                className={`mirror-filter-pill ${effect === e ? "active" : ""}`}
+                onClick={() => setSettings({ mirrorEffect: e })}
+                title={`${EFFECTS[e].name} (${EFFECTS[e].category})`}
+              >
+                <span className="mirror-swatch" style={{ background: EFFECTS[e].swatch }} />
+                <span className="mirror-filter-pill-name">{EFFECTS[e].name}</span>
+              </button>
+            ))}
+          </div>
           <span className="mirror-divider" />
+          <button
+            className={`mirror-cap-btn ${showAdjust || hasCustomAdj ? "on-pink" : ""}`}
+            onClick={() => setShowAdjust((v) => !v)}
+            title="TikTok Camera Adjustments (Glow, Brightness, Contrast, Warmth, Zoom)"
+          >
+            <SlidersHorizontal size={13} />
+          </button>
           <button
             className={`mirror-cap-btn ${settings.mirrorRingLight ? "on-yellow" : ""}`}
             onClick={() => setSettings({ mirrorRingLight: !settings.mirrorRingLight })}
@@ -214,9 +418,16 @@ export function MirrorTab({ onBusy }: { onBusy: (busy: boolean) => void }) {
           <button
             className={`mirror-cap-btn ${settings.mirrorGrid ? "on-yellow" : ""}`}
             onClick={() => setSettings({ mirrorGrid: !settings.mirrorGrid })}
-            title="Grid"
+            title="3×3 Composition Grid"
           >
             <Grid3x3 size={13} />
+          </button>
+          <button
+            className={`mirror-cap-btn ${!adj.mirrorFlipped ? "on-cyan" : ""}`}
+            onClick={() => setSettings({ mirrorFlipped: !adj.mirrorFlipped })}
+            title={adj.mirrorFlipped ? "Mirrored (click for true view)" : "True view (un-mirrored)"}
+          >
+            <FlipHorizontal2 size={13} />
           </button>
           {cameras.length > 1 && (
             <button className="mirror-cap-btn" onClick={nextCamera} title="Switch camera">

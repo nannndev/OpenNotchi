@@ -16,11 +16,12 @@ const FRAMES = [
 ]
 
 const POINTS = [
+  ["✨", "14 TikTok-inspired looks: Natural, Glam, Vivid, Golden, Cool, Sunset, Neon, Y2K, Matcha, Film, VHS, Cinema, Dreamy, and B&W."],
+  ["🎛️", "Real-time studio adjustments: beauty glow bloom, brightness, contrast, warmth, vignette, zoom, and self-timer."],
   ["✌️", "Hold up a peace sign and the countdown starts. 👍 throws confetti."],
-  ["✨", "Korean photobooth deco studio: cute stars, ribbons, stamps, doodle frames and pins."],
-  ["🎵", "The Player frame shows the song you're listening to."],
+  ["🎵", "The Player frame shows the song you're listening to, with full-screen live camera mirror support."],
   ["📐", "1 to 6 photos, as a classic strip or sized for a story, post or square."],
-  ["📤", "Saved to Pictures and dropped in the Tray, ready to AirDrop."],
+  ["📤", "Saved to Pictures / Downloads and dropped in the Tray, ready to share."],
 ]
 
 export function Photobox() {
@@ -28,13 +29,12 @@ export function Photobox() {
     <section id="photobox" className="relative scroll-mt-16 overflow-hidden border-y border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
         <div className="text-center">
-          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">New in 0.5 · Deco Studio</Badge>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">New in v0.21.0 · TikTok Camera & Deco Studio</Badge>
           <h2 className="font-display mt-5 text-[clamp(34px,5vw,54px)] leading-tight font-extrabold tracking-[-0.03em]">
-            A photobooth &amp; deco studio in your notch.
+            A TikTok camera studio &amp; photobooth in your notch.
           </h2>
           <p className="mx-auto mt-3.5 max-w-2xl text-[17px] text-muted-foreground">
-            Open the Mirror, pick a frame, and decorate with Korean photobooth stickers, custom doodle frames, pins, and stamps.
-            Strike a pose with hand gestures, snap your strip, and drop it straight into the Tray.
+            Open the Mirror for 14 trending TikTok looks with real-time beauty glow, tone adjustments, 3×3 rule-of-thirds grid, and self-timer. Decorate with Korean photobooth stickers, custom doodle frames, pins, and stamps.
           </p>
         </div>
 

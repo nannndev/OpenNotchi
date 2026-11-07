@@ -4339,15 +4339,51 @@ button:focus-visible {
   from { translate: 20px 0; opacity: 0; }
 }
 
-/* Shutter and photobox on the right, only while hovering */
+/* Shutter, photobox, self-timer & zoom on the right, only while hovering */
+.mirror-tint-overlay,
+.mirror-vignette-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.mirror-tint-overlay {
+  mix-blend-mode: overlay;
+}
+.mirror-filter-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  translate: -50% 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  pointer-events: none;
+  animation: mirror-banner-in 0.22s ease-out;
+}
+.mirror-filter-banner svg {
+  color: #f472b6;
+}
+@keyframes mirror-banner-in {
+  from { opacity: 0; translate: -50% -6px; }
+  to { opacity: 1; translate: -50% 0; }
+}
 .mirror-right {
   position: absolute;
-  right: 12px;
-  top: 50%;
+  right: 10px;
+  top: 46%;
   translate: 0 -50%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  gap: 7px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
@@ -4357,8 +4393,8 @@ button:focus-visible {
   pointer-events: auto;
 }
 .mirror-shutter {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 3px solid #fff;
   background: transparent;
@@ -4377,8 +4413,8 @@ button:focus-visible {
   transform: scale(0.86);
 }
 .mirror-booth-btn {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -4387,6 +4423,135 @@ button:focus-visible {
   border: 2px solid rgba(255, 255, 255, 0.85);
   filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.4));
 }
+.mirror-rail-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 34px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  font-variant-numeric: tabular-nums;
+}
+.mirror-rail-pill.active-yellow {
+  background: rgba(255, 214, 10, 0.88);
+  color: #000;
+  border-color: transparent;
+}
+.mirror-rail-pill.active-cyan {
+  background: rgba(34, 211, 238, 0.88);
+  color: #000;
+  border-color: transparent;
+}
+
+/* Floating TikTok Adjustments Drawer */
+.mirror-adj-drawer {
+  position: absolute;
+  left: 50%;
+  bottom: 44px;
+  translate: -50% 0;
+  width: min(92%, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(14, 14, 18, 0.78);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  animation: mirror-fade 0.18s ease-out;
+}
+.mirror-adj-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mirror-adj-pills::-webkit-scrollbar {
+  display: none;
+}
+.mirror-adj-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.07);
+  flex: none;
+}
+.mirror-adj-pill.active {
+  color: #000;
+  background: #fff;
+}
+.mirror-adj-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #ffd60a;
+}
+.mirror-adj-pill.active .mirror-adj-dot {
+  background: #ec4899;
+}
+.mirror-adj-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #ffd60a;
+  background: rgba(255, 214, 10, 0.14);
+  flex: none;
+}
+.mirror-adj-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mirror-adj-label {
+  width: 50px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+}
+.mirror-adj-slider-row input[type="range"] {
+  flex: 1;
+  height: 4px;
+  accent-color: #fff;
+  cursor: pointer;
+}
+.mirror-adj-val {
+  width: 38px;
+  text-align: right;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.mirror-adj-single-reset {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.65);
+}
+.mirror-adj-single-reset:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
 
 /* Looks and toggles in one capsule along the bottom, only while hovering */
 .mirror-capsule {
@@ -4394,12 +4559,15 @@ button:focus-visible {
   left: 50%;
   bottom: 8px;
   translate: -50% 0;
+  max-width: 94%;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: 5px;
+  padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
@@ -4409,9 +4577,46 @@ button:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
+.mirror-filter-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 265px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 1px 2px;
+}
+.mirror-filter-strip::-webkit-scrollbar {
+  display: none;
+}
+.mirror-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px 3px 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+  color: rgba(255, 255, 255, 0.72);
+  flex: none;
+  transition: all 0.15s ease;
+}
+.mirror-filter-pill:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.mirror-filter-pill.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.65);
+}
+.mirror-filter-pill-name {
+  font-size: 10px;
+  font-weight: 600;
+}
 .mirror-swatch {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   flex: none;
 }
@@ -4429,6 +4634,7 @@ button:focus-visible {
   width: 1px;
   height: 16px;
   background: rgba(255, 255, 255, 0.25);
+  flex: none;
 }
 .mirror-cap-btn {
   width: 22px;
@@ -4437,6 +4643,7 @@ button:focus-visible {
   place-items: center;
   color: #fff;
   border-radius: 50%;
+  flex: none;
 }
 .mirror-cap-btn:hover {
   background: rgba(255, 255, 255, 0.12);
@@ -4444,8 +4651,39 @@ button:focus-visible {
 .mirror-cap-btn.on-yellow {
   color: #ffd60a;
 }
+.mirror-cap-btn.on-pink {
+  color: #f472b6;
+  background: rgba(244, 114, 182, 0.16);
+}
+.mirror-cap-btn.on-cyan {
+  color: #22d3ee;
+  background: rgba(34, 211, 238, 0.16);
+}
 .mirror-spacer {
   flex: 1;
+}
+.mirror-adj-row-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+.mirror-settings-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mirror-settings-slider input[type="range"] {
+  width: 140px;
+  accent-color: var(--accent, #6366f1);
+  cursor: pointer;
+}
+.mirror-settings-slider span {
+  min-width: 44px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 /* Strip picker over the mirror */
@@ -6778,6 +7016,43 @@ button:focus-visible {
 .np-silhouette-toggle.active {
   color: var(--np-accent);
   background: color-mix(in srgb, var(--np-accent) 20%, transparent);
+}
+
+.np-filter-strip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 240px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+.np-filter-strip::-webkit-scrollbar {
+  display: none;
+}
+.np-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 5px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+  flex: none;
+  transition: all 0.15s ease;
+}
+.np-filter-pill:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.np-filter-pill.active {
+  color: #fff;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.65);
 }
 
 .np-capture-btn {

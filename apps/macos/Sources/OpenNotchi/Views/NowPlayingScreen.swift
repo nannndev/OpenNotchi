@@ -317,8 +317,9 @@ private struct NowPlayingScreenView: View {
             case .mirror:
                 ZStack {
                     CameraPreview(
-                        effect: .natural,
-                        ringLight: false,
+                        effect: settings.mirrorEffect,
+                        adjustments: settings.cameraAdjustments,
+                        ringLight: settings.mirrorRingLight,
                         background: .none,
                         cameraID: settings.mirrorCameraID
                     )
@@ -406,8 +407,9 @@ private struct NowPlayingScreenView: View {
             if settings.nowPlayingCoverMirror {
                 ZStack(alignment: .bottomTrailing) {
                     CameraPreview(
-                        effect: .natural,
-                        ringLight: false,
+                        effect: settings.mirrorEffect,
+                        adjustments: settings.cameraAdjustments,
+                        ringLight: settings.mirrorRingLight,
                         background: .none,
                         cameraID: settings.mirrorCameraID
                     )
@@ -615,6 +617,61 @@ private struct NowPlayingScreenView: View {
                     .foregroundStyle(settings.nowPlayingCoverSilhouette ? tint : .white.opacity(0.75))
                 }
                 .buttonStyle(.plain)
+            }
+
+            if settings.nowPlayingCoverMirror || settings.nowPlayingScreenBackground == .mirror {
+                Divider().frame(height: 16).background(.white.opacity(0.25))
+
+                // TikTok Filter Selector in Fullscreen Music
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 5) {
+                        ForEach(MirrorEffect.allCases) { effect in
+                            let selected = settings.mirrorEffect == effect
+                            Button {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                    settings.mirrorEffect = effect
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Circle()
+                                        .fill(LinearGradient(colors: effect.swatch, startPoint: .topLeading, endPoint: .bottomTrailing))
+                                        .frame(width: 12, height: 12)
+                                    Text(effect.displayName)
+                                        .font(.system(size: 10.5, weight: selected ? .bold : .medium))
+                                }
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(
+                                    selected ? tint.opacity(0.32) : .white.opacity(0.08),
+                                    in: Capsule()
+                                )
+                                .foregroundStyle(selected ? .white : .white.opacity(0.75))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .frame(maxWidth: 260)
+
+                // Beauty Glow quick toggle
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        settings.mirrorGlow = settings.mirrorGlow > 0.1 ? 0.0 : 0.45
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Glow")
+                            .font(.system(size: 10.5, weight: .medium))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(settings.mirrorGlow > 0.1 ? tint.opacity(0.28) : .white.opacity(0.07), in: Capsule())
+                    .foregroundStyle(settings.mirrorGlow > 0.1 ? .white : .white.opacity(0.75))
+                }
+                .buttonStyle(.plain)
+                .help("Toggle Soft Beauty Glow")
             }
 
             Divider().frame(height: 16).background(.white.opacity(0.25))

@@ -92,7 +92,7 @@ const GROUPS: { id: string; label: string; features: Feature[] }[] = [
       { icon: CloudSun, title: "Weather & forecast", body: "Live local temperatures, precipitation, and weekly forecasts one hover away.", os: "all" },
       { icon: MoonStar, title: "Prayer times & Imsak", body: "Calculates accurate local prayer times offline with discreet notifications at azan.", os: "all" },
       { icon: Home, title: "Smarthome & AC control", body: "Adjust AC temperature, lighting dimmers, and smart plugs via Home Assistant.", os: "all" },
-      { icon: Camera, title: "Photobox & mirror", body: "Pose with webcam filters, ring light, and export 19 retro photo strip frames with custom stickers.", os: "all" },
+      { icon: Camera, title: "TikTok mirror & studio", body: "14 trending looks (Glam, Y2K, Cyberpunk, Film, Matcha) with real-time beauty glow bloom, warmth, contrast, zoom, self-timer, 3×3 grid, and retro photo strips.", os: "all", badgeText: "v0.21.0" },
       { icon: Calculator, title: "Smart calculator", body: "Type \"15% dari 200rb\", \"100 usd to idr\" with live rates, \"5 km to mi\" or \"hari sampai 25 des\" and see the answer as you type. Basic and scientific keypads included.", os: "macos", badgeText: "New" },
       { icon: CandlestickChart, title: "Markets with live crypto", body: "IDX and global stocks and FX, with crypto (BTC, ETH) updating live every few seconds and each price showing how fresh it is.", os: "macos", badgeText: "Live crypto" },
     ],
@@ -132,8 +132,8 @@ const PARITY_COMPARISON = [
   },
   {
     dimension: "Feature Parity (100% Shared)",
-    macos: "Notchi chat & mascot, Full-screen player, Synced Lyrics, Lyric Video Studio, Photobox, Pomodoro, Teleprompter, Settings Search.",
-    windows: "Notchi chat & mascot, Full-screen player, Synced Lyrics, Lyric Video Studio, Photobox, Pomodoro, Teleprompter, Settings Search.",
+    macos: "Notchi chat & mascot, Full-screen player, Synced Lyrics, Lyric Video Studio, Photobox & TikTok Studio, Pomodoro, Teleprompter, Settings Search.",
+    windows: "Notchi chat & mascot, Full-screen player, Synced Lyrics, Lyric Video Studio, Photobox & TikTok Studio, Pomodoro, Teleprompter, Settings Search.",
   },
 ]
 

@@ -18,11 +18,13 @@ struct MirrorView: View {
     @State private var savedPhoto: URL?
     @State private var studioSession: PhotoboxSession?
     @State private var cameraAuthStatus = AVCaptureDevice.authorizationStatus(for: .video)
+    @State private var filterBanner: MirrorEffect?
 
     var body: some View {
         VStack(spacing: 4) {
             cameraSource
                 .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay { gridOverlay }
                 .overlay { ringLightGlow }
                 .overlay {
                     ForEach(bursts, id: \.self) { id in
@@ -57,17 +59,79 @@ struct MirrorView: View {
                             .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
-                .overlay(alignment: .top) { boothProgress }
+                .overlay(alignment: .top) {
+                    if boothShots != nil {
+                        boothProgress
+                    } else if let effect = filterBanner {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(LinearGradient(colors: effect.swatch, startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: 11, height: 11)
+                            Text(effect.displayName)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white)
+                            Text("· \(effect.category)")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.65))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(.black.opacity(0.6)))
+                        .background(Capsule().fill(.ultraThinMaterial))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 0.8))
+                        .padding(.top, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
                 .overlay(alignment: .topLeading) { gestureHint }
                 .overlay(alignment: .trailing) {
-                    VStack(spacing: 10) {
-                        ShutterButton(action: { startCountdown() })
+                    VStack(spacing: 8) {
+                        ShutterButton(action: { startCountdown(from: settings.mirrorTimerSeconds) })
                         PhotoboxButton {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { choosingStrip = true }
                         }
+                        // Timer Quick Toggle (0s / 3s / 5s)
+                        Button {
+                            let choices = [0, 3, 5]
+                            let idx = choices.firstIndex(of: settings.mirrorTimerSeconds) ?? 1
+                            settings.mirrorTimerSeconds = choices[(idx + 1) % choices.count]
+                        } label: {
+                            HStack(spacing: 2) {
+                                Image(systemName: "timer")
+                                    .font(.system(size: 9, weight: .bold))
+                                Text(settings.mirrorTimerSeconds == 0 ? "0s" : "\(settings.mirrorTimerSeconds)s")
+                                    .font(.system(size: 9.5, weight: .bold).monospacedDigit())
+                            }
+                            .foregroundStyle(settings.mirrorTimerSeconds == 0 ? .white.opacity(0.8) : .yellow)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(.black.opacity(0.55)))
+                            .overlay(Capsule().strokeBorder(.white.opacity(0.3), lineWidth: 0.8))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Self-timer: \(settings.mirrorTimerSeconds == 0 ? "Instant" : "\(settings.mirrorTimerSeconds) seconds")")
+
+                        // Zoom Quick Cycle (1x / 1.25x / 1.5x / 2x)
+                        Button {
+                            let steps: [Double] = [1.0, 1.25, 1.5, 2.0]
+                            let next = steps.first(where: { $0 > settings.mirrorZoom + 0.05 }) ?? 1.0
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                settings.mirrorZoom = next
+                            }
+                        } label: {
+                            Text(String(format: "%.1fx", settings.mirrorZoom))
+                                .font(.system(size: 9.5, weight: .bold).monospacedDigit())
+                                .foregroundStyle(settings.mirrorZoom > 1.01 ? .cyan : .white.opacity(0.8))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(.black.opacity(0.55)))
+                                .overlay(Capsule().strokeBorder(.white.opacity(0.3), lineWidth: 0.8))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Camera zoom (\(String(format: "%.1fx", settings.mirrorZoom)))")
                     }
-                    .padding(.trailing, 12)
-                    .opacity(isHovering && countdown == nil && boothShots == nil && !choosingStrip ? 1 : 0)
+                    .padding(.trailing, 10)
+                    .opacity(isHovering && countdown == nil && boothShots == nil && !choosingStrip && studioSession == nil ? 1 : 0)
                 }
                 .overlay { stripPicker }
                 .overlay { studio }
@@ -88,6 +152,19 @@ struct MirrorView: View {
         .onChange(of: boothBusy || countdown != nil || studioSession != nil) { _, busy in
             vm.holdOpen = busy
             vm.isStudioOpen = studioSession != nil
+        }
+        .onChange(of: settings.mirrorEffect) { _, newEffect in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                filterBanner = newEffect
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(1300))
+                if filterBanner == newEffect {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        filterBanner = nil
+                    }
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openStripPicker)) { _ in
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { choosingStrip = true }
@@ -142,6 +219,7 @@ struct MirrorView: View {
         } else {
             CameraPreview(
                 effect: settings.mirrorEffect,
+                adjustments: settings.cameraAdjustments,
                 ringLight: settings.mirrorRingLight,
                 background: settings.mirrorBackground,
                 artwork: settings.mirrorBackground == .album
@@ -230,6 +308,29 @@ struct MirrorView: View {
     }
 
     @ViewBuilder
+    private var gridOverlay: some View {
+        if settings.mirrorGrid {
+            GeometryReader { geo in
+                let w = geo.size.width
+                let h = geo.size.height
+                Path { path in
+                    path.move(to: CGPoint(x: w / 3, y: 0))
+                    path.addLine(to: CGPoint(x: w / 3, y: h))
+                    path.move(to: CGPoint(x: 2 * w / 3, y: 0))
+                    path.addLine(to: CGPoint(x: 2 * w / 3, y: h))
+                    path.move(to: CGPoint(x: 0, y: h / 3))
+                    path.addLine(to: CGPoint(x: w, y: h / 3))
+                    path.move(to: CGPoint(x: 0, y: 2 * h / 3))
+                    path.addLine(to: CGPoint(x: w, y: 2 * h / 3))
+                }
+                .stroke(.white.opacity(0.28), lineWidth: 0.8)
+            }
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        }
+    }
+
+    @ViewBuilder
     private var ringLightGlow: some View {
         // Ring light: a soft white glow around the edge, like the real thing.
         if settings.mirrorRingLight {
@@ -244,13 +345,13 @@ struct MirrorView: View {
 
     private func handle(_ gesture: MirrorGesture) {
         switch gesture {
-        case .peace: startCountdown()
+        case .peace: startCountdown(from: max(1, settings.mirrorTimerSeconds))
         case .thumbsUp: bursts.append(UUID())
         case .openPalm: settings.mirrorRingLight.toggle()
         }
     }
 
-    /// 3, 2, 1, flash, photo.
+    /// Countdown (or instant if 0), flash, photo.
     private func startCountdown(from start: Int = 3) {
         guard countdown == nil, !boothBusy else { return }
         Task { @MainActor in await countdownAndShoot(from: start) }
@@ -258,11 +359,13 @@ struct MirrorView: View {
 
     @MainActor
     private func countdownAndShoot(from start: Int) async {
-        for n in stride(from: start, through: 1, by: -1) {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { countdown = n }
-            try? await Task.sleep(for: .milliseconds(800))
+        if start > 0 {
+            for n in stride(from: start, through: 1, by: -1) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { countdown = n }
+                try? await Task.sleep(for: .milliseconds(800))
+            }
+            withAnimation(.easeOut(duration: 0.15)) { countdown = nil }
         }
-        withAnimation(.easeOut(duration: 0.15)) { countdown = nil }
         captureRequest += 1
         flash = true
         withAnimation(.easeOut(duration: 0.5)) { flash = false }

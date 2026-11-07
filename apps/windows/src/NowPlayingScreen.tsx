@@ -1,11 +1,11 @@
 import { invoke } from "@tauri-apps/api/core"
-import { Camera, Captions, Languages, Pause, Play, SkipBack, SkipForward, Video, X } from "lucide-react"
-import { useEffect, useRef, useState, type CSSProperties } from "react"
+import { Camera, Captions, Languages, Pause, Play, SkipBack, SkipForward, Sparkles, Video, X } from "lucide-react"
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { chatAi } from "./tabs/ChatPanel"
 import { currentIndex } from "./lyrics"
 import { control, formatTime, positionAt, useLyrics, useNowPlaying, useTick } from "./media"
 import { useAccent } from "./palette"
-import { savePng } from "./photobox"
+import { buildCameraFilter, EFFECTS, savePng, type CameraAdjustments, type MirrorEffect } from "./photobox"
 import { NOW_PLAYING_BACKGROUNDS, useSettings, type AppSettings } from "./settings"
 
 const translationCache = new Map<string, Record<string, string>>()
@@ -58,6 +58,30 @@ export function NowPlayingScreen() {
   const [flash, setFlash] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [showMirrorBar, setShowMirrorBar] = useState(false)
+
+  const adj: CameraAdjustments = useMemo(
+    () => ({
+      mirrorBrightness: settings.mirrorBrightness ?? 0,
+      mirrorContrast: settings.mirrorContrast ?? 1,
+      mirrorSaturation: settings.mirrorSaturation ?? 1,
+      mirrorWarmth: settings.mirrorWarmth ?? 0,
+      mirrorGlow: settings.mirrorGlow ?? 0,
+      mirrorVignette: settings.mirrorVignette ?? 0,
+      mirrorZoom: settings.mirrorZoom ?? 1,
+      mirrorFlipped: settings.mirrorFlipped ?? true,
+    }),
+    [
+      settings.mirrorBrightness,
+      settings.mirrorContrast,
+      settings.mirrorSaturation,
+      settings.mirrorWarmth,
+      settings.mirrorGlow,
+      settings.mirrorVignette,
+      settings.mirrorZoom,
+      settings.mirrorFlipped,
+    ]
+  )
+  const cameraCssFilter = useMemo(() => buildCameraFilter(settings.mirrorEffect, adj), [settings.mirrorEffect, adj])
 
   // Camera stream lifecycle
   useEffect(() => {
@@ -162,9 +186,19 @@ export function NowPlayingScreen() {
         ctx.beginPath()
         ctx.roundRect(cx, cy, cw, ch, 48)
         ctx.clip()
-        ctx.translate(cx + cw, cy)
-        ctx.scale(-1, 1)
-        ctx.drawImage(video, 0, 0, cw, ch)
+        ctx.filter = cameraCssFilter
+        if (adj.mirrorFlipped) {
+          ctx.translate(cx + cw, cy)
+          ctx.scale(-1, 1)
+          ctx.drawImage(video, 0, 0, cw, ch)
+        } else {
+          ctx.drawImage(video, cx, cy, cw, ch)
+        }
+        ctx.filter = "none"
+        if (EFFECTS[settings.mirrorEffect]?.tint) {
+          ctx.fillStyle = EFFECTS[settings.mirrorEffect].tint!
+          ctx.fillRect(cx, cy, cw, ch)
+        }
         ctx.restore()
 
         ctx.save()
@@ -196,14 +230,19 @@ export function NowPlayingScreen() {
 
       if (video && video.videoWidth) {
         ctx.save()
-        if (settings.nowPlayingMirrorBlur > 0) {
-          ctx.filter = `blur(${settings.nowPlayingMirrorBlur * 1.5}px)`
+        const blurPart = settings.nowPlayingMirrorBlur > 0 ? ` blur(${settings.nowPlayingMirrorBlur * 1.5}px)` : ""
+        ctx.filter = `${cameraCssFilter}${blurPart}`
+        if (adj.mirrorFlipped) {
+          ctx.translate(1920, 0)
+          ctx.scale(-1, 1)
         }
-        ctx.translate(1920, 0)
-        ctx.scale(-1, 1)
         ctx.drawImage(video, 0, 0, 1920, 1080)
         ctx.restore()
         ctx.filter = "none"
+        if (EFFECTS[settings.mirrorEffect]?.tint) {
+          ctx.fillStyle = EFFECTS[settings.mirrorEffect].tint!
+          ctx.fillRect(0, 0, 1920, 1080)
+        }
       }
 
       const shade = ctx.createLinearGradient(0, 0, 0, 1080)
@@ -322,7 +361,10 @@ export function NowPlayingScreen() {
               playsInline
               muted
               className="np-backdrop-video"
-              style={{ filter: `blur(${settings.nowPlayingMirrorBlur}px)` }}
+              style={{
+                filter: `${cameraCssFilter} blur(${settings.nowPlayingMirrorBlur}px)`,
+                transform: `scaleX(${adj.mirrorFlipped ? -1 : 1}) scale(${Math.max(1.06, adj.mirrorZoom)})`,
+              }}
             />
             {settings.nowPlayingCoverSilhouette && np?.artwork && (
               <div className="np-silhouette">
@@ -353,7 +395,14 @@ export function NowPlayingScreen() {
                     playsInline
                     muted
                     className="np-cover-video"
+                    style={{
+                      filter: cameraCssFilter,
+                      transform: `scaleX(${adj.mirrorFlipped ? -1 : 1}) scale(${adj.mirrorZoom})`,
+                    }}
                   />
+                  {EFFECTS[settings.mirrorEffect]?.tint && (
+                    <div className="mirror-tint-overlay" style={{ background: EFFECTS[settings.mirrorEffect].tint, borderRadius: 22 }} />
+                  )}
                   {np.artwork && (
                     <div className="np-cover-badge" title={np.title}>
                       <img src={np.artwork} alt="" />
@@ -489,6 +538,30 @@ export function NowPlayingScreen() {
               </button>
             </>
           )}
+
+          <div className="np-mirror-divider" />
+          <div className="np-filter-strip">
+            {(Object.keys(EFFECTS) as MirrorEffect[]).map((e) => (
+              <button
+                key={e}
+                className={`np-filter-pill ${settings.mirrorEffect === e ? "active" : ""}`}
+                onClick={() => setSettings({ mirrorEffect: e })}
+                title={`${EFFECTS[e].name} (${EFFECTS[e].category})`}
+              >
+                <span className="mirror-swatch" style={{ background: EFFECTS[e].swatch }} />
+                <span>{EFFECTS[e].name}</span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            className={`np-silhouette-toggle ${(settings.mirrorGlow ?? 0) > 0.05 ? "active" : ""}`}
+            onClick={() => setSettings({ mirrorGlow: (settings.mirrorGlow ?? 0) > 0.05 ? 0 : 0.45 })}
+            title="Beauty Glow"
+          >
+            <Sparkles size={11} style={{ display: "inline", marginRight: 3, verticalAlign: "-1px" }} />
+            Glow
+          </button>
 
           <div className="np-mirror-divider" />
           <button className="np-capture-btn" onClick={capturePhoto}>

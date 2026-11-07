@@ -91,6 +91,14 @@ export interface AppSettings {
   mirrorTimer: number
   mirrorRingLight: boolean
   mirrorGrid: boolean
+  mirrorBrightness: number
+  mirrorContrast: number
+  mirrorSaturation: number
+  mirrorWarmth: number
+  mirrorGlow: number
+  mirrorVignette: number
+  mirrorZoom: number
+  mirrorFlipped: boolean
   /** Photos per photobox strip. */
   stripShots: number
   stripCaption: string
@@ -214,6 +222,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
   mirrorTimer: 3,
   mirrorRingLight: false,
   mirrorGrid: false,
+  mirrorBrightness: 0,
+  mirrorContrast: 1,
+  mirrorSaturation: 1,
+  mirrorWarmth: 0,
+  mirrorGlow: 0,
+  mirrorVignette: 0,
+  mirrorZoom: 1,
+  mirrorFlipped: true,
   stripShots: 4,
   stripCaption: "",
   stripFormat: "strip",

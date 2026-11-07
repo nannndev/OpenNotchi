@@ -8,15 +8,18 @@ struct CameraVideoRecordSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var recorder = CameraRecorderModel()
+    @ObservedObject private var settings = AppSettings.shared
     @State private var elapsedSeconds: Int = 0
     @State private var timer: Timer?
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             ZStack(alignment: .topTrailing) {
                 CameraPreview(
-                    effect: .natural,
-                    cameraID: AppSettings.shared.mirrorCameraID
+                    effect: settings.mirrorEffect,
+                    adjustments: settings.cameraAdjustments,
+                    ringLight: settings.mirrorRingLight,
+                    cameraID: settings.mirrorCameraID
                 )
                 .frame(width: 480, height: 360)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -40,6 +43,36 @@ struct CameraVideoRecordSheet: View {
                     .padding(14)
                 }
             }
+
+            // Filter Strip for Video Preview
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(MirrorEffect.allCases) { effect in
+                        let selected = settings.mirrorEffect == effect
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                settings.mirrorEffect = effect
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Circle()
+                                    .fill(LinearGradient(colors: effect.swatch, startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(width: 14, height: 14)
+                                Text(effect.displayName)
+                                    .font(.system(size: 11, weight: selected ? .bold : .medium))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(selected ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.08))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .frame(width: 480)
 
             HStack(spacing: 14) {
                 Button("Cancel") {

@@ -4,6 +4,23 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.21.0] - 2026-11-07
+
+### Added
+- **TikTok Camera Effects & Studio (macOS and Windows)**:
+  - 14 trending looks and filters across all camera features: Natural, Glam, Vivid, Golden, Cool, Sunset, Neon, Y2K, Matcha, Film, VHS, Cinema, Dreamy, and B&W, with category chips and gradient swatches.
+  - Real-time camera studio adjustments: soft beauty glow bloom, brightness, contrast, saturation, color warmth, vignette, and center zoom (1.0x to 2.0x).
+  - Floating adjustments drawer in the Mirror tab with parameter pills, modified indicators, live formatted sliders, and one-click reset.
+  - Right-side camera action rail with Shutter, Photobox, self-timer toggle (0s / 3s / 5s), and quick zoom cycle.
+  - 3×3 rule-of-thirds composition grid overlay and filter change HUD banner.
+  - Live camera filters and adjustments baked directly into the Full-Screen Music Player (Cover Mirror & Background Mirror), Photobox strips, Lyrics Share Camera Capture, Video Recorder, and Teleprompter.
+  - TikTok Camera Adjustments pane in Settings for quick fine-tuning.
+
+### Fixed
+- **Spotify track sync & background hangs (macOS)**:
+  - Resolved Unix pipe deadlock when invoking helper processes (`ps`) in DevTools / CIBuildMonitor that previously exhausted worker threads and froze Spotify polling.
+  - Added native player fast-path checking and polling watchdog timers to ensure Spotify never stays stuck on previous tracks.
+
 ## [0.20.0] - 2026-11-06
 
 ### Added

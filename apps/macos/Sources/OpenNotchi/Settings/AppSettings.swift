@@ -191,6 +191,40 @@ final class AppSettings: ObservableObject {
     @Published var stripStyle: StripStyle { didSet { defaults.set(stripStyle.rawValue, forKey: "stripStyle") } }
     @Published var mirrorGestures: Bool { didSet { defaults.set(mirrorGestures, forKey: "mirrorGestures") } }
     @Published var mirrorCameraID: String { didSet { defaults.set(mirrorCameraID, forKey: "mirrorCameraID") } }
+    @Published var mirrorBrightness: Double { didSet { defaults.set(mirrorBrightness, forKey: "mirrorBrightness") } }
+    @Published var mirrorContrast: Double { didSet { defaults.set(mirrorContrast, forKey: "mirrorContrast") } }
+    @Published var mirrorSaturation: Double { didSet { defaults.set(mirrorSaturation, forKey: "mirrorSaturation") } }
+    @Published var mirrorWarmth: Double { didSet { defaults.set(mirrorWarmth, forKey: "mirrorWarmth") } }
+    @Published var mirrorGlow: Double { didSet { defaults.set(mirrorGlow, forKey: "mirrorGlow") } }
+    @Published var mirrorVignette: Double { didSet { defaults.set(mirrorVignette, forKey: "mirrorVignette") } }
+    @Published var mirrorZoom: Double { didSet { defaults.set(mirrorZoom, forKey: "mirrorZoom") } }
+    @Published var mirrorFlipped: Bool { didSet { defaults.set(mirrorFlipped, forKey: "mirrorFlipped") } }
+    @Published var mirrorGrid: Bool { didSet { defaults.set(mirrorGrid, forKey: "mirrorGrid") } }
+    @Published var mirrorTimerSeconds: Int { didSet { defaults.set(mirrorTimerSeconds, forKey: "mirrorTimerSeconds") } }
+
+    var cameraAdjustments: CameraAdjustments {
+        CameraAdjustments(
+            brightness: mirrorBrightness,
+            contrast: mirrorContrast,
+            saturation: mirrorSaturation,
+            warmth: mirrorWarmth,
+            glow: mirrorGlow,
+            vignette: mirrorVignette,
+            zoom: mirrorZoom,
+            isMirrored: mirrorFlipped
+        )
+    }
+
+    func resetCameraAdjustments() {
+        mirrorBrightness = 0.0
+        mirrorContrast = 1.0
+        mirrorSaturation = 1.0
+        mirrorWarmth = 0.0
+        mirrorGlow = 0.0
+        mirrorVignette = 0.0
+        mirrorZoom = 1.0
+        mirrorFlipped = true
+    }
     @Published var calendarEnabled: Bool { didSet { defaults.set(calendarEnabled, forKey: "calendarEnabled") } }
     @Published var audioDeckEnabled: Bool { didSet { defaults.set(audioDeckEnabled, forKey: "audioDeckEnabled") } }
     @Published var audioDeckStyle: AudioDeckStyle { didSet { defaults.set(audioDeckStyle.rawValue, forKey: "audioDeckStyle") } }
@@ -343,6 +377,16 @@ final class AppSettings: ObservableObject {
             "stripShots": 4,
             "stripFormat": StripFormat.strip.rawValue,
             "mirrorGestures": true,
+            "mirrorBrightness": 0.0,
+            "mirrorContrast": 1.0,
+            "mirrorSaturation": 1.0,
+            "mirrorWarmth": 0.0,
+            "mirrorGlow": 0.0,
+            "mirrorVignette": 0.0,
+            "mirrorZoom": 1.0,
+            "mirrorFlipped": true,
+            "mirrorGrid": false,
+            "mirrorTimerSeconds": 3,
             "meetingReminderMinutes": 5,
             "meetingRemindersOnlyWithLink": false,
             "reminderSound": false,
@@ -478,6 +522,16 @@ final class AppSettings: ObservableObject {
         stripShots = StripShots.choices.contains(defaults.integer(forKey: "stripShots")) ? defaults.integer(forKey: "stripShots") : 4
         stripFormat = StripFormat(rawValue: defaults.string(forKey: "stripFormat") ?? "") ?? .strip
         mirrorGestures = defaults.bool(forKey: "mirrorGestures")
+        mirrorBrightness = defaults.double(forKey: "mirrorBrightness")
+        mirrorContrast = defaults.object(forKey: "mirrorContrast") != nil ? defaults.double(forKey: "mirrorContrast") : 1.0
+        mirrorSaturation = defaults.object(forKey: "mirrorSaturation") != nil ? defaults.double(forKey: "mirrorSaturation") : 1.0
+        mirrorWarmth = defaults.double(forKey: "mirrorWarmth")
+        mirrorGlow = defaults.double(forKey: "mirrorGlow")
+        mirrorVignette = defaults.double(forKey: "mirrorVignette")
+        mirrorZoom = defaults.object(forKey: "mirrorZoom") != nil ? max(1.0, defaults.double(forKey: "mirrorZoom")) : 1.0
+        mirrorFlipped = defaults.object(forKey: "mirrorFlipped") != nil ? defaults.bool(forKey: "mirrorFlipped") : true
+        mirrorGrid = defaults.bool(forKey: "mirrorGrid")
+        mirrorTimerSeconds = defaults.object(forKey: "mirrorTimerSeconds") != nil ? defaults.integer(forKey: "mirrorTimerSeconds") : 3
         meetingReminderMinutes = defaults.integer(forKey: "meetingReminderMinutes")
         meetingRemindersOnlyWithLink = defaults.bool(forKey: "meetingRemindersOnlyWithLink")
         reminderSound = defaults.bool(forKey: "reminderSound")
