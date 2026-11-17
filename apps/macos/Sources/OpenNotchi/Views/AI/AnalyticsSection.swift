@@ -34,7 +34,7 @@ struct AnalyticsSection: View {
     @State private var selectedDate: String?
 
     private var useGateway: Bool {
-        NotchiGatewayService.shared.isAvailable || NotchiGatewayService.shared.hasDatabase
+        NotchiGatewayService.shared.isAvailable
     }
 
     var body: some View {
@@ -88,17 +88,13 @@ struct AnalyticsSection: View {
     /// Everything the tab shows for a window of `days` (nil = all history). Blocking; call off the main thread.
     nonisolated private static func load(days: Int?) -> Snapshot {
         let gw = NotchiGatewayService.shared
+        let current = gw.analytics(days: days)
         var previous: [DayStat] = []
         if let n = days {
             let start = dateKey(daysAgo: n - 1)
-            previous = gw.dailyStats(days: 2 * n).filter { $0.date < start }
+            previous = gw.analytics(days: 2 * n).days.filter { $0.date < start }
         }
-        return Snapshot(
-            days: gw.dailyStats(days: days),
-            previous: previous,
-            models: gw.modelStats(days: days),
-            recent: gw.recentRequests(limit: 20)
-        )
+        return Snapshot(days: current.days, previous: previous, models: current.models, recent: current.recent)
     }
 
     private func total(_ days: [DayStat]) -> DayStat {

@@ -48,7 +48,7 @@ extension AskSection {
                     "\($0.name) \($0.unlimited ? "unlimited" : "\(Int($0.remainingPercentage))% left")"
                 }.joined(separator: ", ")
                 return
-                    "- \(r.account.name) (\(r.account.tool.displayName), \(r.account.isActive ? "on" : "off")): \(formatTokens(r.today.tokens)) tokens today\(quotas.isEmpty ? "" : "; \(quotas)")"
+                    "- \(r.account.name) (\(r.sourceName), \(r.account.isActive ? "on" : "off")): \(formatTokens(r.today.tokens)) tokens today\(quotas.isEmpty ? "" : "; \(quotas)")"
             }
             parts.append("My AI accounts in Gateway:\n" + lines.joined(separator: "\n"))
         }

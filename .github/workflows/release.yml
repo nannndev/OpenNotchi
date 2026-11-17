@@ -39,6 +39,13 @@ jobs:
             echo "Info.plist version ($PLIST_VERSION) does not match tag ($TAG)"; exit 1
           fi
 
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/gateway
+
       - name: Build universal app
         run: UNIVERSAL=1 ./scripts/build-app.sh release
 
@@ -100,7 +107,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: apps/windows/src-tauri
+          workspaces: |
+            apps/windows/src-tauri
+            apps/gateway
       - run: npm ci
       - run: npm test
       - run: npx tauri build --bundles nsis

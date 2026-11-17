@@ -55,6 +55,7 @@ pub fn gateway_router(engine: GatewayEngine) -> Router {
         .route("/gateway/admin/models", get(admin::handle_admin_models))
         .route("/gateway/admin/usage", get(admin::handle_list_usage).delete(admin::handle_clear_usage))
         .route("/gateway/admin/stats", get(admin::handle_get_stats))
+        .route("/gateway/admin/analytics", get(admin::handle_analytics))
         .route("/gateway/admin/settings", get(admin::handle_get_settings).post(admin::handle_update_settings))
         .with_state(engine)
 }

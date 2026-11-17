@@ -5168,7 +5168,7 @@ button:focus-visible {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.2);
 }
-.ai-card-9router {
+.ai-card-gateway {
   cursor: pointer;
 }
 .ai-card-title-group {
@@ -7109,4 +7109,124 @@ button:focus-visible {
 @keyframes np-toast-anim {
   from { opacity: 0; transform: translate(-50%, -10px); }
   to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Settings › Gateway */
+.gw-intro {
+  margin: -6px 0 14px;
+}
+.gw-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.gw-tab {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  background: transparent;
+  border: 1px solid transparent;
+}
+.gw-tab.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.gw-mono {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+}
+.gw-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.gw-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.gw-stats span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.gw-stats b {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.gw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gw-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.gw-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+.gw-code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.gw-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.gw-move {
+  display: inline-flex;
+  gap: 2px;
+}
+.gw-switch input {
+  width: 30px;
+  height: 16px;
+  accent-color: #22c55e;
+}
+.gw-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.gw-inline {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.gw-num {
+  width: 80px;
+}
+.gw-combo-name {
+  width: 110px;
+}
+.gw-msg {
+  margin-top: 12px;
+  font-size: 12px;
+}
+@media (max-width: 520px) {
+  .gw-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

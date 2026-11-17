@@ -1,4 +1,4 @@
-export type SettingsSection = "appearance" | "animations" | "tabs" | "mirror" | "ai" | "general" | "about"
+export type SettingsSection = "appearance" | "animations" | "tabs" | "mirror" | "ai" | "gateway" | "general" | "about"
 
 export interface SettingItem {
   id: string
@@ -274,9 +274,16 @@ export const SETTING_ITEMS: SettingItem[] = [
   {
     id: "ai-quota",
     title: "Quota & Accounts",
-    subtitle: "Multi-account token monitoring, rate limit gauges, and reset countdowns (9router style)",
+    subtitle: "Multi-account token monitoring, rate limit gauges, and reset countdowns",
     section: "ai",
-    keywords: ["quota", "accounts", "tokens", "usage", "limits", "reset", "9router", "kuota", "akun", "penggunaan", "saldo"],
+    keywords: ["quota", "accounts", "tokens", "usage", "limits", "reset", "gateway", "kuota", "akun", "penggunaan", "saldo"],
+  },
+  {
+    id: "gateway",
+    title: "Notchi Gateway",
+    subtitle: "Connect AI accounts and API keys, routing, combos and the local OpenAI-compatible endpoint",
+    section: "gateway",
+    keywords: ["gateway", "provider", "api key", "oauth", "login", "account", "routing", "auto", "combo", "endpoint", "model", "akun", "kunci"],
   },
   {
     id: "ai-meter",
@@ -399,6 +406,7 @@ export const SECTION_METADATA: Record<SettingsSection, { label: string; icon: st
   tabs: { label: "Pill Tabs & Features", icon: "sliders" },
   mirror: { label: "Mirror & Photobox", icon: "video" },
   ai: { label: "AI", icon: "bot" },
+  gateway: { label: "Gateway", icon: "network" },
   general: { label: "General & System", icon: "monitor" },
   about: { label: "About OpenNotchi", icon: "info" },
 }

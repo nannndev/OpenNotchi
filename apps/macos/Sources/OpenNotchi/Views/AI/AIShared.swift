@@ -25,6 +25,28 @@ extension AgentTool {
     }
 }
 
+/// The logo for a usage report: its gateway provider's brand, or the local tool's logo.
+struct ReportLogo: View {
+    let report: UsageReport
+    var size: CGFloat = 20
+
+    var body: some View {
+        if let provider = report.provider, AgentTool(rawValue: provider) == nil {
+            ProviderBrandIcon(providerId: provider, name: report.sourceName, size: size)
+        } else {
+            ToolLogo(tool: report.account.tool, size: size)
+        }
+    }
+}
+
+extension UsageReport {
+    /// Accent colour for this account's source.
+    var tint: Color {
+        if let provider, AgentTool(rawValue: provider) == nil { return ProviderBrandIcon.style(for: provider).color }
+        return account.tool.tint
+    }
+}
+
 /// Provider logo, falling back to the SF Symbol when the bundled PNG is missing (e.g. `swift run`).
 struct ToolLogo: View {
     let tool: AgentTool

@@ -681,7 +681,7 @@ pub async fn start_gemini_cli_flow(
     account_id: Option<String>,
 ) -> Result<Value, String> {
     let client_id = store.get_setting("gemini_oauth_client_id").filter(|s| !s.trim().is_empty()).ok_or_else(|| {
-        "Gemini OAuth Client ID belum dikonfigurasi. Silakan buka tab Gemini App / Settings untuk mengisi client ID dan secret.".to_string()
+        "Gemini CLI login needs a Google OAuth client ID and secret. Add them in Notchi Gateway › Accounts first.".to_string()
     })?;
 
     let session_id = Uuid::new_v4().to_string();

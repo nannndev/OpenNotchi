@@ -125,7 +125,7 @@ enum NotchiBrain {
 
         What OpenNotchi does: hover the notch to open it. Tabs: \(NotchTab.allCases.map(\.rawValue).joined(separator: ", ")). \
         Home shows the music player (Spotify, Apple Music, YouTube) with synced lyrics, calendar and weather. \
-        Tray holds files dragged onto the notch (AirDrop, convert images). AI shows Gateway quota per account, usage analytics, \
+        Tray holds files dragged onto the notch (AirDrop, convert images). AI shows usage per account (local tools and Notchi Gateway), usage analytics, \
         coding agent status (Claude Code, Codex, Antigravity, Command Code) and this chat. Peeks are small banners for charging, \
         devices, downloads, camera/mic use, agents and meetings. Settings panes: \(SettingsPane.allCases.map(\.rawValue).joined(separator: ", ")).
 

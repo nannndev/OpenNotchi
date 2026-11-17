@@ -6,6 +6,24 @@ on:
   pull_request:
 
 jobs:
+  gateway:
+    name: Gateway (Rust)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/gateway
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --all-features --locked -- -D warnings
+      - run: cargo test --locked
+
   macos:
     name: macOS app
     runs-on: macos-15
@@ -18,6 +36,10 @@ jobs:
         run: |
           XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1 || true)
           if [ -n "$XCODE" ]; then sudo xcode-select -s "$XCODE"; fi
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/gateway
       - name: Build
         run: ./scripts/build-app.sh release
 
@@ -53,7 +75,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: apps/windows/src-tauri
+          workspaces: |
+            apps/windows/src-tauri
+            apps/gateway
       - run: npm ci
       - run: npm test
       - run: npx tauri build --bundles nsis

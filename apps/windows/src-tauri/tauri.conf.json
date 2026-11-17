@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build:gateway && npm run build"
   },
   "app": {
     "windows": [
@@ -100,6 +100,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "shortDescription": "Now playing, synced lyrics and live activities in a pill at the top of your screen."
+    "shortDescription": "Now playing, synced lyrics and live activities in a pill at the top of your screen.",
+    "externalBin": [
+      "binaries/notchi-gateway"
+    ]
   }
 }

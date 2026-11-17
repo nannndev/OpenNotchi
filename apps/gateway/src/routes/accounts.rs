@@ -72,24 +72,42 @@ pub async fn handle_reorder_accounts(
     Json(get_oauth_accounts_state(&engine.store))
 }
 
-pub async fn handle_accounts_usage(State(engine): State<GatewayEngine>) -> Json<Value> {
-    let accounts = engine.store.list_accounts();
-    let usage: Vec<Value> = accounts
+#[derive(Deserialize, Default)]
+pub struct UsageQuery {
+    /// How many local days of history to return (default 7).
+    days: Option<u32>,
+    /// Caller's offset from UTC in minutes (east positive), so days match its calendar.
+    tz_offset_min: Option<i64>,
+}
+
+/// One entry per account with its plan, health, cooldown and tokens per local day.
+/// Accounts of one provider share that provider's request log.
+pub async fn handle_accounts_usage(State(engine): State<GatewayEngine>, Query(q): Query<UsageQuery>) -> Json<Value> {
+    let days = q.days.unwrap_or(7).clamp(1, 90);
+    let offset = q.tz_offset_min.unwrap_or(0) * 60;
+    let by_provider = engine.store.daily_tokens_by_provider(days, offset);
+    let usage: Vec<Value> = engine
+        .store
+        .list_accounts()
         .iter()
         .map(|a| {
+            let days_tokens = by_provider.get(&a.provider).cloned().unwrap_or_else(|| vec![0; days as usize]);
             json!({
                 "provider": a.provider,
                 "account_id": a.id,
+                "label": a.label,
                 "email": a.email,
+                "enabled": a.enabled,
+                "sort_order": a.sort_order,
                 "last_error": a.last_error,
                 "plan": a.display_plan(),
-                "windows": [],
-                "limit_reached": false,
-                "fetched_at": crate::store::now(),
+                "cooling_until": engine.store.cooling_until(&a.id),
+                "today_tokens": days_tokens.last().copied().unwrap_or(0),
+                "days": days_tokens,
             })
         })
         .collect();
-    Json(json!({ "usage": usage, "summary": {} }))
+    Json(json!({ "usage": usage }))
 }
 
 #[derive(Deserialize)]

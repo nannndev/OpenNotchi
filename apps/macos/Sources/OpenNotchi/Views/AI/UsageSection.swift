@@ -43,7 +43,7 @@ struct UsageSection: View {
     private var providerFilters: [String] {
         var set: [String] = ["ALL"]
         for r in usage.reports {
-            let key = r.account.tool.rawValue.uppercased()
+            let key = r.sourceKey.uppercased()
             if !set.contains(key) {
                 set.append(key)
             }
@@ -53,7 +53,7 @@ struct UsageSection: View {
 
     private var filteredReports: [UsageReport] {
         if selectedFilter == "ALL" { return usage.reports }
-        return usage.reports.filter { $0.account.tool.rawValue.uppercased() == selectedFilter }
+        return usage.reports.filter { $0.sourceKey.uppercased() == selectedFilter }
     }
 
     var body: some View {
@@ -126,7 +126,7 @@ struct UsageSection: View {
                 HStack(spacing: 6) {
                     if providerFilters.count > 2 {
                         ForEach(providerFilters, id: \.self) { filter in
-                            let count = filter == "ALL" ? usage.reports.count : usage.reports.filter { $0.account.tool.rawValue.uppercased() == filter }.count
+                            let count = filter == "ALL" ? usage.reports.count : usage.reports.filter { $0.sourceKey.uppercased() == filter }.count
                             Button {
                                 selectedFilter = filter
                             } label: {

@@ -442,11 +442,27 @@ pub struct UsageReport {
     /// Tokens per local day, oldest first, today last.
     pub days: Vec<u64>,
     pub limits: Option<CodexLimits>,
-    pub quotas: Vec<crate::ninerouter::NineRouterQuota>,
+    /// Live quota windows (kept for the UI's quota views; the gateway doesn't report them yet).
+    pub quotas: Vec<Quota>,
     pub plan_name: Option<String>,
     pub test_status: Option<String>,
     pub last_error: Option<String>,
-    pub is_from_9router: bool,
+    /// True for accounts connected in Notchi Gateway (they can be toggled there).
+    pub is_from_gateway: bool,
+    /// The gateway provider id (e.g. "codex", "kimi"); None for local session folders.
+    pub provider: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Quota {
+    pub name: String,
+    pub used: f64,
+    pub total: f64,
+    pub remaining: f64,
+    pub remaining_percentage: f64,
+    pub reset_at: Option<i64>,
+    pub unlimited: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -648,7 +664,8 @@ fn claude_report(account: &Account, now: i64, tz: i64) -> UsageReport {
         plan_name: None,
         test_status: None,
         last_error: None,
-        is_from_9router: false,
+        is_from_gateway: false,
+        provider: None,
     }
 }
 
@@ -723,7 +740,8 @@ fn codex_report(account: &Account, now: i64, tz: i64) -> UsageReport {
         plan_name: None,
         test_status: None,
         last_error: None,
-        is_from_9router: false,
+        is_from_gateway: false,
+        provider: None,
     }
 }
 
@@ -797,7 +815,8 @@ fn antigravity_report(account: &Account, now: i64, tz: i64) -> UsageReport {
         plan_name: None,
         test_status: None,
         last_error: None,
-        is_from_9router: false,
+        is_from_gateway: false,
+        provider: None,
     }
 }
 
@@ -806,41 +825,20 @@ fn antigravity_report(account: &Account, now: i64, tz: i64) -> UsageReport {
 pub async fn ai_usage(accounts: Vec<Account>, tz_offset_min: i64) -> Vec<UsageReport> {
     tauri::async_runtime::spawn_blocking(move || {
         let now = now_ms();
-        let mut reports = Vec::new();
-
-        // 1. Prioritize 9router if available
-        if crate::ninerouter::is_available() {
-            let nine_reports = crate::ninerouter::fetch_reports();
-            if !nine_reports.is_empty() {
-                reports = nine_reports;
+        // Accounts connected in Notchi Gateway first, then local session folders it doesn't cover.
+        let mut reports = if crate::gateway::is_available() { crate::gateway::reports(tz_offset_min) } else { Vec::new() };
+        let routed: std::collections::HashSet<String> = reports.iter().map(|r| r.tool.clone()).collect();
+        for a in &accounts {
+            if routed.contains(&a.tool) {
+                continue;
             }
-        }
-
-        // 2. If 9router is not available or returned empty, scan local accounts
-        if reports.is_empty() {
-            reports = accounts
-                .iter()
-                .map(|a| match a.tool.as_str() {
-                    "codex" => codex_report(a, now, tz_offset_min),
-                    "antigravity" => antigravity_report(a, now, tz_offset_min),
-                    _ => claude_report(a, now, tz_offset_min),
-                })
-                .collect();
-        } else {
-            // Append accounts for tools 9router doesn't know
-            use std::collections::HashSet;
-            let routed: HashSet<String> = reports.iter().map(|r| r.tool.clone()).collect();
-            for a in &accounts {
-                if !routed.contains(&a.tool) {
-                    let r = match a.tool.as_str() {
-                        "codex" => codex_report(a, now, tz_offset_min),
-                        "antigravity" => antigravity_report(a, now, tz_offset_min),
-                        _ => claude_report(a, now, tz_offset_min),
-                    };
-                    if r.found {
-                        reports.push(r);
-                    }
-                }
+            let r = match a.tool.as_str() {
+                "codex" => codex_report(a, now, tz_offset_min),
+                "antigravity" => antigravity_report(a, now, tz_offset_min),
+                _ => claude_report(a, now, tz_offset_min),
+            };
+            if r.found || reports.is_empty() {
+                reports.push(r);
             }
         }
 
@@ -851,13 +849,25 @@ pub async fn ai_usage(accounts: Vec<Account>, tz_offset_min: i64) -> Vec<UsageRe
 }
 
 #[tauri::command]
-pub async fn ninerouter_analytics(days: Option<u32>) -> crate::ninerouter::Analytics {
-    tauri::async_runtime::spawn_blocking(move || crate::ninerouter::analytics(days)).await.unwrap_or_default()
+pub async fn gateway_analytics(days: Option<u32>, tz_offset_min: Option<i64>) -> crate::gateway::Analytics {
+    tauri::async_runtime::spawn_blocking(move || crate::gateway::analytics(days, tz_offset_min.unwrap_or(0))).await.unwrap_or_default()
 }
 
 #[tauri::command]
-pub fn set_9router_connection_active(id: String, active: bool) -> Result<(), String> {
-    crate::ninerouter::set_connection_active(&id, active)
+pub async fn gateway_set_account_active(provider: String, id: String, active: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || crate::gateway::set_account_enabled(&provider, &id, active)).await.map_err(|e| e.to_string())?
+}
+
+/// Calls the gateway's admin API for Settings › Gateway (providers, accounts, routing).
+#[tauri::command]
+pub async fn gateway_admin(method: String, path: String, body: Option<Value>) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || crate::gateway::admin(&method, &path, body)).await.map_err(|e| e.to_string())?
+}
+
+/// The local OpenAI-compatible endpoint, for pointing other agents at the gateway.
+#[tauri::command]
+pub fn gateway_endpoint() -> &'static str {
+    crate::gateway::V1_URL
 }
 
 /// The default accounts whose folders exist: `~/.claude`, `~/.codex`, and `~/.gemini/antigravity-ide`.
@@ -1199,12 +1209,11 @@ fn ask_blocking(req: &AskRequest) -> Result<String, String> {
             let r = agent.post(format!("{base}/api/chat"));
             ollama_text(&send(r, json!({ "model": req.model, "messages": messages, "stream": false }))?)
         }
-        "ninerouter" => {
-            let key = crate::ninerouter::api_key().ok_or("No active API key in 9router. Create one in its dashboard › Endpoint & Key.")?;
-            let model = ninerouter_model(&req.model)?;
+        "gateway" => {
+            crate::gateway::ensure_running()?;
             let messages = json!([{ "role": "system", "content": SYSTEM_PROMPT }, { "role": "user", "content": req.prompt }]);
-            let r = agent.post(format!("{}/chat/completions", crate::ninerouter::BASE_URL)).header("Authorization", &format!("Bearer {key}"));
-            openai_text(&send(r, json!({ "model": model, "messages": messages }))?)
+            let r = agent.post(format!("{}/chat/completions", crate::gateway::V1_URL));
+            openai_text(&send(r, json!({ "model": gateway_model(&req.model), "messages": messages, "stream": false }))?)
         }
         _ => Err("Unknown provider".into()),
     }
@@ -1267,14 +1276,9 @@ pub fn sse_delta(line: &str) -> Option<String> {
     (!text.is_empty()).then(|| text.to_string())
 }
 
-/// The chosen 9router model, or the first Haiku/Sonnet it offers so chat works with no setup.
-fn ninerouter_model(chosen: &str) -> Result<String, String> {
-    if !chosen.is_empty() {
-        return Ok(chosen.to_string());
-    }
-    let models = crate::ninerouter::models();
-    models.iter().find(|m| m.contains("haiku")).or_else(|| models.iter().find(|m| m.contains("sonnet"))).or(models.first())
-        .cloned().ok_or_else(|| "9router isn't running. Start it, then try again.".to_string())
+/// The chosen gateway model; empty means let the gateway pick (`auto`).
+fn gateway_model(chosen: &str) -> String {
+    if chosen.trim().is_empty() { "auto".into() } else { chosen.to_string() }
 }
 
 fn chat_blocking(app: &tauri::AppHandle, req: &ChatRequest) -> Result<String, String> {
@@ -1287,9 +1291,9 @@ fn chat_blocking(app: &tauri::AppHandle, req: &ChatRequest) -> Result<String, St
         return Ok(text);
     }
     let (url, key, model) = match req.provider.as_str() {
-        "ninerouter" => {
-            let key = crate::ninerouter::api_key().ok_or("No active API key in 9router. Create one in its dashboard › Endpoint & Key.")?;
-            (format!("{}/chat/completions", crate::ninerouter::BASE_URL), Some(key), ninerouter_model(&req.model)?)
+        "gateway" => {
+            crate::gateway::ensure_running()?;
+            (format!("{}/chat/completions", crate::gateway::V1_URL), None, gateway_model(&req.model))
         }
         "openai" | "ollama" => {
             let base = req.base_url.trim().trim_end_matches('/');
@@ -1340,13 +1344,13 @@ pub async fn ai_chat(app: tauri::AppHandle, req: ChatRequest) -> Result<String, 
 }
 
 #[tauri::command]
-pub async fn ninerouter_models() -> Vec<String> {
-    tauri::async_runtime::spawn_blocking(crate::ninerouter::models).await.unwrap_or_default()
+pub async fn gateway_models() -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(crate::gateway::models).await.unwrap_or_default()
 }
 
 #[tauri::command]
-pub fn ninerouter_available() -> bool {
-    crate::ninerouter::is_available()
+pub fn gateway_available() -> bool {
+    crate::gateway::is_available()
 }
 
 #[cfg(test)]

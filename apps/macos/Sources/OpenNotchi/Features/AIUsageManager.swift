@@ -41,12 +41,12 @@ final class AIUsageManager: ObservableObject {
             var models: [(model: String, tokens: Int, cost: Double)] = []
 
             // 1. Notchi Gateway accounts & reports
-            if NotchiGatewayService.shared.hasDatabase || NotchiGatewayService.shared.isAvailable {
+            if NotchiGatewayService.shared.isAvailable {
                 let gwReports = NotchiGatewayService.shared.fetchReports()
                 if !gwReports.isEmpty {
                     allReports = gwReports
                     fromGateway = true
-                    models = NotchiGatewayService.shared.todayModels()
+                    models = NotchiGatewayService.shared.analytics(days: 1).todayModels
                 }
             }
 
@@ -55,7 +55,8 @@ final class AIUsageManager: ObservableObject {
                 allReports = localAccounts.map { AIUsage.report($0) }
             } else {
                 // Gateway logs requests for routed accounts. Folders not routed are added directly.
-                let routed = Set(allReports.map(\.account.tool))
+                // Only providers that are also local tools (claude, codex, antigravity) can overlap.
+                let routed = Set(allReports.compactMap { $0.provider.flatMap(AgentTool.init(rawValue:)) })
                 for acc in localAccounts where !routed.contains(acc.tool) {
                     let r = AIUsage.report(acc)
                     if r.found {
@@ -73,16 +74,16 @@ final class AIUsageManager: ObservableObject {
         }
     }
 
-    func toggleAccountActive(id: UUID, connectionId: String?, provider: String? = nil, active: Bool) {
+    /// Pauses or resumes a gateway account; local folders can't be toggled.
+    func toggleAccountActive(_ report: UsageReport, active: Bool) {
+        guard let provider = report.provider, let connId = report.account.connectionId else { return }
         // Optimistic local update
-        if let idx = reports.firstIndex(where: { $0.account.id == id }) {
+        if let idx = reports.firstIndex(where: { $0.account.id == report.account.id }) {
             reports[idx].account.isActive = active
         }
-        if let connId = connectionId {
-            Task {
-                try? await NotchiGatewayService.shared.toggleAccount(provider: provider ?? "", id: connId, enabled: active)
-                self.refresh(force: true)
-            }
+        Task {
+            try? await NotchiGatewayService.shared.toggleAccount(provider: provider, id: connId, enabled: active)
+            self.refresh(force: true)
         }
     }
 

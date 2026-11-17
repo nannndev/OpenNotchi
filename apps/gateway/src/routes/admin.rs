@@ -195,6 +195,18 @@ pub async fn handle_get_stats(State(engine): State<GatewayEngine>) -> Json<Value
     Json(engine.store.get_stats())
 }
 
+#[derive(Deserialize)]
+pub struct AnalyticsQuery {
+    /// Days of history; omit for all.
+    days: Option<u32>,
+    /// Caller's offset from UTC in minutes (east positive).
+    tz_offset_min: Option<i64>,
+}
+
+pub async fn handle_analytics(State(engine): State<GatewayEngine>, Query(q): Query<AnalyticsQuery>) -> Json<Value> {
+    Json(engine.store.analytics(q.days, q.tz_offset_min.unwrap_or(0) * 60))
+}
+
 pub async fn handle_get_settings(State(engine): State<GatewayEngine>) -> Json<Value> {
     Json(settings_response(&engine))
 }

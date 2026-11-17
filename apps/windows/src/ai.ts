@@ -1,6 +1,6 @@
 /** AI features: agent status, usage and Ask AI. Pure helpers here; the file reading is in Rust (src-tauri/src/ai.rs). */
 
-export type AiProvider = "ninerouter" | "ollama" | "anthropic" | "openai"
+export type AiProvider = "gateway" | "ollama" | "anthropic" | "openai"
 export type AgentTool = "claude" | "codex" | "antigravity" | "commandcode" | string
 export type AgentState = "working" | "needs_you" | "done" | "idle"
 export type AccountHealth = "healthy" | "warning" | "exhausted"
@@ -35,7 +35,7 @@ export interface RateWindow {
   resetsAt: number
 }
 
-export interface NineRouterQuota {
+export interface Quota {
   name: string
   used: number
   total: number
@@ -59,11 +59,14 @@ export interface UsageReport {
   block: { start: number; end: number; tokens: number; cost: number } | null
   days: number[]
   limits: { planType: string | null; primary: RateWindow | null; secondary: RateWindow | null } | null
-  quotas?: NineRouterQuota[]
+  quotas?: Quota[]
   planName?: string | null
   testStatus?: string | null
   lastError?: string | null
-  isFrom9Router?: boolean
+  /** Connected in Notchi Gateway, so it can be paused / resumed there. */
+  isFromGateway?: boolean
+  /** Gateway provider id ("codex", "kimi", …); absent for local session folders. */
+  provider?: string | null
 }
 
 export interface QuotaInfo {
@@ -85,7 +88,7 @@ export const TOOL_NAMES: Record<string, string> = {
 export const STATE_LABELS: Record<AgentState, string> = { working: "working", needs_you: "needs you", done: "done", idle: "idle" }
 
 export const PROVIDERS: { id: AiProvider; name: string }[] = [
-  { id: "ninerouter", name: "9router (your accounts)" },
+  { id: "gateway", name: "Notchi Gateway (your accounts)" },
   { id: "ollama", name: "Ollama (local)" },
   { id: "anthropic", name: "Anthropic API" },
   { id: "openai", name: "OpenAI-compatible" },
@@ -155,10 +158,10 @@ export function resetsIn(atMs: number, now: number): string {
   return `resets in ${m}m`
 }
 
-/** The compact closed-notch meter: a hot 9router / Codex window at ≥ 80 %, else an active Claude block's elapsed share. */
+/** The compact closed-notch meter: a hot gateway quota / Codex window at ≥ 80 %, else an active Claude block's elapsed share. */
 export function closedMeter(reports: UsageReport[], now: number): { label: string; percent: number; hot: boolean } | null {
   for (const r of reports) {
-    if (r.isFrom9Router && r.isActive !== false && r.quotas) {
+    if (r.isFromGateway && r.isActive !== false && r.quotas) {
       for (const q of r.quotas) {
         if (!q.unlimited && q.total > 0 && q.remainingPercentage <= 20) {
           const pct = Math.min(100, Math.max(0, 100 - q.remainingPercentage))
@@ -177,9 +180,9 @@ export function closedMeter(reports: UsageReport[], now: number): { label: strin
   return { label: formatTokens(block.tokens), percent, hot: false }
 }
 
-/** 9router-style quota and rate-limit gauge info for an account. */
+/** Quota and rate-limit gauge info for an account. */
 export function getAccountQuota(r: UsageReport, now: number): QuotaInfo {
-  if (r.isFrom9Router && r.quotas && r.quotas.length > 0) {
+  if (r.isFromGateway && r.quotas && r.quotas.length > 0) {
     const primary = r.quotas.find((q) => q.name.toLowerCase().includes("session") || q.name.includes("5h")) || r.quotas[0]
     if (primary) {
       const percent = primary.unlimited ? 0 : Math.min(100, Math.max(0, 100 - primary.remainingPercentage))

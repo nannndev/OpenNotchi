@@ -803,7 +803,7 @@ impl GatewayStore {
                     "input_tokens": r.get::<_, Option<i64>>(6)?.unwrap_or(0),
                     "output_tokens": r.get::<_, Option<i64>>(7)?.unwrap_or(0),
                     "duration_ms": r.get::<_, Option<i64>>(8)?.unwrap_or(0),
-                    "status": r.get::<_, Option<String>>(9)?.unwrap_or_else(|| "ok".to_string()),
+                    "status": r.get::<_, Option<String>>(9)?.unwrap_or_else(|| "success".to_string()),
                     "status_code": r.get::<_, Option<i64>>(10)?.unwrap_or(200),
                     "error": r.get::<_, Option<String>>(11)?,
                     "streaming": r.get::<_, Option<i64>>(12)?.unwrap_or(0) != 0,
@@ -830,6 +830,90 @@ impl GatewayStore {
         );
     }
 
+    /// Tokens per provider per local day for the last `days` days (oldest first, today last).
+    /// `utc_offset_secs` shifts unix time to the caller's local day.
+    pub fn daily_tokens_by_provider(&self, days: u32, utc_offset_secs: i64) -> HashMap<String, Vec<i64>> {
+        let conn = self.conn.lock();
+        let today = (now() as i64 + utc_offset_secs).div_euclid(86_400);
+        let first = today - i64::from(days.max(1)) + 1;
+        let rows = query_rows(
+            &conn,
+            "SELECT provider, CAST((ts + ?1) / 86400 AS INTEGER) AS d, SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0))
+             FROM usage WHERE provider IS NOT NULL AND (ts + ?1) >= ?2 * 86400 GROUP BY provider, d",
+            params![utc_offset_secs, first],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?, r.get::<_, i64>(2)?)),
+        );
+        let mut out: HashMap<String, Vec<i64>> = HashMap::new();
+        for (provider, day, tokens) in rows {
+            let idx = day - first;
+            if (0..i64::from(days.max(1))).contains(&idx) {
+                out.entry(provider).or_insert_with(|| vec![0; days.max(1) as usize])[idx as usize] += tokens;
+            }
+        }
+        out
+    }
+
+    /// Request log rollup for charts: per-day totals, latest requests and top models.
+    /// `days` None covers all history; days are local per `utc_offset_secs`.
+    pub fn analytics(&self, days: Option<u32>, utc_offset_secs: i64) -> Value {
+        let conn = self.conn.lock();
+        let since = days.map_or(0.0, |d| {
+            let today = (now() as i64 + utc_offset_secs).div_euclid(86_400);
+            ((today - i64::from(d.max(1)) + 1) * 86_400 - utc_offset_secs) as f64
+        });
+        let day_rows = query_rows(
+            &conn,
+            "SELECT CAST((ts + ?1) / 86400 AS INTEGER) AS d, COUNT(*), SUM(COALESCE(input_tokens,0)), SUM(COALESCE(output_tokens,0))
+             FROM usage WHERE ts >= ?2 GROUP BY d ORDER BY d",
+            params![utc_offset_secs, since],
+            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, i64>(2)?, r.get::<_, i64>(3)?)),
+        );
+        let days_json: Vec<Value> = day_rows
+            .into_iter()
+            .map(|(d, req, inp, out)| {
+                let date = chrono::DateTime::from_timestamp(d * 86_400, 0).map(|t| t.format("%Y-%m-%d").to_string()).unwrap_or_default();
+                json!({ "date": date, "requests": req, "input": inp, "cached": 0, "output": out, "cost": 0.0 })
+            })
+            .collect();
+        let recent = query_rows(
+            &conn,
+            "SELECT ts, COALESCE(model,'auto'), COALESCE(provider,''), COALESCE(input_tokens,0), COALESCE(output_tokens,0), COALESCE(status_code,200)
+             FROM usage ORDER BY ts DESC LIMIT 20",
+            [],
+            |r| {
+                Ok(json!({
+                    "ts": r.get::<_, f64>(0)?, "model": r.get::<_, String>(1)?, "provider": r.get::<_, String>(2)?,
+                    "input": r.get::<_, i64>(3)?, "output": r.get::<_, i64>(4)?, "ok": r.get::<_, i64>(5)? < 400,
+                }))
+            },
+        );
+        let today_start = ((now() as i64 + utc_offset_secs).div_euclid(86_400) * 86_400 - utc_offset_secs) as f64;
+        let top = query_rows(
+            &conn,
+            "SELECT COALESCE(model,'auto'), COALESCE(provider,''), SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0)) AS tok
+             FROM usage WHERE ts >= ?1 GROUP BY model, provider ORDER BY tok DESC LIMIT 8",
+            params![today_start],
+            |r| {
+                Ok(
+                    json!({ "model": r.get::<_, String>(0)?, "provider": r.get::<_, String>(1)?, "tokens": r.get::<_, i64>(2)?, "cost": 0.0 }),
+                )
+            },
+        );
+        let models = query_rows(
+            &conn,
+            "SELECT COALESCE(model,'auto'), COALESCE(provider,''), SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0)) AS tok
+             FROM usage WHERE ts >= ?1 GROUP BY model, provider ORDER BY tok DESC LIMIT 12",
+            params![since],
+            |r| {
+                Ok(
+                    json!({ "model": r.get::<_, String>(0)?, "provider": r.get::<_, String>(1)?, "tokens": r.get::<_, i64>(2)?, "cost": 0.0 }),
+                )
+            },
+        );
+        // `top_models` covers today only; `models` covers the requested range.
+        json!({ "days": days_json, "recent": recent, "top_models": top, "models": models })
+    }
+
     pub fn get_stats(&self) -> Value {
         let conn = self.conn.lock();
         let mut stats = json!({
@@ -842,7 +926,7 @@ impl GatewayStore {
         });
 
         let _ = conn.query_row(
-            "SELECT COUNT(*), COALESCE(SUM(input_tokens), 0), COALESCE(SUM(output_tokens), 0), COALESCE(SUM(CASE WHEN status != 'ok' OR status_code >= 400 THEN 1 ELSE 0 END), 0) FROM usage",
+            "SELECT COUNT(*), COALESCE(SUM(input_tokens), 0), COALESCE(SUM(output_tokens), 0), COALESCE(SUM(CASE WHEN status = 'error' OR status_code >= 400 THEN 1 ELSE 0 END), 0) FROM usage",
             [],
             |r| {
                 stats["requests"] = json!(r.get::<_, i64>(0)?);
@@ -1127,6 +1211,103 @@ mod tests {
         fn defaults_to_two_auto_models_per_provider() {
             let (s, _d) = store();
             assert_eq!(s.get_gateway_settings().auto_models_per_provider, 2);
+        }
+    }
+
+    mod analytics {
+        use super::*;
+
+        fn log(s: &GatewayStore, provider: &str, tokens: i64, status_code: i64) {
+            s.record_usage(&UsageEntry {
+                key_id: None,
+                key_name: None,
+                provider: Some(provider),
+                model: Some("m"),
+                input_tokens: tokens,
+                output_tokens: 0,
+                duration_ms: 1,
+                status: if status_code < 400 { "success" } else { "error" },
+                status_code,
+                error: None,
+                streaming: false,
+            });
+        }
+
+        #[test]
+        fn todays_tokens_land_in_the_last_day_slot() {
+            let (s, _d) = store();
+            log(&s, "codex", 7, 200);
+            assert_eq!(s.daily_tokens_by_provider(7, 0).get("codex").map(|d| d[6]), Some(7));
+        }
+
+        #[test]
+        fn daily_tokens_cover_the_requested_number_of_days() {
+            let (s, _d) = store();
+            log(&s, "codex", 7, 200);
+            assert_eq!(s.daily_tokens_by_provider(14, 0).get("codex").map(Vec::len), Some(14));
+        }
+
+        #[test]
+        fn analytics_counts_requests_per_day() {
+            let (s, _d) = store();
+            log(&s, "codex", 1, 200);
+            log(&s, "codex", 1, 200);
+            assert_eq!(s.analytics(Some(7), 0)["days"][0]["requests"], 2);
+        }
+
+        #[test]
+        fn analytics_marks_failed_requests() {
+            let (s, _d) = store();
+            log(&s, "codex", 1, 429);
+            assert_eq!(s.analytics(None, 0)["recent"][0]["ok"], false);
+        }
+
+        #[test]
+        fn analytics_lists_models_for_the_whole_range() {
+            let (s, _d) = store();
+            log(&s, "codex", 5, 200);
+            assert_eq!(s.analytics(None, 0)["models"][0]["provider"], "codex");
+        }
+
+        #[test]
+        fn analytics_ranks_todays_models_by_tokens() {
+            let (s, _d) = store();
+            log(&s, "codex", 5, 200);
+            assert_eq!(s.analytics(Some(1), 0)["top_models"][0]["tokens"], 5);
+        }
+    }
+
+    mod stats {
+        use super::*;
+
+        fn log(s: &GatewayStore, status: &str, code: i64) {
+            s.record_usage(&UsageEntry {
+                key_id: None,
+                key_name: None,
+                provider: Some("codex"),
+                model: Some("m"),
+                input_tokens: 1,
+                output_tokens: 1,
+                duration_ms: 1,
+                status,
+                status_code: code,
+                error: None,
+                streaming: false,
+            });
+        }
+
+        #[test]
+        fn successful_requests_are_not_counted_as_errors() {
+            let (s, _d) = store();
+            log(&s, "success", 200);
+            assert_eq!(s.get_stats()["errors"], 0);
+        }
+
+        #[test]
+        fn failed_requests_are_counted_as_errors() {
+            let (s, _d) = store();
+            log(&s, "error", 429);
+            assert_eq!(s.get_stats()["errors"], 1);
         }
     }
 

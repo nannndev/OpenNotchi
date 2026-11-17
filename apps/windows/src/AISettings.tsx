@@ -161,7 +161,7 @@ function ProviderSettings() {
   const [routerModels, setRouterModels] = useState<string[]>([])
 
   useEffect(() => {
-    if (p === "ninerouter") invoke<string[]>("ninerouter_models").then(setRouterModels).catch(() => {})
+    if (p === "gateway") invoke<string[]>("gateway_models").then(setRouterModels).catch(() => {})
   }, [p])
 
   useEffect(() => {
@@ -205,7 +205,7 @@ function ProviderSettings() {
         </select>
       </div>
 
-      {p !== "anthropic" && p !== "ninerouter" && (
+      {p !== "anthropic" && p !== "gateway" && (
         <div className="toggle-row">
           <div className="toggle-info">
             <div className="toggle-title">Base URL</div>
@@ -222,10 +222,10 @@ function ProviderSettings() {
         <div className="toggle-info">
           <div className="toggle-title">Model</div>
         </div>
-        {p === "ninerouter" ? (
-          <select className="settings-select" value={settings.aiNineRouterModel} onChange={(e) => setSettings({ aiNineRouterModel: e.target.value })}>
-            <option value="">Automatic (Haiku or Sonnet)</option>
-            {routerModels.map((m) => (
+        {p === "gateway" ? (
+          <select className="settings-select" value={settings.aiGatewayModel} onChange={(e) => setSettings({ aiGatewayModel: e.target.value })}>
+            <option value="">Automatic (auto fallback)</option>
+            {routerModels.filter((m) => m !== "auto").map((m) => (
               <option key={m}>{m}</option>
             ))}
           </select>

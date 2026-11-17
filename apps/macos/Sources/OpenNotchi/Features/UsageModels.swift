@@ -41,10 +41,7 @@ struct GatewayQuota: Equatable {
     }
 
     private static let poolLabels: [(key: String, label: String)] = [
-        ("gemini_pro", "Gemini 2.5 Pro"),
-        ("gemini_flash", "Gemini 2.5 Flash"),
-        ("claude_sonnet", "Claude 3.7 Sonnet"),
-        ("claude_opus", "Claude 3 Opus"),
+        ("gemini_session", "Gemini (5h)"),
         ("claude_gpt_session", "Claude & GPT (5h)"),
         ("gemini_weekly", "Gemini (Weekly)"),
         ("claude_gpt_weekly", "Claude & GPT (Weekly)"),
@@ -106,6 +103,38 @@ struct UsageReport: Identifiable {
     var testStatus: String?
     var lastError: String?
     var isFromGateway: Bool = false
+    /// Gateway provider id ("codex", "kimi", "cline", …); nil for local session folders.
+    var provider: String?
+    /// The gateway is skipping this account after a rate limit until then.
+    var coolingUntil: Date?
+
+    /// Provider name for gateway accounts, the tool name for local folders.
+    var sourceName: String { provider.map(GatewayProvider.name) ?? account.tool.displayName }
+    /// Key used to group and filter accounts by where they come from.
+    var sourceKey: String { provider ?? account.tool.rawValue }
+}
+
+/// Display names for gateway providers that aren't local agent tools.
+enum GatewayProvider {
+    static func name(_ id: String) -> String {
+        switch id {
+        case "claude": return "Claude"
+        case "codex": return "ChatGPT / Codex"
+        case "copilot": return "GitHub Copilot"
+        case "gemini-cli": return "Gemini CLI"
+        case "kimi": return "Kimi Code"
+        case "muse": return "Muse Code"
+        case "nous": return "Nous Research"
+        case "kilocode": return "Kilo Code"
+        case "cline": return "Cline"
+        case "minimax-code": return "MiniMax Code"
+        case "minimax-code-global": return "MiniMax Code (Global)"
+        case "antigravity": return "Antigravity"
+        case "grok-cli": return "Grok CLI"
+        case "kiro": return "Kiro"
+        default: return id.capitalized
+        }
+    }
 }
 
 enum AccountHealth: String {
@@ -126,7 +155,7 @@ extension UsageReport {
                 return AccountQuota(percent: 100, label: "Inactive", resetsText: "Disabled in Gateway", health: .exhausted)
             }
             if testStatus == "unavailable" || (lastError?.contains("rate_limit") == true) {
-                let reset = quotas.compactMap(\.resetAt).filter { $0 > .now }.min()
+                let reset = coolingUntil ?? quotas.compactMap(\.resetAt).filter { $0 > .now }.min()
                 let resetsText = reset != nil ? resetsIn(reset!) : "Rate limited"
                 return AccountQuota(percent: 100, label: "Rate Limit", resetsText: resetsText, health: .exhausted)
             }

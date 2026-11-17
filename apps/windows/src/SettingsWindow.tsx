@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
+import { listen } from "@tauri-apps/api/event"
 import {
   Check,
   ChevronRight,
@@ -22,12 +23,14 @@ import {
   Video,
   Wand2,
   Bot,
+  Network,
   Search,
   X,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { CURRENT_VERSION, openExternalUrl, useUpdateChecker } from "./updater"
 import { AISettings } from "./AISettings"
+import { GatewaySettings } from "./GatewaySettings"
 import { MirrorSettings } from "./MirrorSettings"
 import { filterSettingItems, SETTING_ITEMS, type SettingsSection } from "./settingsSearch"
 import {
@@ -52,11 +55,19 @@ interface MonitorInfo {
   height: number
 }
 
-type TabKey = "appearance" | "animations" | "tabs" | "mirror" | "ai" | "general" | "about"
+type TabKey = "appearance" | "animations" | "tabs" | "mirror" | "ai" | "gateway" | "general" | "about"
 
 export function SettingsWindow() {
   const [settings, setSettings] = useSettings()
-  const [activeTab, setActiveTab] = useState<TabKey>("appearance")
+  const [activeTab, setActiveTab] = useState<TabKey>(() => (location.hash === "#gateway" ? "gateway" : "appearance"))
+
+  // Other windows open a specific page via the `open-settings-tab` event.
+  useEffect(() => {
+    const un = listen<TabKey>("open-settings-tab", ({ payload }) => setActiveTab(payload))
+    return () => {
+      un.then((f) => f())
+    }
+  }, [])
   const [monitors, setMonitors] = useState<MonitorInfo[]>([])
   const [autostartEnabled, setAutostartEnabled] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -84,7 +95,7 @@ export function SettingsWindow() {
   // Automatically switch tab if active tab has no matches during search
   useEffect(() => {
     if (hasSearch && matchingSections && !matchingSections.has(activeTab)) {
-      const order: TabKey[] = ["appearance", "animations", "tabs", "mirror", "ai", "general", "about"]
+      const order: TabKey[] = ["appearance", "animations", "tabs", "mirror", "ai", "gateway", "general", "about"]
       const first = order.find((s) => matchingSections.has(s))
       if (first) setActiveTab(first)
     }
@@ -216,6 +227,19 @@ export function SettingsWindow() {
               <span>AI</span>
               {hasSearch && sectionCounts["ai"] && (
                 <span className="nav-match-count">{sectionCounts["ai"]}</span>
+              )}
+            </button>
+          )}
+
+          {(!hasSearch || matchingSections?.has("gateway")) && (
+            <button
+              className={`nav-item ${activeTab === "gateway" ? "active" : ""}`}
+              onClick={() => setActiveTab("gateway")}
+            >
+              <Network size={16} />
+              <span>Gateway</span>
+              {hasSearch && sectionCounts["gateway"] && (
+                <span className="nav-match-count">{sectionCounts["gateway"]}</span>
               )}
             </button>
           )}
@@ -794,6 +818,8 @@ export function SettingsWindow() {
         {activeTab === "mirror" && <MirrorSettings />}
 
         {activeTab === "ai" && <AISettings />}
+
+        {activeTab === "gateway" && <GatewaySettings />}
 
         {/* Tab 5: About */}
         {activeTab === "about" && (

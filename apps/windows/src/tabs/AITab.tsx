@@ -118,7 +118,7 @@ export function AITab({
             )}
 
             {(!usage || usage.length === 0) && settings.aiAccounts.length === 0 ? (
-              <div className="ai-empty">No AI accounts found. Connect 9router or add accounts in Settings › AI.</div>
+              <div className="ai-empty">No AI accounts found. Connect one in Settings › Gateway or add a session folder in Settings › AI.</div>
             ) : !usage ? (
               <div className="ai-empty">Reading usage & quotas…</div>
             ) : (
@@ -152,7 +152,7 @@ export function AITab({
 
 const LOGOS = ["claude", "codex", "antigravity", "commandcode"]
 
-/** The provider's real logo (public/providers, from 9router), falling back to a generic icon. */
+/** The provider's real logo (public/providers), falling back to a generic icon. */
 function AgentToolIcon({ tool, size = 16 }: { tool: string; size?: number }) {
   const t = tool.toLowerCase()
   if (LOGOS.includes(t)) return <img src={`/providers/${t}.png`} width={size} height={size} className="ai-logo" alt={TOOL_NAMES[t] || t} />
@@ -186,8 +186,8 @@ function UsageCard({
 
   return (
     <div
-      className={`ai-card ai-card-${quota.health} ${!isActive ? "ai-card-inactive" : ""} ${r.isFrom9Router ? "ai-card-9router" : ""} ${expanded ? "expanded" : ""}`}
-      onClick={() => r.isFrom9Router && setExpanded(!expanded)}
+      className={`ai-card ai-card-${quota.health} ${!isActive ? "ai-card-inactive" : ""} ${r.isFromGateway ? "ai-card-gateway" : ""} ${expanded ? "expanded" : ""}`}
+      onClick={() => r.isFromGateway && setExpanded(!expanded)}
     >
       <div className="ai-card-head">
         <AgentToolIcon tool={r.tool} />
@@ -196,12 +196,12 @@ function UsageCard({
           <span className="ai-card-email">{TOOL_NAMES[r.tool] || r.tool}</span>
         </div>
 
-        {r.isFrom9Router && (
+        {r.isFromGateway && (
           <button
             type="button"
             className={`ai-toggle-pill ${isActive ? "active" : "inactive"}`}
             onClick={handleToggle}
-            title={isActive ? "Active in 9router. Click to toggle OFF." : "Inactive. Click to toggle ON."}
+            title={isActive ? "Used by Notchi Gateway. Click to pause." : "Paused. Click to use it again."}
           >
             {isActive ? "ON" : "OFF"}
           </button>
@@ -209,7 +209,7 @@ function UsageCard({
 
         <span className={`ai-health-badge ${quota.health}`}>{quota.health}</span>
 
-        {r.isFrom9Router && (
+        {r.isFromGateway && (
           <span className={`ai-expand-arrow ${expanded ? "expanded" : ""}`} aria-hidden="true">
             ▼
           </span>
@@ -218,8 +218,8 @@ function UsageCard({
 
       {!r.found ? (
         <div className="ai-card-empty">No sessions found in {r.dir}</div>
-      ) : r.isFrom9Router ? (
-        <div className="ai-9router-body">
+      ) : r.isFromGateway ? (
+        <div className="ai-gateway-body">
           {r.quotas && r.quotas.length > 0 ? (
             <div className="ai-quota-list">
               {(expanded ? r.quotas : r.quotas.slice(0, 1)).map((q, idx) => {
@@ -338,12 +338,12 @@ function UsageRow({
   const isActive = r.isActive !== false
   const tight = tightestQuota(r)
   const remaining = tight?.remainingPercentage ?? 100
-  const toggle = r.isFrom9Router && (
+  const toggle = r.isFromGateway && (
     <button
       type="button"
       className={`ai-switch ${isActive ? "on" : ""}`}
       onClick={() => onToggleActive?.(r.connectionId || r.id || "", !isActive)}
-      title={isActive ? "Active in 9router. Click to turn off." : "Inactive. Click to turn on."}
+      title={isActive ? "Used by Notchi Gateway. Click to pause." : "Paused. Click to use it again."}
       aria-label={`${r.name} ${isActive ? "on" : "off"}`}
     />
   )
@@ -457,7 +457,7 @@ const RANGES = { Today: 1, "7D": 7, "30D": 30, All: null } as const
 type Range = keyof typeof RANGES
 type Metric = "Tokens" | "Requests" | "Cost"
 
-/** 9router usage history: totals, a chart, recent requests and today's top models. */
+/** Gateway request history: totals, a chart, recent requests and today's top models. */
 function AnalyticsPanel() {
   const [range, setRange] = useStored<Range>("analyticsRange", "7D")
   const [metric, setMetric] = useState<Metric>("Tokens")
@@ -465,14 +465,15 @@ function AnalyticsPanel() {
   const now = Date.now()
 
   useEffect(() => {
-    const load = () => invoke<Analytics>("ninerouter_analytics", { days: RANGES[range] }).then(setData).catch(() => setData(null))
+    const load = () =>
+      invoke<Analytics>("gateway_analytics", { days: RANGES[range], tzOffsetMin: new Date().getTimezoneOffset() }).then(setData).catch(() => setData(null))
     load()
     const id = setInterval(load, 10_000)
     return () => clearInterval(id)
   }, [range])
 
-  if (!data) return <div className="ai-empty">Reading 9router…</div>
-  if (data.days.length === 0 && data.recent.length === 0) return <div className="ai-empty">Install 9router to see request history and analytics.</div>
+  if (!data) return <div className="ai-empty">Reading Notchi Gateway…</div>
+  if (data.days.length === 0 && data.recent.length === 0) return <div className="ai-empty">No requests through Notchi Gateway yet. Ask something in the Ask tab to see analytics here.</div>
 
   const total = data.days.reduce(
     (t, d) => ({ requests: t.requests + d.requests, input: t.input + d.input, cached: t.cached + d.cached, output: t.output + d.output, cost: t.cost + d.cost }),
@@ -540,8 +541,8 @@ function AnalyticsPanel() {
               <b>{formatTokens(m.tokens)}</b>
             </div>
           ))}
-          <button className="ai-an-open" onClick={() => invoke("open_external_url", { url: "http://127.0.0.1:20128" }).catch(() => {})}>
-            <ExternalLink size={10} /> Open 9router
+          <button className="ai-an-open" onClick={() => invoke("open_settings", { tab: "gateway" }).catch(() => {})}>
+            <ExternalLink size={10} /> Gateway settings
           </button>
         </div>
       </div>
@@ -612,7 +613,7 @@ export function useAgents(enabled: boolean, onPeek?: (banner: Banner) => void): 
   return sessions
 }
 
-/** Usage per account, rescanned every 30 s while AI features are on. Supports 9router toggle. */
+/** Usage per account, rescanned every 30 s while AI features are on. Gateway accounts can be paused. */
 export function useUsage(enabled: boolean): {
   usage: UsageReport[] | null
   toggleActive: (id: string, active: boolean) => Promise<void>
@@ -641,15 +642,17 @@ export function useUsage(enabled: boolean): {
   }, [enabled, key])
 
   const toggleActive = async (id: string, active: boolean) => {
+    const provider = usage?.find((r) => r.connectionId === id || r.id === id)?.provider
+    if (!provider) return
     // Optimistic local update
     setUsage((prev) =>
       prev?.map((r) => ((r.connectionId === id || r.id === id) ? { ...r, isActive: active } : r)) ?? null
     )
     try {
-      await invoke("set_9router_connection_active", { id, active })
+      await invoke("gateway_set_account_active", { provider, id, active })
       setTimeout(poll, 500)
     } catch (e) {
-      console.error("Failed to toggle connection in 9router:", e)
+      console.error("Failed to toggle the account in Notchi Gateway:", e)
       poll()
     }
   }

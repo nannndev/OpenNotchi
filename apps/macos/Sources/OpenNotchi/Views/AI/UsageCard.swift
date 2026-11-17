@@ -7,7 +7,7 @@ struct UsageCard: View {
     @EnvironmentObject private var vm: NotchViewModel
     @State private var isHovering = false
 
-    private var toolTint: Color { report.account.tool.tint }
+    private var toolTint: Color { report.tint }
 
     private var healthColor: Color {
         if !report.account.isActive { return .gray }
@@ -33,14 +33,14 @@ struct UsageCard: View {
         VStack(alignment: .leading, spacing: 6) {
             // Header: Tool Icon, Name, Provider & Priority, Interactive ON/OFF Toggle & Health Pill
             HStack(spacing: 6) {
-                ToolLogo(tool: report.account.tool, size: 20)
+                ReportLogo(report: report, size: 20)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(report.account.name)
                         .font(.system(size: 11.5, weight: .bold))
                         .lineLimit(1)
                     HStack(spacing: 3) {
-                        Text(report.account.tool.displayName)
+                        Text(report.sourceName)
                             .font(.system(size: 8.5, weight: .medium))
                             .foregroundStyle(.secondary)
                         if let p = report.account.priority {
@@ -56,11 +56,7 @@ struct UsageCard: View {
                 // Interactive Gateway ON / OFF Toggle Pill
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
-                        usage.toggleAccountActive(
-                            id: report.account.id,
-                            connectionId: report.account.connectionId,
-                            active: !report.account.isActive
-                        )
+                        usage.toggleAccountActive(report, active: !report.account.isActive)
                     }
                 } label: {
                     HStack(spacing: 3) {

@@ -120,7 +120,8 @@ export interface AppSettings {
   aiOpenaiUrl: string
   aiOpenaiModel: string
   /** Empty means "pick a Haiku/Sonnet model automatically". */
-  aiNineRouterModel: string
+  /** Gateway model id; empty means `auto`. */
+  aiGatewayModel: string
   /** Quota & Accounts layout. */
   usageLayout: "cards" | "compact" | "list"
   /** Full-screen player: opens after this many idle minutes while music plays (0 = never automatically). */
@@ -239,13 +240,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   aiNotify: true,
   aiAccounts: [],
   aiClosedMeter: true,
-  aiProvider: "ninerouter",
+  aiProvider: "gateway",
   aiOllamaUrl: "http://127.0.0.1:11434",
   aiOllamaModel: "llama3.2",
   aiAnthropicModel: "claude-haiku-5-5",
   aiOpenaiUrl: "https://api.openai.com/v1",
   aiOpenaiModel: "gpt-4o-mini",
-  aiNineRouterModel: "",
+  aiGatewayModel: "",
   usageLayout: "cards",
   nowPlayingEnabled: true,
   nowPlayingIdleMinutes: 2,
@@ -263,11 +264,19 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 
 
+/** 9router was replaced by the bundled Notchi Gateway: carry the old choice over. */
+export function migrate(s: AppSettings & { aiNineRouterModel?: string }): AppSettings {
+  const { aiNineRouterModel, ...rest } = s
+  if ((rest.aiProvider as string) === "ninerouter") rest.aiProvider = "gateway"
+  if (!rest.aiGatewayModel && aiNineRouterModel) rest.aiGatewayModel = aiNineRouterModel
+  return rest
+}
+
 export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
     if (!raw) return DEFAULT_SETTINGS
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
+    return migrate({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) })
   } catch {
     return DEFAULT_SETTINGS
   }
@@ -305,7 +314,7 @@ export function useSettings(): [AppSettings, (partial: Partial<AppSettings>) => 
     const onStorage = (e: StorageEvent) => {
       if (e.key === SETTINGS_KEY && e.newValue) {
         try {
-          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(e.newValue) })
+          setSettings(migrate({ ...DEFAULT_SETTINGS, ...JSON.parse(e.newValue) }))
         } catch {}
       }
     }

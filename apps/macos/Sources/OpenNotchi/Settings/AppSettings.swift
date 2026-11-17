@@ -560,14 +560,16 @@ final class AppSettings: ObservableObject {
         aiAccounts = loadedAccounts.isEmpty ? AIAccount.defaults : loadedAccounts
         aiClosedMeter = defaults.bool(forKey: "aiClosedMeter")
         // Built-in Notchi Gateway is preferred when available, then Apple Intelligence, Ollama.
-        aiProvider = AIProvider(rawValue: defaults.string(forKey: "aiProvider") ?? "").flatMap { AIProvider.available.contains($0) ? $0 : nil }
+        let storedProvider = defaults.string(forKey: "aiProvider").map { $0 == "ninerouter" ? "gateway" : $0 } ?? ""
+        aiProvider = AIProvider(rawValue: storedProvider).flatMap { AIProvider.available.contains($0) ? $0 : nil }
             ?? (NotchiGatewayService.shared.isAvailable ? .gateway : AIAssistant.appleAvailable ? .apple : .ollama)
         aiOllamaURL = defaults.string(forKey: "aiOllamaURL") ?? ""
         aiOllamaModel = defaults.string(forKey: "aiOllamaModel") ?? ""
         aiAnthropicModel = defaults.string(forKey: "aiAnthropicModel") ?? "claude-haiku-5-5"
         aiOpenaiURL = defaults.string(forKey: "aiOpenaiURL") ?? ""
         aiOpenaiModel = defaults.string(forKey: "aiOpenaiModel") ?? ""
-        aiGatewayModel = defaults.string(forKey: "aiGatewayModel") ?? ""
+        // 9router was replaced by Notchi Gateway: carry the old model choice over once.
+        aiGatewayModel = defaults.string(forKey: "aiGatewayModel") ?? defaults.string(forKey: "aiNineRouterModel") ?? ""
         notchiBubbleEnabled = defaults.object(forKey: "notchiBubbleEnabled") as? Bool ?? true
         notchiBubbleStyle = NotchiBubbleStyle(rawValue: defaults.string(forKey: "notchiBubbleStyle") ?? "") ?? .glass
         launchAtLogin = SMAppService.mainApp.status == .enabled

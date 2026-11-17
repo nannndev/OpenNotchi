@@ -41,7 +41,7 @@ function saveSessions(sessions: Session[]) {
 }
 
 function providerFields(s: AppSettings) {
-  if (s.aiProvider === "ninerouter") return { provider: "ninerouter", baseUrl: "", model: s.aiNineRouterModel }
+  if (s.aiProvider === "gateway") return { provider: "gateway", baseUrl: "", model: s.aiGatewayModel }
   if (s.aiProvider === "anthropic") return { provider: "anthropic", baseUrl: "", model: s.aiAnthropicModel }
   if (s.aiProvider === "openai") return { provider: "openai", baseUrl: s.aiOpenaiUrl, model: s.aiOpenaiModel }
   return { provider: "ollama", baseUrl: s.aiOllamaUrl, model: s.aiOllamaModel }
@@ -154,7 +154,7 @@ export function ChatPanel({
     if (el) el.scrollTop = el.scrollHeight
   }, [messages.length, messages[messages.length - 1]?.content, busy, error])
   useEffect(() => {
-    if (settings.aiProvider === "ninerouter") invoke<string[]>("ninerouter_models").then(setModels).catch(() => {})
+    if (settings.aiProvider === "gateway") invoke<string[]>("gateway_models").then(setModels).catch(() => {})
   }, [settings.aiProvider])
 
   const updateCurrent = (fn: (m: Message[]) => Message[], id = currentId) =>
@@ -177,7 +177,7 @@ export function ChatPanel({
         const q = (r.quotas ?? []).map((x) => `${x.name} ${x.unlimited ? "unlimited" : `${Math.round(x.remainingPercentage)}% left`}`).join(", ")
         return `- ${r.name} (${r.tool}, ${r.isActive === false ? "off" : "on"}): ${formatTokens(r.today.tokens)} tokens today${q ? `; ${q}` : ""}`
       })
-      parts.push(`My AI accounts in 9router:\n${lines.join("\n")}`)
+      parts.push(`My AI accounts in Notchi Gateway:\n${lines.join("\n")}`)
     }
     return parts
   }
@@ -318,8 +318,8 @@ export function ChatPanel({
   }
 
   const providerLabel =
-    settings.aiProvider === "ninerouter"
-      ? `9router · ${settings.aiNineRouterModel || "auto"}`
+    settings.aiProvider === "gateway"
+      ? `Gateway · ${settings.aiGatewayModel || "auto"}`
       : settings.aiProvider === "anthropic"
       ? `Anthropic · ${settings.aiAnthropicModel}`
       : settings.aiProvider === "openai"
@@ -344,18 +344,18 @@ export function ChatPanel({
       <div className="chat-head">
         <select
           className="chat-model"
-          value={settings.aiProvider === "ninerouter" ? `9r:${settings.aiNineRouterModel}` : settings.aiProvider}
+          value={settings.aiProvider === "gateway" ? `gw:${settings.aiGatewayModel}` : settings.aiProvider}
           onChange={(e) => {
             const v = e.target.value
-            if (v.startsWith("9r:")) setSettings({ aiProvider: "ninerouter", aiNineRouterModel: v.slice(3) })
+            if (v.startsWith("gw:")) setSettings({ aiProvider: "gateway", aiGatewayModel: v.slice(3) })
             else setSettings({ aiProvider: v as AppSettings["aiProvider"] })
           }}
           title="Where your prompts go"
         >
-          <option value="9r:">9router · auto</option>
-          {models.map((m) => (
-            <option key={m} value={`9r:${m}`}>
-              9router · {m}
+          <option value="gw:">Gateway · auto</option>
+          {models.filter((m) => m !== "auto").map((m) => (
+            <option key={m} value={`gw:${m}`}>
+              Gateway · {m}
             </option>
           ))}
           <option value="anthropic">Anthropic API</option>

@@ -65,7 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateLyricsOverlay()
         nowPlayingScreen = NowPlayingScreenController(media: media, lyrics: lyrics, settings: settings)
         updateAI()
-        if settings.aiProvider == .gateway || NotchiGatewayService.shared.isAvailable {
+        // The gateway also serves usage for connected accounts, so start it whenever AI is on.
+        if settings.aiProvider == .gateway || (settings.aiEnabled && NotchiGatewayService.shared.isAvailable) {
             NotchiGatewayService.shared.startIfNeeded()
         }
 

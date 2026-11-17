@@ -8,7 +8,7 @@ struct AccountToggle: View {
     var body: some View {
         Button {
             withAnimation(.easeInOut(duration: 0.15)) {
-                usage.toggleAccountActive(id: report.account.id, connectionId: report.account.connectionId, active: !report.account.isActive)
+                usage.toggleAccountActive(report, active: !report.account.isActive)
             }
         } label: {
             Capsule()
@@ -32,7 +32,7 @@ struct CompactUsageTile: View {
     var body: some View {
         let tight = tightestQuota(report)
         let remaining = tight?.remainingPercentage ?? 100
-        let tint = report.account.tool.tint
+        let tint = report.tint
 
         HStack(spacing: 8) {
             ZStack {
@@ -41,7 +41,7 @@ struct CompactUsageTile: View {
                     .trim(from: 0, to: CGFloat(min(100, max(0, remaining)) / 100))
                     .stroke(tight == nil ? tint : quotaColor(remaining), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                ToolLogo(tool: report.account.tool, size: 18)
+                ReportLogo(report: report, size: 18)
             }
             .frame(width: 32, height: 32)
 
@@ -49,11 +49,11 @@ struct CompactUsageTile: View {
                 Text(report.account.name)
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
-                Text(tight.map { "\(Int($0.remainingPercentage.rounded()))% · \($0.name)" } ?? (report.quotas.isEmpty ? report.account.tool.displayName : "Unlimited"))
+                Text(tight.map { "\(Int($0.remainingPercentage.rounded()))% · \($0.name)" } ?? (report.quotas.isEmpty ? report.sourceName : "Unlimited"))
                     .font(.system(size: 9, weight: .medium).monospacedDigit())
                     .foregroundStyle(tight.map { quotaColor($0.remainingPercentage) } ?? .secondary)
                     .lineLimit(1)
-                Text("\(report.account.tool.displayName) · \(formatTokens(report.today.tokens)) today")
+                Text("\(report.sourceName) · \(formatTokens(report.today.tokens)) today")
                     .font(.system(size: 9).monospacedDigit())
                     .foregroundStyle(.tertiary)
             }
@@ -65,7 +65,7 @@ struct CompactUsageTile: View {
         .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(hovering ? 0.08 : 0.04)))
         .opacity(report.account.isActive ? 1 : 0.5)
         .onHover { hovering = $0 }
-        .help(tight.flatMap { $0.resetAt }.map { formatResetDetail($0) } ?? report.account.tool.displayName)
+        .help(tight.flatMap { $0.resetAt }.map { formatResetDetail($0) } ?? report.sourceName)
     }
 }
 
@@ -75,12 +75,12 @@ struct UsageListRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            ToolLogo(tool: report.account.tool, size: 20)
+            ReportLogo(report: report, size: 20)
             VStack(alignment: .leading, spacing: 0) {
                 Text(report.account.name)
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
-                Text(report.account.tool.displayName)
+                Text(report.sourceName)
                     .font(.system(size: 8.5, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

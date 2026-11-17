@@ -1,7 +1,7 @@
 mod ai;
 mod devtools;
 mod media;
-mod ninerouter;
+mod gateway;
 mod system;
 
 use std::sync::Mutex;
@@ -143,13 +143,17 @@ fn set_pill_monitor(app: tauri::AppHandle, monitor_name: String) -> Result<(), S
     Ok(())
 }
 
-/// Shows the settings window.
+/// Shows the settings window, optionally on a given page (e.g. "gateway").
 #[tauri::command]
-fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
+fn open_settings(app: tauri::AppHandle, tab: Option<String>) -> Result<(), String> {
+    use tauri::Emitter;
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
+        if let Some(tab) = tab {
+            let _ = w.emit("open-settings-tab", tab);
+        }
     }
     Ok(())
 }
@@ -437,11 +441,13 @@ pub fn run() {
             ai::ai_key_set,
             ai::ai_key_exists,
             ai::ask_ai,
-            ai::set_9router_connection_active,
-            ai::ninerouter_analytics,
+            ai::gateway_set_account_active,
+            ai::gateway_analytics,
+            ai::gateway_admin,
+            ai::gateway_endpoint,
             ai::ai_chat,
-            ai::ninerouter_models,
-            ai::ninerouter_available,
+            ai::gateway_models,
+            ai::gateway_available,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -450,6 +456,13 @@ pub fn run() {
 
             // Start dedicated SMTC background thread
             media::init();
+
+            // Warm up the Ask AI gateway off the main thread so the first question is fast.
+            std::thread::spawn(|| {
+                if let Err(e) = gateway::ensure_running() {
+                    log::warn!("notchi-gateway: {e}");
+                }
+            });
 
             if let Some(pill) = app.get_webview_window("pill") {
                 place_pill(&pill)?;
@@ -502,8 +515,14 @@ pub fn run() {
                 .build(app)?;
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running OpenNotchi");
+        .build(tauri::generate_context!())
+        .expect("error while building OpenNotchi")
+        .run(|_app, event| {
+            // The gateway sidecar must not outlive the app.
+            if let tauri::RunEvent::Exit = event {
+                gateway::stop();
+            }
+        });
 }
 
 #[cfg(test)]
