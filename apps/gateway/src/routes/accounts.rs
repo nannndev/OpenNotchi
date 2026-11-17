@@ -78,20 +78,35 @@ pub struct UsageQuery {
     days: Option<u32>,
     /// Caller's offset from UTC in minutes (east positive), so days match its calendar.
     tz_offset_min: Option<i64>,
+    /// Skip the quota cache (manual refresh).
+    force: Option<bool>,
 }
 
-/// One entry per account with its plan, health, cooldown and tokens per local day.
+/// One entry per account: plan, health, cooldown, tokens per local day and live quota windows.
 /// Accounts of one provider share that provider's request log.
 pub async fn handle_accounts_usage(State(engine): State<GatewayEngine>, Query(q): Query<UsageQuery>) -> Json<Value> {
     let days = q.days.unwrap_or(7).clamp(1, 90);
     let offset = q.tz_offset_min.unwrap_or(0) * 60;
     let by_provider = engine.store.daily_tokens_by_provider(days, offset);
-    let usage: Vec<Value> = engine
-        .store
-        .list_accounts()
+    let accounts = engine.store.list_accounts();
+    // Fetch every enabled account's quota in parallel; disabled ones aren't worth the request.
+    let quotas = futures::future::join_all(accounts.iter().map(|a| {
+        let engine = engine.clone();
+        let force = q.force.unwrap_or(false);
+        async move {
+            if !a.enabled {
+                return None;
+            }
+            engine.quotas.get(&engine.http_client, &engine.store, a, force).await
+        }
+    }))
+    .await;
+    let usage: Vec<Value> = accounts
         .iter()
-        .map(|a| {
+        .zip(quotas)
+        .map(|(a, live)| {
             let days_tokens = by_provider.get(&a.provider).cloned().unwrap_or_else(|| vec![0; days as usize]);
+            let plan = live.as_ref().and_then(|l| l.plan.clone()).unwrap_or_else(|| a.display_plan());
             json!({
                 "provider": a.provider,
                 "account_id": a.id,
@@ -100,10 +115,13 @@ pub async fn handle_accounts_usage(State(engine): State<GatewayEngine>, Query(q)
                 "enabled": a.enabled,
                 "sort_order": a.sort_order,
                 "last_error": a.last_error,
-                "plan": a.display_plan(),
+                "plan": plan,
                 "cooling_until": engine.store.cooling_until(&a.id),
                 "today_tokens": days_tokens.last().copied().unwrap_or(0),
                 "days": days_tokens,
+                "quotas": live.as_ref().map(|l| l.quotas.clone()).unwrap_or_default(),
+                "quota_message": live.as_ref().and_then(|l| l.message.clone()),
+                "quota_fetched_at": live.as_ref().map(|l| l.fetched_at),
             })
         })
         .collect();

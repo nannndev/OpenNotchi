@@ -20,6 +20,8 @@ pub struct GatewayEngine {
     pub store: Arc<GatewayStore>,
     pub http_client: Client,
     pub oauth: crate::oauth::OAuthManager,
+    /// Live usage windows per subscription account, cached briefly.
+    pub quotas: crate::quota::QuotaCache,
     /// Round-robin cursor per provider.
     rr: Arc<parking_lot::Mutex<HashMap<String, usize>>>,
     /// fill_first: the account that last succeeded, per provider.
@@ -35,6 +37,7 @@ impl GatewayEngine {
             oauth: crate::oauth::OAuthManager::new(),
             rr: Default::default(),
             sticky: Default::default(),
+            quotas: Default::default(),
         }
     }
 
@@ -345,6 +348,7 @@ impl GatewayEngine {
                     model: Some(&target.model),
                     input_tokens: 0,
                     output_tokens: 0,
+                    cached_tokens: 0,
                     duration_ms: t0.elapsed().as_millis() as i64,
                     status: "error",
                     status_code: i64::from(status.as_u16()),
@@ -471,7 +475,10 @@ struct UsageGuard {
 
 impl Drop for UsageGuard {
     fn drop(&mut self) {
-        let (inp, out) = self.tr.lock().usage;
+        let (inp, out, cached) = {
+            let t = self.tr.lock();
+            (t.usage.0, t.usage.1, t.cached)
+        };
         self.store.record_usage(&UsageEntry {
             key_id: self.key_id.as_deref(),
             key_name: Some(&self.key_name),
@@ -479,6 +486,7 @@ impl Drop for UsageGuard {
             model: Some(&self.model),
             input_tokens: inp,
             output_tokens: out,
+            cached_tokens: cached,
             duration_ms: self.t0.elapsed().as_millis() as i64,
             status: "success",
             status_code: 200,

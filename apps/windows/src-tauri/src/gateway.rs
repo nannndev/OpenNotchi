@@ -87,7 +87,7 @@ pub fn stop() {
 
 fn get(path: &str) -> Result<Value, String> {
     ensure_running()?;
-    let mut r = agent(10).get(format!("{BASE_URL}{path}")).call().map_err(|e| format!("Gateway: {e}"))?;
+    let mut r = agent(25).get(format!("{BASE_URL}{path}")).call().map_err(|e| format!("Gateway: {e}"))?;
     let status = r.status();
     let v: Value = r.body_mut().read_json().unwrap_or(Value::Null);
     if status.is_success() { Ok(v) } else { Err(error_text(&v, status.as_u16())) }
@@ -137,6 +137,7 @@ fn tool_for(provider: &str) -> String {
 pub fn reports(tz_offset_min: i64) -> Vec<UsageReport> {
     // JS getTimezoneOffset() is minutes *behind* UTC; the gateway wants minutes east.
     let Ok(v) = get(&format!("/gateway/admin/accounts/usage?days=7&tz_offset_min={}", -tz_offset_min)) else { return vec![] };
+    // `get` uses a 10 s timeout; a cold quota cache asks every provider once, in parallel.
     let now_s = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0);
     v["usage"]
         .as_array()
@@ -172,7 +173,25 @@ pub fn reports(tz_offset_min: i64) -> Vec<UsageReport> {
                 block: None,
                 days: a["days"].as_array().into_iter().flatten().map(|d| d.as_u64().unwrap_or(0)).collect(),
                 limits: None,
-                quotas: Vec::new(),
+                quotas: a["quotas"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|q| {
+                        let total = q["total"].as_f64().unwrap_or(0.0);
+                        let used = q["used"].as_f64().unwrap_or(0.0);
+                        crate::ai::Quota {
+                            name: q["name"].as_str().unwrap_or("").into(),
+                            used,
+                            total,
+                            remaining: (total - used).max(0.0),
+                            remaining_percentage: q["remaining_percentage"].as_f64().unwrap_or(100.0),
+                            // The UI works in unix ms.
+                            reset_at: q["reset_at"].as_f64().map(|s| (s * 1000.0) as i64),
+                            unlimited: q["unlimited"].as_bool().unwrap_or(false),
+                        }
+                    })
+                    .collect(),
                 plan_name: a["plan"].as_str().map(String::from),
                 test_status: Some(test_status.into()),
                 last_error,

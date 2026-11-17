@@ -570,8 +570,10 @@ pub struct SseToOpenAi {
     claude_tools: HashMap<u64, usize>,
     tool_count: usize,
     finished: bool,
-    /// (input, output) tokens reported by the upstream, if any.
+    /// (input, output) tokens reported by the upstream, if any. Input includes cached tokens.
     pub usage: (i64, i64),
+    /// Input tokens served from the provider's prompt cache (part of `usage.0`).
+    pub cached: i64,
     cc_tools: HashMap<String, usize>,
     cc_finish: Option<String>,
 }
@@ -585,6 +587,7 @@ impl SseToOpenAi {
             tool_count: 0,
             finished: false,
             usage: (0, 0),
+            cached: 0,
             cc_tools: HashMap::new(),
             cc_finish: None,
         }
@@ -624,6 +627,7 @@ impl SseToOpenAi {
             // Pass-through; just note usage (sent when stream_options.include_usage is set).
             if let Some(u) = ev.get("usage").filter(|u| u.is_object()) {
                 self.usage = (u["prompt_tokens"].as_i64().unwrap_or(0), u["completion_tokens"].as_i64().unwrap_or(0));
+                self.cached = u["prompt_tokens_details"]["cached_tokens"].as_i64().unwrap_or(0);
             }
             if let Some(e) = ev.get("error") {
                 return Err(e["message"].as_str().unwrap_or("Upstream error").to_string());
@@ -634,6 +638,7 @@ impl SseToOpenAi {
                 "response.completed" => {
                     let u = &ev["response"]["usage"];
                     self.usage = (u["input_tokens"].as_i64().unwrap_or(0), u["output_tokens"].as_i64().unwrap_or(0));
+                    self.cached = u["input_tokens_details"]["cached_tokens"].as_i64().unwrap_or(0);
                     self.tool_count = self.base.tool_calls.len();
                     let reason = if ev["response"]["incomplete_details"]["reason"] == "max_output_tokens" { "length" } else { "stop" };
                     out.extend(self.finish(reason));
@@ -681,6 +686,7 @@ impl SseToOpenAi {
                     let u = if ev["type"] == "finish" && ev["totalUsage"].is_object() { &ev["totalUsage"] } else { &ev["usage"] };
                     if u.is_object() {
                         self.usage = (u["inputTokens"].as_i64().unwrap_or(0), u["outputTokens"].as_i64().unwrap_or(0));
+                        self.cached = u["inputTokenDetails"]["cacheReadTokens"].as_i64().unwrap_or(0);
                     }
                     if let Some(r) = ev["finishReason"].as_str() {
                         self.cc_finish = Some(r.to_string());
@@ -710,9 +716,9 @@ impl SseToOpenAi {
             match ev["type"].as_str().unwrap_or("") {
                 "message_start" => {
                     let u = &ev["message"]["usage"];
-                    self.usage.0 = u["input_tokens"].as_i64().unwrap_or(0)
-                        + u["cache_read_input_tokens"].as_i64().unwrap_or(0)
-                        + u["cache_creation_input_tokens"].as_i64().unwrap_or(0);
+                    self.cached = u["cache_read_input_tokens"].as_i64().unwrap_or(0);
+                    self.usage.0 =
+                        u["input_tokens"].as_i64().unwrap_or(0) + self.cached + u["cache_creation_input_tokens"].as_i64().unwrap_or(0);
                 }
                 "content_block_start" if ev["content_block"]["type"] == "tool_use" => {
                     let idx = self.tool_count;
@@ -752,6 +758,7 @@ impl SseToOpenAi {
                     u["promptTokenCount"].as_i64().unwrap_or(0),
                     u["candidatesTokenCount"].as_i64().unwrap_or(0) + u["thoughtsTokenCount"].as_i64().unwrap_or(0),
                 );
+                self.cached = u["cachedContentTokenCount"].as_i64().unwrap_or(0);
             }
             let cand = &r["candidates"][0];
             for part in cand["content"]["parts"].as_array().into_iter().flatten() {
@@ -1149,6 +1156,39 @@ mod tests {
         fn error_events_carry_the_upstream_message() {
             let err = new().feed(&json!({"type":"error","error":"quota"})).unwrap_err();
             assert!(err.contains("quota"), "{err}");
+        }
+    }
+
+    mod cached_tokens {
+        use super::*;
+
+        #[test]
+        fn claude_cache_reads_are_counted() {
+            let mut t = SseToOpenAi::new("claude", "cc/x".into());
+            feed_all(&mut t, &[json!({"type":"message_start","message":{"usage":{"input_tokens":4,"cache_read_input_tokens":6}}})]);
+            assert_eq!((t.usage.0, t.cached), (10, 6));
+        }
+
+        #[test]
+        fn openai_cached_prompt_tokens_are_counted() {
+            let mut t = SseToOpenAi::new("openai", "oa/x".into());
+            feed_all(
+                &mut t,
+                &[json!({"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":1,"prompt_tokens_details":{"cached_tokens":7}}})],
+            );
+            assert_eq!(t.cached, 7);
+        }
+
+        #[test]
+        fn codex_cached_input_tokens_are_counted() {
+            let mut t = SseToOpenAi::new("codex", "cx/x".into());
+            feed_all(
+                &mut t,
+                &[
+                    json!({"type":"response.completed","response":{"usage":{"input_tokens":9,"output_tokens":1,"input_tokens_details":{"cached_tokens":5}}}}),
+                ],
+            );
+            assert_eq!(t.cached, 5);
         }
     }
 

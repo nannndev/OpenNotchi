@@ -359,6 +359,7 @@ impl KiroStream {
                     let (i, o) = (m["inputTokens"].as_i64().unwrap_or(0), m["outputTokens"].as_i64().unwrap_or(0));
                     if i > 0 || o > 0 {
                         tr.usage = (i, o);
+                        tr.cached = m["cacheReadInputTokens"].as_i64().unwrap_or(0);
                     }
                 }
                 _ => {}

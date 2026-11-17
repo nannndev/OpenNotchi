@@ -540,7 +540,8 @@ final class NotchiGatewayService: ObservableObject {
     private func getSync(_ path: String) -> [String: Any]? {
         guard let url = URL(string: Self.baseURL + path) else { return nil }
         var req = URLRequest(url: url)
-        req.timeoutInterval = 5
+        // Quota lookups hit several providers in parallel on a cold cache.
+        req.timeoutInterval = 20
         let sem = DispatchSemaphore(value: 0)
         var out: [String: Any]?
         URLSession.shared.dataTask(with: req) { data, resp, _ in
@@ -549,7 +550,7 @@ final class NotchiGatewayService: ObservableObject {
             }
             sem.signal()
         }.resume()
-        _ = sem.wait(timeout: .now() + 6)
+        _ = sem.wait(timeout: .now() + 21)
         return out
     }
 
@@ -567,8 +568,8 @@ final class NotchiGatewayService: ObservableObject {
     }
 
     /// One report per connected subscription account. Blocking; call off the main thread.
-    func fetchReports() -> [UsageReport] {
-        guard let json = getSync("/gateway/admin/accounts/usage?days=7&tz_offset_min=\(Self.tzOffsetMin)"),
+    func fetchReports(force: Bool = false) -> [UsageReport] {
+        guard let json = getSync("/gateway/admin/accounts/usage?days=7&tz_offset_min=\(Self.tzOffsetMin)\(force ? "&force=true" : "")"),
               let rows = json["usage"] as? [[String: Any]] else { return [] }
         let now = Date().timeIntervalSince1970
         return rows.map { a in
@@ -594,6 +595,19 @@ final class NotchiGatewayService: ObservableObject {
             report.days = (a["days"] as? [Int]) ?? report.days
             report.today = UsageTotals(tokens: a["today_tokens"] as? Int ?? 0)
             report.planName = a["plan"] as? String
+            report.quotas = GatewayQuota.displayQuotas((a["quotas"] as? [[String: Any]] ?? []).map { q in
+                let total = q["total"] as? Double ?? 0
+                let used = q["used"] as? Double ?? 0
+                return GatewayQuota(
+                    name: q["name"] as? String ?? "",
+                    used: used,
+                    total: total,
+                    remaining: max(0, total - used),
+                    remainingPercentage: q["remaining_percentage"] as? Double ?? 100,
+                    resetAt: (q["reset_at"] as? Double).map(Date.init(timeIntervalSince1970:)),
+                    unlimited: q["unlimited"] as? Bool ?? false
+                )
+            })
             report.lastError = lastError
             report.coolingUntil = coolingUntil.map(Date.init(timeIntervalSince1970:))
             report.testStatus = !enabled ? "paused" : coolingUntil != nil ? "unavailable" : lastError == nil ? "active" : "error"

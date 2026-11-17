@@ -396,7 +396,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            let _ = open_settings(app.clone());
+            let _ = open_settings(app.clone(), None);
         }))
         .on_window_event(|window, event| {
             if window.label() == "settings" || window.label() == "share" {
@@ -496,7 +496,7 @@ pub fn run() {
                         let _ = open_share_lyrics(app.clone());
                     }
                     "settings" => {
-                        let _ = open_settings(app.clone());
+                        let _ = open_settings(app.clone(), None);
                     }
                     "quit" => app.exit(0),
                     _ => {}
@@ -509,7 +509,7 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        let _ = open_settings(app.clone());
+                        let _ = open_settings(app.clone(), None);
                     }
                 })
                 .build(app)?;

@@ -34,6 +34,7 @@ final class AIUsageManager: ObservableObject {
         scanning = true
         lastScan = .now
         let localAccounts = accounts
+        let forceQuotas = force
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
             var allReports: [UsageReport] = []
@@ -42,7 +43,7 @@ final class AIUsageManager: ObservableObject {
 
             // 1. Notchi Gateway accounts & reports
             if NotchiGatewayService.shared.isAvailable {
-                let gwReports = NotchiGatewayService.shared.fetchReports()
+                let gwReports = NotchiGatewayService.shared.fetchReports(force: forceQuotas)
                 if !gwReports.isEmpty {
                     allReports = gwReports
                     fromGateway = true

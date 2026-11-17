@@ -50,6 +50,8 @@ pub struct UsageEntry<'a> {
     pub model: Option<&'a str>,
     pub input_tokens: i64,
     pub output_tokens: i64,
+    /// Part of `input_tokens` served from the provider's prompt cache.
+    pub cached_tokens: i64,
     pub duration_ms: i64,
     /// "success" or "error".
     pub status: &'a str,
@@ -241,6 +243,9 @@ impl GatewayStore {
         // Model lists fetched from each provider's /models endpoint.
         let _ = conn.execute("ALTER TABLE providers ADD COLUMN synced_models TEXT", []);
         let _ = conn.execute("ALTER TABLE providers ADD COLUMN models_synced_at REAL", []);
+        // Prompt-cache hits and estimated cost per request.
+        let _ = conn.execute("ALTER TABLE usage ADD COLUMN cached_tokens INTEGER", []);
+        let _ = conn.execute("ALTER TABLE usage ADD COLUMN cost REAL", []);
         Ok(())
     }
 
@@ -820,12 +825,13 @@ impl GatewayStore {
     pub fn record_usage(&self, u: &UsageEntry<'_>) {
         let conn = self.conn.lock();
         let id = format!("usg_{}", uuid::Uuid::new_v4().simple());
+        let cost = u.model.map_or(0.0, |m| crate::pricing::cost(m, u.input_tokens, u.output_tokens, u.cached_tokens));
         let _ = conn.execute(
-            "INSERT INTO usage (id, ts, key_id, key_name, provider, model, input_tokens, output_tokens, duration_ms, status, status_code, error, streaming) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            "INSERT INTO usage (id, ts, key_id, key_name, provider, model, input_tokens, output_tokens, duration_ms, status, status_code, error, streaming, cached_tokens, cost) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             params![
                 id, now(), u.key_id, u.key_name, u.provider, u.model,
                 u.input_tokens, u.output_tokens, u.duration_ms, u.status, u.status_code, u.error,
-                i64::from(u.streaming)
+                i64::from(u.streaming), u.cached_tokens, cost
             ],
         );
     }
@@ -863,50 +869,53 @@ impl GatewayStore {
         });
         let day_rows = query_rows(
             &conn,
-            "SELECT CAST((ts + ?1) / 86400 AS INTEGER) AS d, COUNT(*), SUM(COALESCE(input_tokens,0)), SUM(COALESCE(output_tokens,0))
+            "SELECT CAST((ts + ?1) / 86400 AS INTEGER) AS d, COUNT(*), SUM(COALESCE(input_tokens,0)), SUM(COALESCE(output_tokens,0)),
+                    SUM(COALESCE(cached_tokens,0)), SUM(COALESCE(cost,0))
              FROM usage WHERE ts >= ?2 GROUP BY d ORDER BY d",
             params![utc_offset_secs, since],
-            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, i64>(2)?, r.get::<_, i64>(3)?)),
+            |r| {
+                Ok(json!({
+                    "date": chrono::DateTime::from_timestamp(r.get::<_, i64>(0)? * 86_400, 0).map(|t| t.format("%Y-%m-%d").to_string()).unwrap_or_default(),
+                    "requests": r.get::<_, i64>(1)?, "input": r.get::<_, i64>(2)?, "output": r.get::<_, i64>(3)?,
+                    "cached": r.get::<_, i64>(4)?, "cost": r.get::<_, f64>(5)?,
+                }))
+            },
         );
-        let days_json: Vec<Value> = day_rows
-            .into_iter()
-            .map(|(d, req, inp, out)| {
-                let date = chrono::DateTime::from_timestamp(d * 86_400, 0).map(|t| t.format("%Y-%m-%d").to_string()).unwrap_or_default();
-                json!({ "date": date, "requests": req, "input": inp, "cached": 0, "output": out, "cost": 0.0 })
-            })
-            .collect();
+        let days_json = day_rows;
         let recent = query_rows(
             &conn,
-            "SELECT ts, COALESCE(model,'auto'), COALESCE(provider,''), COALESCE(input_tokens,0), COALESCE(output_tokens,0), COALESCE(status_code,200)
+            "SELECT ts, COALESCE(model,'auto'), COALESCE(provider,''), COALESCE(input_tokens,0), COALESCE(output_tokens,0), COALESCE(status_code,200),
+                    COALESCE(cost,0)
              FROM usage ORDER BY ts DESC LIMIT 20",
             [],
             |r| {
                 Ok(json!({
                     "ts": r.get::<_, f64>(0)?, "model": r.get::<_, String>(1)?, "provider": r.get::<_, String>(2)?,
                     "input": r.get::<_, i64>(3)?, "output": r.get::<_, i64>(4)?, "ok": r.get::<_, i64>(5)? < 400,
+                    "cost": r.get::<_, f64>(6)?,
                 }))
             },
         );
         let today_start = ((now() as i64 + utc_offset_secs).div_euclid(86_400) * 86_400 - utc_offset_secs) as f64;
         let top = query_rows(
             &conn,
-            "SELECT COALESCE(model,'auto'), COALESCE(provider,''), SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0)) AS tok
+            "SELECT COALESCE(model,'auto'), COALESCE(provider,''), SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0)) AS tok, SUM(COALESCE(cost,0))
              FROM usage WHERE ts >= ?1 GROUP BY model, provider ORDER BY tok DESC LIMIT 8",
             params![today_start],
             |r| {
                 Ok(
-                    json!({ "model": r.get::<_, String>(0)?, "provider": r.get::<_, String>(1)?, "tokens": r.get::<_, i64>(2)?, "cost": 0.0 }),
+                    json!({ "model": r.get::<_, String>(0)?, "provider": r.get::<_, String>(1)?, "tokens": r.get::<_, i64>(2)?, "cost": r.get::<_, f64>(3)? }),
                 )
             },
         );
         let models = query_rows(
             &conn,
-            "SELECT COALESCE(model,'auto'), COALESCE(provider,''), SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0)) AS tok
+            "SELECT COALESCE(model,'auto'), COALESCE(provider,''), SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0)) AS tok, SUM(COALESCE(cost,0))
              FROM usage WHERE ts >= ?1 GROUP BY model, provider ORDER BY tok DESC LIMIT 12",
             params![since],
             |r| {
                 Ok(
-                    json!({ "model": r.get::<_, String>(0)?, "provider": r.get::<_, String>(1)?, "tokens": r.get::<_, i64>(2)?, "cost": 0.0 }),
+                    json!({ "model": r.get::<_, String>(0)?, "provider": r.get::<_, String>(1)?, "tokens": r.get::<_, i64>(2)?, "cost": r.get::<_, f64>(3)? }),
                 )
             },
         );
@@ -1148,6 +1157,7 @@ mod tests {
                 model: Some("gpt"),
                 input_tokens: 1,
                 output_tokens: 1,
+                cached_tokens: 0,
                 duration_ms: 1,
                 status: "success",
                 status_code: 200,
@@ -1225,6 +1235,7 @@ mod tests {
                 model: Some("m"),
                 input_tokens: tokens,
                 output_tokens: 0,
+                cached_tokens: 0,
                 duration_ms: 1,
                 status: if status_code < 400 { "success" } else { "error" },
                 status_code,
@@ -1270,6 +1281,46 @@ mod tests {
         }
 
         #[test]
+        fn analytics_reports_estimated_cost_for_priced_models() {
+            let (s, _d) = store();
+            s.record_usage(&UsageEntry {
+                key_id: None,
+                key_name: None,
+                provider: Some("claude"),
+                model: Some("claude-sonnet-5-5"),
+                input_tokens: 1_000_000,
+                output_tokens: 0,
+                cached_tokens: 0,
+                duration_ms: 1,
+                status: "success",
+                status_code: 200,
+                error: None,
+                streaming: false,
+            });
+            assert_eq!(s.analytics(Some(1), 0)["days"][0]["cost"], 2.0);
+        }
+
+        #[test]
+        fn analytics_sums_cached_tokens_per_day() {
+            let (s, _d) = store();
+            s.record_usage(&UsageEntry {
+                key_id: None,
+                key_name: None,
+                provider: Some("claude"),
+                model: Some("m"),
+                input_tokens: 10,
+                output_tokens: 0,
+                cached_tokens: 6,
+                duration_ms: 1,
+                status: "success",
+                status_code: 200,
+                error: None,
+                streaming: false,
+            });
+            assert_eq!(s.analytics(Some(1), 0)["days"][0]["cached"], 6);
+        }
+
+        #[test]
         fn analytics_ranks_todays_models_by_tokens() {
             let (s, _d) = store();
             log(&s, "codex", 5, 200);
@@ -1288,6 +1339,7 @@ mod tests {
                 model: Some("m"),
                 input_tokens: 1,
                 output_tokens: 1,
+                cached_tokens: 0,
                 duration_ms: 1,
                 status,
                 status_code: code,

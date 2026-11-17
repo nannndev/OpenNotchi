@@ -956,7 +956,7 @@ pub fn grok_model_and_effort(model: &str) -> (String, Option<&'static str>) {
 const AG_CLIENT_ID: &str = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";
 const AG_CLIENT_SECRET: &str = "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";
 const AG_REDIRECT_PORT: u16 = 54547;
-const AG_USER_AGENT: &str = "antigravity/hub/2.24.0 darwin/arm64";
+pub const AG_USER_AGENT: &str = "antigravity/hub/2.24.0 darwin/arm64";
 pub const AG_CHAT_BASE: &str = "https://daily-cloudcode-pa.googleapis.com";
 /// Fallback thought signature the API accepts for the first function call of a turn.
 pub const AG_DEFAULT_THOUGHT_SIGNATURE: &str = include_str!("antigravity_sig.txt");
@@ -1320,7 +1320,7 @@ const CLINE_API: &str = "https://api.cline.bot/api/v1";
 const CLINE_REDIRECT_PORT: u16 = 54546;
 
 /// Cline's WorkOS JWTs must be sent as `workos:<jwt>`.
-fn cline_bearer(tok: &str) -> String {
+pub fn cline_bearer(tok: &str) -> String {
     if tok.starts_with("eyJ") {
         format!("workos:{tok}")
     } else {
