@@ -267,8 +267,10 @@ final class AppSettings: ObservableObject {
     @Published var aiAnthropicModel: String { didSet { defaults.set(aiAnthropicModel, forKey: "aiAnthropicModel") } }
     @Published var aiOpenaiURL: String { didSet { defaults.set(aiOpenaiURL, forKey: "aiOpenaiURL") } }
     @Published var aiOpenaiModel: String { didSet { defaults.set(aiOpenaiModel, forKey: "aiOpenaiModel") } }
-    /// Empty means "pick a Haiku/Sonnet model automatically".
-    @Published var aiNineRouterModel: String { didSet { defaults.set(aiNineRouterModel, forKey: "aiNineRouterModel") } }
+    /// Empty means "auto" routing on Notchi Gateway.
+    @Published var aiGatewayModel: String { didSet { defaults.set(aiGatewayModel, forKey: "aiGatewayModel") } }
+    @Published var notchiBubbleEnabled: Bool { didSet { defaults.set(notchiBubbleEnabled, forKey: "notchiBubbleEnabled") } }
+    @Published var notchiBubbleStyle: NotchiBubbleStyle { didSet { defaults.set(notchiBubbleStyle.rawValue, forKey: "notchiBubbleStyle") } }
 
     @Published var launchAtLogin: Bool {
         didSet {
@@ -557,15 +559,17 @@ final class AppSettings: ObservableObject {
         let loadedAccounts = defaults.data(forKey: "aiAccounts").flatMap { try? JSONDecoder().decode([AIAccount].self, from: $0) } ?? []
         aiAccounts = loadedAccounts.isEmpty ? AIAccount.defaults : loadedAccounts
         aiClosedMeter = defaults.bool(forKey: "aiClosedMeter")
-        // 9router is the default when installed (it uses the user's own accounts), then Apple Intelligence, then Ollama.
+        // Built-in Notchi Gateway is preferred when available, then Apple Intelligence, Ollama.
         aiProvider = AIProvider(rawValue: defaults.string(forKey: "aiProvider") ?? "").flatMap { AIProvider.available.contains($0) ? $0 : nil }
-            ?? (NineRouterService.shared.isAvailable ? .ninerouter : AIAssistant.appleAvailable ? .apple : .ollama)
+            ?? (NotchiGatewayService.shared.isAvailable ? .gateway : AIAssistant.appleAvailable ? .apple : .ollama)
         aiOllamaURL = defaults.string(forKey: "aiOllamaURL") ?? ""
         aiOllamaModel = defaults.string(forKey: "aiOllamaModel") ?? ""
         aiAnthropicModel = defaults.string(forKey: "aiAnthropicModel") ?? "claude-haiku-5-5"
         aiOpenaiURL = defaults.string(forKey: "aiOpenaiURL") ?? ""
         aiOpenaiModel = defaults.string(forKey: "aiOpenaiModel") ?? ""
-        aiNineRouterModel = defaults.string(forKey: "aiNineRouterModel") ?? ""
+        aiGatewayModel = defaults.string(forKey: "aiGatewayModel") ?? ""
+        notchiBubbleEnabled = defaults.object(forKey: "notchiBubbleEnabled") as? Bool ?? true
+        notchiBubbleStyle = NotchiBubbleStyle(rawValue: defaults.string(forKey: "notchiBubbleStyle") ?? "") ?? .glass
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
@@ -612,6 +616,22 @@ final class AppSettings: ObservableObject {
         case AppleMusicProvider.bundleID: return appleMusicEnabled
         case SpotifyWebProvider.providerID: return spotifyRemoteEnabled
         default: return youtubeEnabled // browser YouTube providers
+        }
+    }
+}
+
+enum NotchiBubbleStyle: String, CaseIterable, Identifiable {
+    case glass, neon, minimal, comic, off
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .glass: return "Frosted Glass"
+        case .neon: return "Neon Glow"
+        case .minimal: return "Minimal Pill"
+        case .comic: return "Comic Bubble"
+        case .off: return "Off"
         }
     }
 }

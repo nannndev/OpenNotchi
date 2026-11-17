@@ -302,13 +302,23 @@ struct FeaturesPane: View {
                 Toggle("Real-time lyrics translation", isOn: $settings.lyricsTranslate)
                     .disabled(!settings.lyricsEnabled)
                 if settings.lyricsTranslate {
-                    Picker("Translate into", selection: $settings.lyricsTranslateTarget) {
-                        ForEach(
-                            ["id", "en", "ja", "ko", "zh-Hans", "es", "fr", "de", "ar", "pt", "it", "th", "vi"],
-                            id: \.self
-                        ) { code in
-                            Text(Locale.current.localizedString(forIdentifier: code) ?? code).tag(code)
-                        }
+                    let langOptions = ["id", "en", "ja", "ko", "zh-Hans", "es", "fr", "de", "ar", "pt", "it", "th", "vi"].map { code in
+                        SearchableDropdownOption(
+                            id: code,
+                            title: Locale.current.localizedString(forIdentifier: code) ?? code,
+                            subtitle: nil,
+                            badgeText: code.uppercased(),
+                            badgeColor: .secondary
+                        )
+                    }
+                    LabeledContent("Translate into") {
+                        SearchableDropdown(
+                            options: langOptions,
+                            selectedId: settings.lyricsTranslateTarget,
+                            placeholder: "Search language…",
+                            width: 240,
+                            maxHeight: 240
+                        ) { settings.lyricsTranslateTarget = $0 }
                     }
                     TranslationIssueRow()
                 }

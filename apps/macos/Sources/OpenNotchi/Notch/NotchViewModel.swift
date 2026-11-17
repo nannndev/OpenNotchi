@@ -195,7 +195,7 @@ final class NotchViewModel: ObservableObject {
             }
             pending = work
             DispatchQueue.main.asyncAfter(deadline: .now() + settings.hoverDelay, execute: work)
-        } else if !isDropTargeted && !staysOpenOnHoverExit {
+        } else if !isDropTargeted && !staysOpenOnHoverExit && Self.activePopoverCount == 0 {
             scheduleClose(after: 0.12)
         }
     }
@@ -223,9 +223,12 @@ final class NotchViewModel: ObservableObject {
     /// Set while something must not be interrupted, like a photobox countdown.
     @Published var holdOpen = false
 
+    /// Number of open SwiftUI popovers (e.g. SearchableDropdown) that temporarily live in a child window.
+    static var activePopoverCount = 0
+
     /// A click in another app closes the notch, unless it's being held open.
     func clickedOutside() {
-        guard !holdOpen, !pinned else { return }
+        guard !holdOpen, !pinned, Self.activePopoverCount == 0 else { return }
         close()
     }
 
@@ -284,7 +287,7 @@ final class NotchViewModel: ObservableObject {
         let work = DispatchWorkItem { [weak self] in
             // holdOpen also covers the pointer leaving: a file picker or screenshot crosshair always moves it away,
             // and closing would tear down the chat view along with the attachment being added.
-            guard let self, !self.isHovering, !self.isDropTargeted, !self.isResizing, !self.holdOpen else { return }
+            guard let self, !self.isHovering, !self.isDropTargeted, !self.isResizing, !self.holdOpen, Self.activePopoverCount == 0 else { return }
             self.close()
         }
         pending = work

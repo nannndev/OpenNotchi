@@ -135,6 +135,13 @@ struct NotchRootView: View {
                 .overlay(alignment: .top) {
                     if !vm.isOpen { hoverStrip }
                 }
+                .overlay(alignment: .bottomTrailing) {
+                    if !vm.isOpen && settings.showMascot && vm.peek == nil {
+                        NotchiFloatingBubble(accent: accent.highlight)
+                            .offset(x: 6, y: 28)
+                            .allowsHitTesting(false)
+                    }
+                }
                 .onDrop(of: [.fileURL], isTargeted: $vm.isDropTargeted) { providers in
                     tray.handleDrop(providers)
                 }
@@ -191,6 +198,13 @@ struct NotchRootView: View {
                 .onHover { vm.hoverChanged($0) }
                 .overlay(alignment: .top) {
                     if !vm.isOpen { hoverStrip }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if !vm.isOpen && settings.showMascot && vm.peek == nil {
+                        NotchiFloatingBubble(accent: accent.highlight)
+                            .offset(x: 6, y: 28)
+                            .allowsHitTesting(false)
+                    }
                 }
                 .onDrop(of: [.fileURL], isTargeted: $vm.isDropTargeted) { providers in
                     tray.handleDrop(providers)

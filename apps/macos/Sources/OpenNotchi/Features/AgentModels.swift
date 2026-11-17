@@ -21,7 +21,7 @@ enum AgentTool: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// The provider's real logo, bundled from 9router's provider icons (Resources/ProviderIcons).
+    /// The provider's real logo, bundled from provider icons (Resources/ProviderIcons).
     var logo: NSImage? { Self.logos[self] ?? nil }
 
     private static let logos: [AgentTool: NSImage?] = Dictionary(
@@ -63,7 +63,7 @@ struct AgentSession: Identifiable, Equatable {
     var cwd = ""
 }
 
-/// A Claude Code, Codex, Antigravity, or 9router connection to read usage (and agent status) from.
+/// A Claude Code, Codex, Antigravity, or Notchi Gateway connection to read usage (and agent status) from.
 struct AIAccount: Codable, Hashable, Identifiable {
     var id = UUID()
     var name: String

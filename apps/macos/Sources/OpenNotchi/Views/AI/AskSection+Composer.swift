@@ -21,7 +21,7 @@ extension AskSection {
                             .background(Capsule().fill(on ? accent.highlight.opacity(0.16) : .white.opacity(0.05)))
                     }
                     .buttonStyle(.plain)
-                    .disabled(ctx == .song && media.info == nil || ctx == .usage && !usage.is9RouterConnected)
+                    .disabled(ctx == .song && media.info == nil || ctx == .usage && !usage.isGatewayConnected)
                     .help("Attach \(ctx.label.lowercased()) to your next message")
                 }
                 Spacer()

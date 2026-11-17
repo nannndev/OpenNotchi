@@ -8,12 +8,6 @@ extension AskSection {
                 Picker("Provider", selection: $settings.aiProvider) {
                     ForEach(AIProvider.available) { Text($0.displayName).tag($0) }
                 }
-                if settings.aiProvider == .ninerouter {
-                    Picker("Model", selection: $settings.aiNineRouterModel) {
-                        Text("Automatic").tag("")
-                        ForEach(routerModels, id: \.self) { Text($0).tag($0) }
-                    }
-                }
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "sparkles").foregroundStyle(accent.highlight)
@@ -25,7 +19,21 @@ extension AskSection {
             .fixedSize()
             .help("Where your prompts go")
             .task(id: settings.aiProvider) {
-                if settings.aiProvider == .ninerouter { routerModels = await NineRouterService.shared.models() }
+                if settings.aiProvider == .gateway {
+                    routerModels = await NotchiGatewayService.shared.models()
+                }
+            }
+
+            if settings.aiProvider == .gateway && !routerModels.isEmpty {
+                SearchableDropdown(
+                    options: ProviderSettings.modelDropdownOptions(routerModels, autoLabel: "Auto"),
+                    selectedId: settings.aiGatewayModel,
+                    placeholder: "Search models…",
+                    width: 280,
+                    maxHeight: 240,
+                    compact: true
+                ) { settings.aiGatewayModel = $0 }
+                .frame(maxWidth: 160)
             }
 
             Spacer()

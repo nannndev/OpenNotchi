@@ -53,7 +53,7 @@ struct UsageCard: View {
 
                 Spacer(minLength: 4)
 
-                // Interactive 9router ON / OFF Toggle Pill
+                // Interactive Gateway ON / OFF Toggle Pill
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         usage.toggleAccountActive(
@@ -80,7 +80,7 @@ struct UsageCard: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .help(report.account.isActive ? "Active in 9router. Click to toggle OFF." : "Inactive. Click to toggle ON.")
+                .help(report.account.isActive ? "Active in Gateway. Click to toggle OFF." : "Inactive. Click to toggle ON.")
 
                 // Health status badge
                 Text(healthLabel)
@@ -93,12 +93,12 @@ struct UsageCard: View {
 
             if !report.found {
                 note("No logs found in \(report.account.dir)")
-            } else if report.isFrom9Router {
-                // 9router Quota Bars (e.g. session 5h and weekly 7d, or multiple models)
+            } else if report.isFromGateway {
+                // Gateway Quota Bars (e.g. session 5h and weekly 7d, or multiple models)
                 if !report.quotas.isEmpty {
                     VStack(spacing: 5) {
                         ForEach(report.quotas, id: \.name) { q in
-                            NineRouterQuotaBar(quota: q)
+                            GatewayQuotaBar(quota: q)
                         }
                     }
                 } else if let plan = report.planName {
@@ -183,8 +183,8 @@ struct UsageCard: View {
     }
 }
 
-struct NineRouterQuotaBar: View {
-    let quota: NineRouterQuota
+struct GatewayQuotaBar: View {
+    let quota: GatewayQuota
     @Environment(\.notchAccent) private var accent
 
     private var barColor: Color {

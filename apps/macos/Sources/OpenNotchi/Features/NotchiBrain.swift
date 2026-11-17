@@ -89,6 +89,8 @@ enum NotchiBrain {
         bool("downloadPeek", \.downloadPeekEnabled, "Peek when a download finishes"),
         bool("notificationSounds", \.notificationSounds, "Sounds for peeks and reminders"),
         bool("mascot", \.showMascot, "Notchi mascot beside the notch"),
+        bool("notchiBubble", \.notchiBubbleEnabled, "Notchi floating speech bubble"),
+        choice("bubbleStyle", \.notchiBubbleStyle, "Floating speech bubble style", name: \.displayName),
         bool("statsInHeader", \.showStatsInHeader, "CPU / RAM stats in the header"),
         bool("markets", \.marketsEnabled, "Markets tab (stocks, crypto)"),
         bool("tickerInHeader", \.showTickerInHeader, "Market ticker in the header"),
@@ -123,7 +125,7 @@ enum NotchiBrain {
 
         What OpenNotchi does: hover the notch to open it. Tabs: \(NotchTab.allCases.map(\.rawValue).joined(separator: ", ")). \
         Home shows the music player (Spotify, Apple Music, YouTube) with synced lyrics, calendar and weather. \
-        Tray holds files dragged onto the notch (AirDrop, convert images). AI shows 9router quota per account, usage analytics, \
+        Tray holds files dragged onto the notch (AirDrop, convert images). AI shows Gateway quota per account, usage analytics, \
         coding agent status (Claude Code, Codex, Antigravity, Command Code) and this chat. Peeks are small banners for charging, \
         devices, downloads, camera/mic use, agents and meetings. Settings panes: \(SettingsPane.allCases.map(\.rawValue).joined(separator: ", ")).
 
@@ -133,10 +135,25 @@ enum NotchiBrain {
         You can also play music: "play" takes a search like "Hindia Evaluasi" and starts the best match. \
         \(SpotifyAuth.shared.isLoggedIn ? "It searches Spotify." : "Spotify isn't connected, so it only searches the Apple Music library; if the user wants Spotify, tell them to connect it in Settings › Media (lyrics and play/pause/skip work without it).")
 
-        You can change settings, switch tabs and open Settings. When the user asks for that, or clearly wants it, say in one \
-        short sentence what you'll change, then end your reply with exactly one block:
+        You can also control OpenNotchi & this Mac with actions! When the user asks for any of these, say in one \
+        short sentence what you'll do, then end your reply with exactly one block:
         ```notchi
-        {"set": {"theme": "aurora", "lyrics": true}, "tab": "Timer", "settings": "Appearance", "play": "song or artist"}
+        {
+          "set": {"theme": "aurora", "lyrics": true},
+          "tab": "Timer",
+          "settings": "Appearance",
+          "play": "song or artist",
+          "media": "play_pause|next|previous",
+          "volume": 50,
+          "mute": false,
+          "openApp": "Safari",
+          "openUrl": "https://example.com",
+          "copy": "text to put on clipboard",
+          "note": "quick note content",
+          "timer": 25,
+          "killPort": 3000,
+          "gatewayModel": "cc/claude-sonnet-5-5"
+        }
         ```
         Every field is optional. Use only the keys and values listed above. Don't add the block when nothing should change.
         """
@@ -147,6 +164,16 @@ enum NotchiBrain {
         var tab: String?
         var settings: String?
         var play: String?
+        var media: String?
+        var volume: Int?
+        var mute: Bool?
+        var openApp: String?
+        var openUrl: String?
+        var copy: String?
+        var note: String?
+        var timer: Int?
+        var killPort: Int?
+        var gatewayModel: String?
     }
 
     /// A JSON scalar, so `true`, `2` and `"aurora"` all decode.
@@ -200,7 +227,78 @@ enum NotchiBrain {
             AppDelegate.shared?.showSettings()
             changes.append(Change(label: "Opened Settings › \(pane.rawValue)", undo: nil, key: "settings"))
         }
+        if let mediaCmd = actions.media?.lowercased() {
+            switch mediaCmd {
+            case "play_pause", "playpause", "toggle":
+                AppDelegate.shared?.media.playPause()
+                changes.append(Change(label: "Toggled playback", undo: nil, key: "media"))
+            case "next", "skip":
+                AppDelegate.shared?.media.nextTrack()
+                changes.append(Change(label: "Skipped to next track", undo: nil, key: "media"))
+            case "previous", "prev", "back":
+                AppDelegate.shared?.media.previousTrack()
+                changes.append(Change(label: "Previous track", undo: nil, key: "media"))
+            default: break
+            }
+        }
+        if let vol = actions.volume {
+            let clamped = max(0, min(100, vol))
+            runOsascript("set volume output volume \(clamped)")
+            changes.append(Change(label: "Volume: \(clamped)%", undo: nil, key: "volume"))
+        }
+        if let muted = actions.mute {
+            runOsascript("set volume output muted \(muted ? "true" : "false")")
+            changes.append(Change(label: muted ? "Muted audio" : "Unmuted audio", undo: nil, key: "mute"))
+        }
+        if let appName = actions.openApp?.trimmingCharacters(in: .whitespacesAndNewlines), !appName.isEmpty {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            proc.arguments = ["-a", appName]
+            try? proc.run()
+            changes.append(Change(label: "Opened \(appName)", undo: nil, key: "openApp"))
+        }
+        if let urlStr = actions.openUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
+           let url = URL(string: urlStr),
+           let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
+            NSWorkspace.shared.open(url)
+            changes.append(Change(label: "Opened \(url.host ?? urlStr)", undo: nil, key: "openUrl"))
+        }
+        if let textToCopy = actions.copy, !textToCopy.isEmpty {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(textToCopy, forType: .string)
+            changes.append(Change(label: "Copied to clipboard", undo: nil, key: "copy"))
+        }
+        if let noteText = actions.note?.trimmingCharacters(in: .whitespacesAndNewlines), !noteText.isEmpty {
+            let id = NoteStore.shared.create()
+            NoteStore.shared.update(id, text: noteText)
+            changes.append(Change(label: "Saved note", undo: nil, key: "note"))
+        }
+        if let minutes = actions.timer, minutes > 0 {
+            let t = AppDelegate.shared?.timer
+            t?.setDuration(minutes: minutes)
+            t?.start()
+            changes.append(Change(label: "Started \(minutes)m timer", undo: nil, key: "timer"))
+        }
+        if let port = actions.killPort, (1...65535).contains(port) {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/bin/sh")
+            proc.arguments = ["-c", "lsof -ti tcp:\(port) | xargs -r kill -9"]
+            try? proc.run()
+            changes.append(Change(label: "Killed process on :\(port)", undo: nil, key: "killPort"))
+        }
+        if let gwModel = actions.gatewayModel?.trimmingCharacters(in: .whitespacesAndNewlines), !gwModel.isEmpty {
+            let old = s.aiGatewayModel
+            s.aiGatewayModel = gwModel
+            changes.append(Change(label: "Gateway model: \(gwModel)", undo: old, key: "gatewayModel"))
+        }
         return changes
+    }
+
+    private static func runOsascript(_ script: String) {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        proc.arguments = ["-e", script]
+        try? proc.run()
     }
 
     static func undo(_ change: Change) {

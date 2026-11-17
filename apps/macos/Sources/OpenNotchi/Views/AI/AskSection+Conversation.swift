@@ -81,7 +81,7 @@ extension AskSection {
                 }
             }
             HStack(spacing: 14) {
-                if usage.is9RouterConnected {
+                if usage.isGatewayConnected {
                     suggestion("How's my AI usage today?", icon: "chart.bar.xaxis") {
                         send("How is my AI usage looking? Anything close to its limit?", context: [.usage])
                     }

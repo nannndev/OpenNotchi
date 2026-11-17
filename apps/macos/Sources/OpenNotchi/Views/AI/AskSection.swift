@@ -48,7 +48,7 @@ struct AskSection: View {
 
     var providerLabel: String {
         switch settings.aiProvider {
-        case .ninerouter: return "9router · \(settings.aiNineRouterModel.isEmpty ? "auto" : settings.aiNineRouterModel)"
+        case .gateway: return "Gateway · \(settings.aiGatewayModel.isEmpty ? "auto" : settings.aiGatewayModel)"
         case .anthropic: return "Anthropic · \(settings.aiAnthropicModel)"
         case .openai: return settings.aiOpenaiModel
         case .ollama: return "Ollama · \(settings.aiOllamaModel)"

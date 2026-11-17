@@ -25,10 +25,73 @@ struct CodexLimits: Equatable {
     var secondary: RateWindow?
 }
 
+struct GatewayQuota: Equatable {
+    var name: String
+    var used: Double
+    var total: Double
+    var remaining: Double
+    var remainingPercentage: Double
+    var resetAt: Date?
+    var unlimited: Bool
+
+    var isExhausted: Bool {
+        if unlimited { return false }
+        if total > 0 && used >= total { return true }
+        return remainingPercentage <= 0.0
+    }
+
+    private static let poolLabels: [(key: String, label: String)] = [
+        ("gemini_pro", "Gemini 2.5 Pro"),
+        ("gemini_flash", "Gemini 2.5 Flash"),
+        ("claude_sonnet", "Claude 3.7 Sonnet"),
+        ("claude_opus", "Claude 3 Opus"),
+        ("claude_gpt_session", "Claude & GPT (5h)"),
+        ("gemini_weekly", "Gemini (Weekly)"),
+        ("claude_gpt_weekly", "Claude & GPT (Weekly)"),
+    ]
+
+    static func displayQuotas(_ quotas: [GatewayQuota]) -> [GatewayQuota] {
+        let pools = poolLabels.compactMap { pool -> GatewayQuota? in
+            guard var q = quotas.first(where: { $0.name == pool.key }) else { return nil }
+            q.name = pool.label
+            return q
+        }
+        return pools.isEmpty ? quotas.sorted { $0.name < $1.name } : pools
+    }
+}
+
+struct DayStat: Identifiable {
+    var date: String
+    var requests: Int
+    var input: Int
+    var cached: Int
+    var output: Int
+    var cost: Double
+    var id: String { date }
+}
+
+struct RecentRequest: Identifiable {
+    var id: Int64
+    var date: Date
+    var model: String
+    var provider: String
+    var input: Int
+    var output: Int
+    var ok: Bool
+}
+
+struct ModelStat: Identifiable {
+    var id: String
+    var tokens: Int
+    var cost: Double
+    var model: String { String(id.split(separator: "|").first ?? Substring(id)) }
+    var provider: String { id.split(separator: "|").dropFirst().first.map(String.init) ?? "" }
+}
+
 struct UsageReport: Identifiable {
     var account: AIAccount
     var id: UUID { account.id }
-    /// False when the folder has no session logs and no 9router connection found.
+    /// False when the folder has no session logs and no Gateway connection found.
     var found = false
     var today = UsageTotals()
     /// The running 5-hour block (Claude Code).
@@ -37,12 +100,12 @@ struct UsageReport: Identifiable {
     var days = [Int](repeating: 0, count: 7)
     var limits: CodexLimits?
 
-    // 9router multi-account enhancements:
-    var quotas: [NineRouterQuota] = []
+    // Multi-account gateway enhancements:
+    var quotas: [GatewayQuota] = []
     var planName: String?
     var testStatus: String?
     var lastError: String?
-    var isFrom9Router: Bool = false
+    var isFromGateway: Bool = false
 }
 
 enum AccountHealth: String {
@@ -58,9 +121,9 @@ struct AccountQuota {
 
 extension UsageReport {
     var quota: AccountQuota {
-        if isFrom9Router {
+        if isFromGateway {
             if !account.isActive {
-                return AccountQuota(percent: 100, label: "Inactive", resetsText: "Disabled in 9router", health: .exhausted)
+                return AccountQuota(percent: 100, label: "Inactive", resetsText: "Disabled in Gateway", health: .exhausted)
             }
             if testStatus == "unavailable" || (lastError?.contains("rate_limit") == true) {
                 let reset = quotas.compactMap(\.resetAt).filter { $0 > .now }.min()

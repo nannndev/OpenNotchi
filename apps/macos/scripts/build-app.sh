@@ -20,6 +20,30 @@ BIN_DIR="$(swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-b
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/OpenNotchi" "$APP/Contents/MacOS/OpenNotchi"
+
+# Build and bundle notchi-gateway sidecar if Cargo is available.
+GATEWAY_DIR="../gateway"
+if [[ -f "$GATEWAY_DIR/Cargo.toml" ]] && command -v cargo >/dev/null 2>&1; then
+    CARGO_PROFILE_FLAG=()
+    GATEWAY_SUBDIR="debug"
+    if [[ "$CONFIG" == "release" ]]; then
+        CARGO_PROFILE_FLAG=(--release)
+        GATEWAY_SUBDIR="release"
+    fi
+
+    if [[ "${UNIVERSAL:-0}" == "1" ]]; then
+        cargo build --manifest-path "$GATEWAY_DIR/Cargo.toml" ${CARGO_PROFILE_FLAG[@]+"${CARGO_PROFILE_FLAG[@]}"} --target aarch64-apple-darwin
+        cargo build --manifest-path "$GATEWAY_DIR/Cargo.toml" ${CARGO_PROFILE_FLAG[@]+"${CARGO_PROFILE_FLAG[@]}"} --target x86_64-apple-darwin
+        lipo -create \
+            "$GATEWAY_DIR/target/aarch64-apple-darwin/$GATEWAY_SUBDIR/notchi-gateway" \
+            "$GATEWAY_DIR/target/x86_64-apple-darwin/$GATEWAY_SUBDIR/notchi-gateway" \
+            -output "$APP/Contents/MacOS/notchi-gateway"
+    else
+        cargo build --manifest-path "$GATEWAY_DIR/Cargo.toml" ${CARGO_PROFILE_FLAG[@]+"${CARGO_PROFILE_FLAG[@]}"}
+        cp "$GATEWAY_DIR/target/$GATEWAY_SUBDIR/notchi-gateway" "$APP/Contents/MacOS/notchi-gateway"
+    fi
+fi
+
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp -R Resources/ProviderIcons "$APP/Contents/Resources/ProviderIcons"

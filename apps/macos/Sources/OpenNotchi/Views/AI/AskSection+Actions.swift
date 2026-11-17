@@ -50,7 +50,7 @@ extension AskSection {
                 return
                     "- \(r.account.name) (\(r.account.tool.displayName), \(r.account.isActive ? "on" : "off")): \(formatTokens(r.today.tokens)) tokens today\(quotas.isEmpty ? "" : "; \(quotas)")"
             }
-            parts.append("My AI accounts in 9router:\n" + lines.joined(separator: "\n"))
+            parts.append("My AI accounts in Gateway:\n" + lines.joined(separator: "\n"))
         }
         return parts.joined(separator: "\n\n")
     }

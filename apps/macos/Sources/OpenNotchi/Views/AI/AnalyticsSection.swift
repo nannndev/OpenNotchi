@@ -26,16 +26,20 @@ struct AnalyticsSection: View {
     @Environment(\.notchAccent) private var accent
     @AppStorage("analyticsRange") private var range: Range = .week
     @State private var metric: Metric = .tokens
-    @State private var days: [NineRouterService.DayStat] = []
+    @State private var days: [DayStat] = []
     /// The same number of days just before `days`, for the change badges; empty for All.
-    @State private var previous: [NineRouterService.DayStat] = []
-    @State private var models: [NineRouterService.ModelStat] = []
-    @State private var recent: [NineRouterService.RecentRequest] = []
+    @State private var previous: [DayStat] = []
+    @State private var models: [ModelStat] = []
+    @State private var recent: [RecentRequest] = []
     @State private var selectedDate: String?
 
+    private var useGateway: Bool {
+        NotchiGatewayService.shared.isAvailable || NotchiGatewayService.shared.hasDatabase
+    }
+
     var body: some View {
-        if !NineRouterService.shared.isAvailable {
-            emptyState("Install 9router to see request history and analytics.", icon: "chart.xyaxis.line")
+        if !useGateway {
+            emptyState("Connect a provider in Settings › AI › Notchi Gateway to see request history and analytics.", icon: "chart.xyaxis.line")
         } else {
             VStack(spacing: 8) {
                 statsRow
@@ -75,28 +79,30 @@ struct AnalyticsSection: View {
     }
 
     private struct Snapshot {
-        var days: [NineRouterService.DayStat]
-        var previous: [NineRouterService.DayStat]
-        var models: [NineRouterService.ModelStat]
-        var recent: [NineRouterService.RecentRequest]
+        var days: [DayStat]
+        var previous: [DayStat]
+        var models: [ModelStat]
+        var recent: [RecentRequest]
     }
 
     /// Everything the tab shows for a window of `days` (nil = all history). Blocking; call off the main thread.
     nonisolated private static func load(days: Int?) -> Snapshot {
-        let service = NineRouterService.shared
-        var previous: [NineRouterService.DayStat] = []
+        let gw = NotchiGatewayService.shared
+        var previous: [DayStat] = []
         if let n = days {
-            // The n days before the current window; rows only exist for days with usage, so cut by date.
             let start = dateKey(daysAgo: n - 1)
-            previous = service.dailyStats(days: 2 * n).filter { $0.date < start }
+            previous = gw.dailyStats(days: 2 * n).filter { $0.date < start }
         }
         return Snapshot(
-            days: service.dailyStats(days: days), previous: previous, models: service.modelStats(days: days),
-            recent: service.recentRequests(limit: 20))
+            days: gw.dailyStats(days: days),
+            previous: previous,
+            models: gw.modelStats(days: days),
+            recent: gw.recentRequests(limit: 20)
+        )
     }
 
-    private func total(_ days: [NineRouterService.DayStat]) -> NineRouterService.DayStat {
-        days.reduce(into: NineRouterService.DayStat(date: "", requests: 0, input: 0, cached: 0, output: 0, cost: 0)) {
+    private func total(_ days: [DayStat]) -> DayStat {
+        days.reduce(into: DayStat(date: "", requests: 0, input: 0, cached: 0, output: 0, cost: 0)) {
             $0.requests += $1.requests
             $0.input += $1.input
             $0.cached += $1.cached
@@ -186,7 +192,7 @@ struct AnalyticsSection: View {
         metric == .cost ? formatCost(n) : formatTokens(Int(n))
     }
 
-    private func tooltip(_ d: NineRouterService.DayStat) -> some View {
+    private func tooltip(_ d: DayStat) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(d.date).font(.system(size: 9, weight: .bold))
             tooltipRow("Requests", d.requests.formatted(), .primary)
@@ -334,7 +340,7 @@ struct AnalyticsSection: View {
         .background(RoundedRectangle(cornerRadius: 9).fill(.white.opacity(0.04)))
     }
 
-    /// Local YYYY-MM-DD for `daysAgo` days before today, matching 9router's `dateKey`.
+    /// Local YYYY-MM-DD for `daysAgo` days before today, matching gateway's `dateKey`.
     nonisolated static func dateKey(daysAgo: Int, from now: Date = .now) -> String {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"

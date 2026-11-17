@@ -50,7 +50,7 @@ struct ToolLogo: View {
 // MARK: - Compact & list layouts
 
 /// The quota closest to running out, which is what decides whether an account is usable.
-func tightestQuota(_ report: UsageReport) -> NineRouterQuota? {
+func tightestQuota(_ report: UsageReport) -> GatewayQuota? {
     report.quotas.filter { !$0.unlimited }.min { $0.remainingPercentage < $1.remainingPercentage }
 }
 

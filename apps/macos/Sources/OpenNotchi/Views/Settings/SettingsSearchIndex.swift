@@ -158,9 +158,9 @@ struct SettingItem: Identifiable {
             title: "Enable AI features", subtitle: "Master toggle for AI Quota, Agents, and Ask AI in OpenNotchi",
             pane: .ai, keywords: ["ai", "enable", "agents", "quota"], icon: "sparkles"),
         SettingItem(
-            title: "Quota & Accounts (9router style)",
+            title: "Quota & Accounts (Notchi Gateway)",
             subtitle: "Multi-account token monitoring, rate limit gauges, and reset countdowns", pane: .ai,
-            keywords: ["quota", "tokens", "usage", "accounts", "rate limit", "9router"], icon: "chart.bar.xaxis"),
+            keywords: ["quota", "tokens", "usage", "accounts", "rate limit", "gateway"], icon: "chart.bar.xaxis"),
         SettingItem(
             title: "Google Antigravity",
             subtitle: "Track Antigravity agent sessions, prompts, and tokens in ~/.gemini/antigravity-ide", pane: .ai,

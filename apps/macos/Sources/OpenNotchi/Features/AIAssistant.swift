@@ -10,14 +10,22 @@ struct AIError: LocalizedError {
     var errorDescription: String? { message }
 }
 
+@MainActor
+final class AIActivityState: ObservableObject {
+    static let shared = AIActivityState()
+    @Published var isGenerating = false
+    @Published var activeLabel: String?
+    private init() {}
+}
+
 enum AIProvider: String, CaseIterable, Identifiable {
-    case ninerouter, apple, ollama, anthropic, openai
+    case gateway, apple, ollama, anthropic, openai
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .ninerouter: return "9router (your accounts)"
+        case .gateway: return "Notchi Gateway (built-in)"
         case .apple: return "Apple Intelligence (on-device)"
         case .ollama: return "Ollama (local)"
         case .anthropic: return "Anthropic API"
@@ -27,11 +35,11 @@ enum AIProvider: String, CaseIterable, Identifiable {
 
     var needsKey: Bool { self == .anthropic || self == .openai }
 
-    /// Providers to offer: 9router only when installed, Apple Intelligence only when the on-device model is ready.
+    /// Providers to offer: Notchi Gateway when available, Apple Intelligence when ready.
     static var available: [AIProvider] {
         allCases.filter {
             switch $0 {
-            case .ninerouter: return NineRouterService.shared.isAvailable
+            case .gateway: return NotchiGatewayService.shared.isAvailable
             case .apple: return AIAssistant.appleAvailable
             default: return true
             }
@@ -147,21 +155,36 @@ enum AIAssistant {
         try await chat([Message(role: "user", content: prompt)], settings: settings)
     }
 
-    /// Sends a whole conversation. OpenAI-style providers (9router, OpenAI, Ollama) stream: `onDelta` gets
+    /// Sends a whole conversation. OpenAI-style providers (Gateway, OpenAI, Ollama) stream: `onDelta` gets
     /// each new chunk of text as it arrives. The others answer in one go and call `onDelta` once.
     @discardableResult
     static func chat(_ history: [Message], system: String = systemPrompt, settings: AppSettings = .shared,
                      onDelta: @escaping @MainActor (String) -> Void = { _ in }) async throws -> String {
         let provider = settings.aiProvider
         if provider == .apple, history.contains(where: { !($0.images ?? []).isEmpty }) {
-            throw AIError("Apple Intelligence can't read images. Pick 9router or another provider for this chat.")
+            throw AIError("Apple Intelligence can't read images. Pick Notchi Gateway or another provider for this chat.")
+        }
+        await MainActor.run {
+            AIActivityState.shared.isGenerating = true
+            AIActivityState.shared.activeLabel = provider == .gateway
+                ? (settings.aiGatewayModel.isEmpty ? "thinking…" : settings.aiGatewayModel.split(separator: "/").last.map(String.init) ?? "thinking…")
+                : "thinking…"
+        }
+        defer {
+            Task { @MainActor in
+                AIActivityState.shared.isGenerating = false
+                AIActivityState.shared.activeLabel = nil
+            }
         }
         switch provider {
-        case .ninerouter:
-            guard let key = NineRouterService.shared.apiKey() else { throw AIError("No active API key in 9router. Create one in its dashboard › Endpoint & Key.") }
-            let model = try await nineRouterModel(settings)
-            return try await stream(NineRouterService.baseURL + "/chat/completions", model: model, history: history, system: system,
-                                    headers: ["Authorization": "Bearer \(key)"], onDelta: onDelta)
+        case .gateway:
+            guard await NotchiGatewayService.shared.ensureRunning() else {
+                throw AIError(NotchiGatewayService.shared.lastError ?? "Notchi Gateway failed to start.")
+            }
+            let model = settings.aiGatewayModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            return try await stream(NotchiGatewayService.v1BaseURL + "/chat/completions",
+                                    model: model.isEmpty ? "auto" : model,
+                                    history: history, system: system, headers: [:], onDelta: onDelta)
 
         case .openai:
             let key = try apiKey(provider)
@@ -185,7 +208,7 @@ enum AIAssistant {
         let provider = settings.aiProvider
         let prompt = history.last?.full ?? ""
         switch provider {
-        case .ninerouter, .openai, .ollama:
+        case .gateway, .openai, .ollama:
             throw AIError("Unreachable")
 
         case .apple:
@@ -199,7 +222,7 @@ enum AIAssistant {
                 } catch let error as LanguageModelSession.GenerationError {
                     // Apple's on-device guardrails reject many harmless prompts; say so instead of "unsafe".
                     if case .guardrailViolation = error {
-                        throw AIError("Apple Intelligence's safety filter blocked this prompt. Switch the model to 9router or another provider in Settings › AI.")
+                        throw AIError("Apple Intelligence's safety filter blocked this prompt. Switch the model to Notchi Gateway or another provider in Settings › AI.")
                     }
                     throw error
                 }
@@ -274,16 +297,6 @@ enum AIAssistant {
             }
         }
         return try nonEmpty(text)
-    }
-
-    /// The chosen 9router model, or the first Haiku/Sonnet it offers so Ask works with no setup.
-    private static func nineRouterModel(_ settings: AppSettings) async throws -> String {
-        if !settings.aiNineRouterModel.isEmpty { return settings.aiNineRouterModel }
-        let models = await NineRouterService.shared.models()
-        guard let pick = models.first(where: { $0.contains("haiku") }) ?? models.first(where: { $0.contains("sonnet") }) ?? models.first else {
-            throw AIError("9router isn't running. Start it, then try again.")
-        }
-        return pick
     }
 
     private static func apiKey(_ provider: AIProvider) throws -> String {

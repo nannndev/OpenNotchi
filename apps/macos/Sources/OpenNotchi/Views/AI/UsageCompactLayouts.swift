@@ -19,7 +19,7 @@ struct AccountToggle: View {
                 }
         }
         .buttonStyle(.plain)
-        .help(report.account.isActive ? "Active in 9router. Click to turn off." : "Inactive. Click to turn on.")
+        .help(report.account.isActive ? "Active in Gateway. Click to turn off." : "Inactive. Click to turn on.")
         .accessibilityLabel("\(report.account.name) \(report.account.isActive ? "on" : "off")")
     }
 }
@@ -121,7 +121,7 @@ struct UsageListRow: View {
     }
 }
 
-/// Today's busiest models across all 9router accounts, plus a shortcut to its dashboard.
+/// Today's busiest models across all Gateway accounts, plus a shortcut to its dashboard.
 struct TopModelsPanel: View {
     let models: [(model: String, tokens: Int, cost: Double)]
     @Environment(\.notchAccent) private var accent
@@ -148,14 +148,14 @@ struct TopModelsPanel: View {
             }
             Spacer(minLength: 0)
             Button {
-                if let url = URL(string: "http://127.0.0.1:20128") { NSWorkspace.shared.open(url) }
+                if let url = URL(string: "\(NotchiGatewayService.baseURL)/admin/accounts") { NSWorkspace.shared.open(url) }
             } label: {
-                Label("Open 9router", systemImage: "arrow.up.right.square")
+                Label("Open Gateway", systemImage: "arrow.up.right.square")
                     .font(.system(size: 9.5, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help("Open the 9router dashboard in your browser")
+            .help("Open Notchi Gateway in your browser")
         }
         .padding(8)
         .frame(width: 170)

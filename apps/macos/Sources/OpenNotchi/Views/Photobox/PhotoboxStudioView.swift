@@ -75,26 +75,25 @@ struct PhotoboxStudioView: View {
 
     private var stylePicker: some View {
         HStack(spacing: 6) {
-            Menu {
-                Picker("Style", selection: $session.style) {
-                    ForEach(StripStyle.allCases) { style in
-                        Text(style.displayName).tag(style)
-                    }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "paintpalette.fill")
-                        .font(.system(size: 10))
-                    Text(session.style.displayName)
-                        .font(.system(size: 11, weight: .semibold))
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(.white.opacity(0.12)))
-                .foregroundStyle(.white)
+            let styleOptions = StripStyle.allCases.map { style in
+                SearchableDropdownOption(
+                    id: style.rawValue,
+                    title: style.displayName,
+                    icon: AnyView(Image(systemName: "paintpalette.fill").font(.system(size: 10)).foregroundStyle(.secondary))
+                )
             }
-            .menuStyle(.borderlessButton)
+            SearchableDropdown(
+                options: styleOptions,
+                selectedId: session.style.rawValue,
+                placeholder: "Search styles…",
+                width: 240,
+                maxHeight: 260,
+                compact: true
+            ) { picked in
+                if let style = StripStyle(rawValue: picked) {
+                    session.style = style
+                }
+            }
             .fixedSize()
 
             Menu {

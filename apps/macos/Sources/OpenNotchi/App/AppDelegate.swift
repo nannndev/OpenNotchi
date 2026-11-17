@@ -39,6 +39,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var toggleMenuItem: NSMenuItem?
     private(set) var settingsWindow: NSWindow?
 
+    func applicationWillTerminate(_ notification: Notification) {
+        NotchiGatewayService.shared.stop()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         screenManager = NotchScreenManager(
             media: media,
@@ -61,6 +65,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateLyricsOverlay()
         nowPlayingScreen = NowPlayingScreenController(media: media, lyrics: lyrics, settings: settings)
         updateAI()
+        if settings.aiProvider == .gateway || NotchiGatewayService.shared.isAvailable {
+            NotchiGatewayService.shared.startIfNeeded()
+        }
 
         if CommandLine.arguments.contains("--settings") || CommandLine.arguments.contains("-s") {
             showSettings()

@@ -269,17 +269,17 @@ enum AISelfTest {
         let refDate = ISO8601DateFormatter().date(from: "2026-10-27T12:00:00Z")!
         check(AnalyticsSection.dateKey(daysAgo: 6, from: refDate) == "2026-10-21", "7D window starts 6 days back")
 
-        print("9router quotas")
-        func quota(_ name: String, _ pct: Double) -> NineRouterQuota {
-            NineRouterQuota(name: name, used: 0, total: 1000, remaining: 0, remainingPercentage: pct, resetAt: nil, unlimited: false)
+        print("Gateway quotas")
+        func quota(_ name: String, _ pct: Double) -> GatewayQuota {
+            GatewayQuota(name: name, used: 0, total: 1000, remaining: 0, remainingPercentage: pct, resetAt: nil, unlimited: false)
         }
-        let antigravity = NineRouterService.displayQuotas([
+        let antigravity = GatewayQuota.displayQuotas([
             quota("claude-opus-5-5-high", 100), quota("gemini-3.8-flash-low", 77), quota("gemini_session", 77),
             quota("claude_gpt_session", 100), quota("gemini_weekly", 92), quota("claude_gpt_weekly", 100),
         ])
         check(antigravity.map(\.name) == ["Gemini (5h)", "Claude & GPT (5h)", "Gemini (Weekly)", "Claude & GPT (Weekly)"], "pools only, dashboard labels and order")
         check(antigravity.first?.remainingPercentage == 77, "pool keeps its numbers")
-        let claude = NineRouterService.displayQuotas([quota("weekly (7d)", 2), quota("session (5h)", 82)])
+        let claude = GatewayQuota.displayQuotas([quota("weekly (7d)", 2), quota("session (5h)", 82)])
         check(claude.map(\.name) == ["session (5h)", "weekly (7d)"], "no pools: every quota, sorted")
 
         print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) FAILED.")

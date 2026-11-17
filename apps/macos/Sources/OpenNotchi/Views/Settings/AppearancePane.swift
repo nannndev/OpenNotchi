@@ -59,6 +59,14 @@ struct AppearancePane: View {
                             .frame(width: 30, alignment: .trailing)
                     }
                 }
+                Toggle("Notchi speech bubble", isOn: $settings.notchiBubbleEnabled)
+                if settings.notchiBubbleEnabled {
+                    Picker("Bubble style", selection: $settings.notchiBubbleStyle) {
+                        ForEach(NotchiBubbleStyle.allCases.filter { $0 != .off }) {
+                            Text($0.displayName).tag($0)
+                        }
+                    }
+                }
             }
 
             Section("Open Animation") {

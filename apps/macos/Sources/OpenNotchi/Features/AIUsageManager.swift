@@ -5,9 +5,9 @@ final class AIUsageManager: ObservableObject {
     static let shared = AIUsageManager()
 
     @Published private(set) var reports: [UsageReport] = []
-    @Published private(set) var is9RouterConnected: Bool = false
+    @Published private(set) var isGatewayConnected: Bool = false
     @Published private(set) var scanning = false
-    /// Today's top models across 9router accounts (empty without 9router).
+    /// Today's top models across Gateway accounts.
     @Published private(set) var topModels: [(model: String, tokens: Int, cost: Double)] = []
     private var timer: Timer?
     private var accounts: [AIAccount] = []
@@ -37,26 +37,24 @@ final class AIUsageManager: ObservableObject {
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
             var allReports: [UsageReport] = []
-            var from9Router = false
+            var fromGateway = false
             var models: [(model: String, tokens: Int, cost: Double)] = []
 
-            // 1. Prioritize 9router if available: fetches all multi-accounts per provider
-            if NineRouterService.shared.isAvailable {
-                let nineReports = NineRouterService.shared.fetchReports()
-                if !nineReports.isEmpty {
-                    allReports = nineReports
-                    from9Router = true
-                    models = NineRouterService.shared.todayModels()
+            // 1. Notchi Gateway accounts & reports
+            if NotchiGatewayService.shared.hasDatabase || NotchiGatewayService.shared.isAvailable {
+                let gwReports = NotchiGatewayService.shared.fetchReports()
+                if !gwReports.isEmpty {
+                    allReports = gwReports
+                    fromGateway = true
+                    models = NotchiGatewayService.shared.todayModels()
                 }
             }
 
-            // 2. If 9router is not available or returned empty, scan local directories
+            // 2. If Gateway has no accounts yet, scan local directories
             if allReports.isEmpty {
                 allReports = localAccounts.map { AIUsage.report($0) }
             } else {
-                // 9router already logs every request it routes, per account. A local folder for a tool 9router
-                // covers would count the same tokens again, so only tools 9router doesn't know are added.
-                // Those folders still feed the Agents list.
+                // Gateway logs requests for routed accounts. Folders not routed are added directly.
                 let routed = Set(allReports.map(\.account.tool))
                 for acc in localAccounts where !routed.contains(acc.tool) {
                     let r = AIUsage.report(acc)
@@ -68,29 +66,30 @@ final class AIUsageManager: ObservableObject {
 
             DispatchQueue.main.async {
                 self?.reports = allReports
-                self?.is9RouterConnected = from9Router
+                self?.isGatewayConnected = fromGateway
                 self?.topModels = models
                 self?.scanning = false
             }
         }
     }
 
-    func toggleAccountActive(id: UUID, connectionId: String?, active: Bool) {
+    func toggleAccountActive(id: UUID, connectionId: String?, provider: String? = nil, active: Bool) {
         // Optimistic local update
         if let idx = reports.firstIndex(where: { $0.account.id == id }) {
             reports[idx].account.isActive = active
         }
         if let connId = connectionId {
-            NineRouterService.shared.setConnectionActive(id: connId, active: active) { [weak self] _ in
-                self?.refresh(force: true)
+            Task {
+                try? await NotchiGatewayService.shared.toggleAccount(provider: provider ?? "", id: connId, enabled: active)
+                self.refresh(force: true)
             }
         }
     }
 
-    /// The compact closed-notch meter: a hot 9router / Codex / Claude window.
+    /// The compact closed-notch meter: a hot Gateway / Codex / Claude window.
     var closedMeter: (label: String, fraction: Double, hot: Bool)? {
         for r in reports {
-            if r.isFrom9Router && r.account.isActive {
+            if r.isFromGateway && r.account.isActive {
                 for q in r.quotas where !q.unlimited && q.total > 0 && q.remainingPercentage <= 20 {
                     let pct = 100.0 - q.remainingPercentage
                     return ("\(r.account.name) \(Int(q.remainingPercentage.rounded()))%", pct / 100.0, true)

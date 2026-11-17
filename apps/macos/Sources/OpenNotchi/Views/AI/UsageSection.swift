@@ -57,24 +57,24 @@ struct UsageSection: View {
     }
 
     var body: some View {
-        if usage.reports.isEmpty && !usage.scanning && settings.aiAccounts.isEmpty && !usage.is9RouterConnected {
+        if usage.reports.isEmpty && !usage.scanning && settings.aiAccounts.isEmpty && !usage.isGatewayConnected {
             emptyState("Add Claude Code, Codex, or Antigravity in Settings › AI.", icon: "chart.bar")
         } else if usage.reports.isEmpty && usage.scanning {
             VStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Connecting to 9router & analyzing accounts…")
+                Text("Connecting to Gateway & analyzing accounts…")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(spacing: 8) {
-                // Aggregated Summary Strip with 9router status, Totals, and Live Refresh
+                // Aggregated Summary Strip with Gateway status, Totals, and Live Refresh
                 HStack(spacing: 10) {
-                    if usage.is9RouterConnected {
+                    if usage.isGatewayConnected {
                         HStack(spacing: 4) {
                             Circle().fill(Color.green).frame(width: 6, height: 6)
-                            Text("9router")
+                            Text("Gateway")
                                 .font(.system(size: 9.5, weight: .bold))
                                 .foregroundStyle(.green)
                             Text("(\(usage.reports.count))")

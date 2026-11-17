@@ -154,26 +154,23 @@ export function Features() {
         <div className="mt-8 inline-flex items-center rounded-full border border-white/10 bg-neutral-900/90 p-1.5 shadow-xl backdrop-blur-md">
           <button
             onClick={() => setPlatform("all")}
-            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-              platform === "all" ? "bg-white text-black shadow-md" : "text-neutral-400 hover:text-white"
-            }`}
+            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${platform === "all" ? "bg-white text-black shadow-md" : "text-neutral-400 hover:text-white"
+              }`}
           >
             All Features
           </button>
           <button
             onClick={() => setPlatform("macos")}
-            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
-              platform === "macos" ? "bg-neutral-200 text-black shadow-md" : "text-neutral-400 hover:text-white"
-            }`}
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${platform === "macos" ? "bg-neutral-200 text-black shadow-md" : "text-neutral-400 hover:text-white"
+              }`}
           >
             <AppleIcon className="size-3.5" />
             macOS Tailored
           </button>
           <button
             onClick={() => setPlatform("windows")}
-            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
-              platform === "windows" ? "bg-sky-400 text-black shadow-md shadow-sky-500/20" : "text-neutral-400 hover:text-white"
-            }`}
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${platform === "windows" ? "bg-sky-400 text-black shadow-md shadow-sky-500/20" : "text-neutral-400 hover:text-white"
+              }`}
           >
             <WindowsIcon className="size-3" />
             Windows Tailored

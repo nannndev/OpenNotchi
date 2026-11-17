@@ -21,7 +21,7 @@ struct ListeningPort: Identifiable, Hashable {
         }
         let commonDevPorts: Set<Int> = [
             3000, 3001, 3002, 3003, 3333, 4000, 4200, 5000, 5173, 5174, 5500,
-            8000, 8080, 8081, 8888, 9000, 9090, 1313, 20128
+            8000, 8080, 8081, 8888, 9000, 9090, 1313, 20129
         ]
         let devKeywords = ["node", "bun", "deno", "python", "python3", "ruby", "go", "cargo", "java", "php", "vite", "next", "webpack", "flask", "django", "rails"]
         if commonDevPorts.contains(port) { return true }

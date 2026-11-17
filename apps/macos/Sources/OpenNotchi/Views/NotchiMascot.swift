@@ -919,6 +919,94 @@ private struct NotchiState: DynamicProperty {
 
 /// Interactive Notchi for slots that already show something else on the other side (music on left, timer on right, AI meter).
 /// Supports full hover (without opening the notch), left-click petting, 2D gaze, and right-click companion menu.
+struct NotchiBubbleItem: Equatable {
+    let icon: String
+    let tint: Color
+    let title: String
+    let subtitle: String?
+}
+
+@MainActor
+private func notchiEssentialBubble(
+    state: NotchiState,
+    now: Date,
+    aiActivity: AIActivityState,
+    companion: NotchiCompanionStore
+) -> NotchiBubbleItem? {
+    if !AppSettings.shared.notchiBubbleEnabled {
+        return nil
+    }
+    if let explicit = companion.speechBubble, !explicit.isEmpty {
+        return NotchiBubbleItem(icon: "heart.fill", tint: .pink, title: explicit, subtitle: nil)
+    }
+    if aiActivity.isGenerating {
+        let model = aiActivity.activeLabel ?? "AI"
+        return NotchiBubbleItem(icon: "sparkles", tint: .purple, title: "Thinking · \(model)", subtitle: nil)
+    }
+    if state.settings.aiEnabled && state.settings.aiAgents {
+        if let urgent = state.agents.sessions.first(where: { $0.state == .needsYou }) {
+            let detail = urgent.message?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return NotchiBubbleItem(
+                icon: "exclamationmark.triangle.fill",
+                tint: .orange,
+                title: "\(urgent.tool.displayName) · \(urgent.project)",
+                subtitle: (detail?.isEmpty == false) ? detail : "Waiting for your confirmation"
+            )
+        }
+        if let working = state.agents.sessions.first(where: { $0.state == .working && now.timeIntervalSince($0.updatedAt) < 20 }) {
+            let detail = working.message?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return NotchiBubbleItem(
+                icon: "terminal.fill",
+                tint: .cyan,
+                title: "\(working.tool.displayName) · \(working.project)",
+                subtitle: (detail?.isEmpty == false) ? detail : nil
+            )
+        }
+    }
+    if let info = AppDelegate.shared?.media.info, info.isPlaying,
+       let lyric = AppDelegate.shared?.lyrics.currentLine(at: info.position(at: now))?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !lyric.isEmpty {
+        return NotchiBubbleItem(icon: "music.note", tint: state.accent, title: lyric, subtitle: nil)
+    }
+    return nil
+}
+
+@MainActor
+func notchiAmbientBubble(
+    mood: NotchiMood,
+    now: Date,
+    hovered: Bool,
+    pets: Int,
+    aiActivity: AIActivityState,
+    companion: NotchiCompanionStore,
+    maxLength: Int = 24
+) -> String? {
+    if !AppSettings.shared.notchiBubbleEnabled {
+        return nil
+    }
+    if let explicit = companion.speechBubble, !explicit.isEmpty {
+        return explicit
+    }
+    if aiActivity.isGenerating {
+        let label = aiActivity.activeLabel ?? "thinking…"
+        return "✦ \(truncateBubbleText(label, limit: maxLength))"
+    }
+    if mood == .vibing, let info = AppDelegate.shared?.media.info, info.isPlaying,
+       let lyric = AppDelegate.shared?.lyrics.currentLine(at: info.position(at: now)), !lyric.isEmpty {
+        return "♪ \(truncateBubbleText(lyric, limit: maxLength))"
+    }
+    if hovered {
+        return notchiLine(mood, hour: Calendar.current.component(.hour, from: now), pets: pets)
+    }
+    return nil
+}
+
+private func truncateBubbleText(_ text: String, limit: Int) -> String {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.count > limit else { return trimmed }
+    return String(trimmed.prefix(limit - 1)) + "…"
+}
+
 struct NotchiLive: View {
     private var state = NotchiState()
     @EnvironmentObject private var vm: NotchViewModel
@@ -926,6 +1014,7 @@ struct NotchiLive: View {
     @ObservedObject private var companion = NotchiCompanionStore.shared
     @ObservedObject private var keepAwake = KeepAwake.shared
     @ObservedObject private var ambient = AmbientSoundManager.shared
+    @ObservedObject private var aiActivity = AIActivityState.shared
     let size: CGFloat
 
     @State private var hovered = false
@@ -1007,6 +1096,30 @@ struct NotchiLive: View {
                 Label("Ask Notchi AI…", systemImage: "sparkles")
             }
         }
+        Menu("Speech Bubble") {
+            Button {
+                AppSettings.shared.notchiBubbleEnabled.toggle()
+            } label: {
+                Label(
+                    AppSettings.shared.notchiBubbleEnabled ? "Turn Off Bubble" : "Turn On Bubble",
+                    systemImage: AppSettings.shared.notchiBubbleEnabled ? "bubble.left.and.bubble.right.fill" : "bubble.left"
+                )
+            }
+            Divider()
+            ForEach(NotchiBubbleStyle.allCases.filter { $0 != .off }) { style in
+                Button {
+                    AppSettings.shared.notchiBubbleEnabled = true
+                    AppSettings.shared.notchiBubbleStyle = style
+                } label: {
+                    HStack {
+                        Text(style.displayName)
+                        if AppSettings.shared.notchiBubbleEnabled && AppSettings.shared.notchiBubbleStyle == style {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        }
         Menu("Costume & Hat") {
             ForEach(NotchiAccessory.allCases) { item in
                 Button {
@@ -1044,51 +1157,59 @@ struct NotchiHeaderAvatarButton: View {
     @EnvironmentObject private var vm: NotchViewModel
     @EnvironmentObject private var timer: TimerManager
     @ObservedObject private var companion = NotchiCompanionStore.shared
+    @ObservedObject private var aiActivity = AIActivityState.shared
     @State private var showPopover = false
     @State private var isHovering = false
 
     var body: some View {
-        let now = Date.now
-        let petted = companion.pettedAt.map { now.timeIntervalSince($0) < 3.5 } ?? false
-        let c = state.context(now: now, petted: petted || isHovering)
-        let mood = notchiMood(c)
-
-        Button {
-            showPopover.toggle()
-        } label: {
-            HStack(spacing: 4) {
-                NotchiMascot(
-                    mood: mood,
-                    size: 20,
-                    color: state.accent,
-                    pettedAt: companion.pettedAt,
-                    accessory: companion.accessory
-                )
-                if let bubble = companion.speechBubble {
-                    Text(bubble)
-                        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .transition(.scale.combined(with: .opacity))
-                }
-            }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(
-                Capsule()
-                    .fill(.white.opacity(isHovering || showPopover ? 0.14 : 0.06))
+        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+            let now = context.date
+            let petted = companion.pettedAt.map { now.timeIntervalSince($0) < 3.5 } ?? false
+            let c = state.context(now: now, petted: petted || isHovering)
+            let mood = notchiMood(c)
+            let bubble = notchiAmbientBubble(
+                mood: mood, now: now, hovered: isHovering, pets: companion.recentPetCombo,
+                aiActivity: aiActivity, companion: companion, maxLength: 24
             )
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-        .onChange(of: showPopover) { _, open in
-            vm.holdOpen = open
-        }
-        .help("Notchi Companion (Lv.\(companion.level) \(companion.bondTitle)) — Click to interact!")
-        .popover(isPresented: $showPopover, arrowEdge: .bottom) {
-            NotchiCompanionCard(mood: mood, accent: state.accent)
-                .environmentObject(vm)
-                .environmentObject(timer)
+
+            Button {
+                showPopover.toggle()
+            } label: {
+                HStack(spacing: 5) {
+                    NotchiMascot(
+                        mood: mood,
+                        size: 20,
+                        color: state.accent,
+                        pettedAt: companion.pettedAt,
+                        accessory: companion.accessory
+                    )
+                    if let bubble {
+                        Text(bubble)
+                            .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .frame(maxWidth: 140, alignment: .leading)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(.white.opacity(isHovering || showPopover ? 0.14 : 0.08))
+                )
+            }
+            .buttonStyle(.plain)
+            .onHover { isHovering = $0 }
+            .onChange(of: showPopover) { _, open in
+                vm.holdOpen = open
+            }
+            .help("Notchi Companion (Lv.\(companion.level) \(companion.bondTitle)) — Click to interact!")
+            .popover(isPresented: $showPopover, arrowEdge: .bottom) {
+                NotchiCompanionCard(mood: mood, accent: state.accent)
+                    .environmentObject(vm)
+                    .environmentObject(timer)
+            }
         }
     }
 }
@@ -1102,6 +1223,7 @@ struct NotchiCompanionCard: View {
     @ObservedObject private var companion = NotchiCompanionStore.shared
     @ObservedObject private var keepAwake = KeepAwake.shared
     @ObservedObject private var ambient = AmbientSoundManager.shared
+    @ObservedObject private var aiActivity = AIActivityState.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1314,6 +1436,7 @@ struct NotchiIdleRow: View {
     @ObservedObject private var companion = NotchiCompanionStore.shared
     @ObservedObject private var keepAwake = KeepAwake.shared
     @ObservedObject private var ambient = AmbientSoundManager.shared
+    @ObservedObject private var aiActivity = AIActivityState.shared
     let height: CGFloat
 
     @State private var hovered = false
@@ -1378,6 +1501,41 @@ struct NotchiIdleRow: View {
         }
     }
 
+    private func liveBubble(mood: NotchiMood, now: Date) -> String? {
+        if let explicit = companion.speechBubble {
+            return explicit
+        }
+        if aiActivity.isGenerating {
+            let label = aiActivity.activeLabel ?? "thinking…"
+            return "✦ \(truncateBubble(label, limit: 18))"
+        }
+        if mood == .alert {
+            return "agent needs you!"
+        }
+        if mood == .busy {
+            return "coding…"
+        }
+        if mood == .vibing, let info = AppDelegate.shared?.media.info, info.isPlaying {
+            if let lyric = AppDelegate.shared?.lyrics.currentLine(at: info.position(at: now)), !lyric.isEmpty {
+                return "♪ \(truncateBubble(lyric, limit: 22))"
+            }
+            if !info.title.isEmpty {
+                return "♪ \(truncateBubble(info.title, limit: 20))"
+            }
+            return "♪ vibing"
+        }
+        if hovered {
+            return notchiLine(mood, hour: Calendar.current.component(.hour, from: now), pets: companion.recentPetCombo)
+        }
+        return nil
+    }
+
+    private func truncateBubble(_ text: String, limit: Int) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > limit else { return trimmed }
+        return String(trimmed.prefix(limit - 1)) + "…"
+    }
+
     @ViewBuilder
     private var notchiContextMenu: some View {
         Section("Notchi Lv.\(companion.level) · \(companion.bondTitle)") {
@@ -1416,6 +1574,30 @@ struct NotchiIdleRow: View {
                 vm.open()
             } label: {
                 Label("Ask Notchi AI…", systemImage: "sparkles")
+            }
+        }
+        Menu("Speech Bubble") {
+            Button {
+                AppSettings.shared.notchiBubbleEnabled.toggle()
+            } label: {
+                Label(
+                    AppSettings.shared.notchiBubbleEnabled ? "Turn Off Bubble" : "Turn On Bubble",
+                    systemImage: AppSettings.shared.notchiBubbleEnabled ? "bubble.left.and.bubble.right.fill" : "bubble.left"
+                )
+            }
+            Divider()
+            ForEach(NotchiBubbleStyle.allCases.filter { $0 != .off }) { style in
+                Button {
+                    AppSettings.shared.notchiBubbleEnabled = true
+                    AppSettings.shared.notchiBubbleStyle = style
+                } label: {
+                    HStack {
+                        Text(style.displayName)
+                        if AppSettings.shared.notchiBubbleEnabled && AppSettings.shared.notchiBubbleStyle == style {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
             }
         }
         Menu("Costume & Hat") {
@@ -1576,5 +1758,113 @@ private struct NotchiStatus: View {
         }
         items.append(("clock", now.formatted(date: .omitted, time: .shortened)))
         return items
+    }
+}
+
+/// Floating animated speech bubble rendered below the right wing of the closed notch so the camera bezel never hides it.
+struct NotchiFloatingBubble: View {
+    private var state = NotchiState()
+    @ObservedObject private var companion = NotchiCompanionStore.shared
+    @ObservedObject private var aiActivity = AIActivityState.shared
+    @ObservedObject private var settings = AppSettings.shared
+    let accent: Color
+
+    var body: some View {
+        let style = settings.notchiBubbleStyle
+        if !settings.notchiBubbleEnabled || style == .off {
+            EmptyView()
+        } else {
+            TimelineView(.periodic(from: .now, by: 0.35)) { context in
+                let now = context.date
+                if let item = notchiEssentialBubble(state: state, now: now, aiActivity: aiActivity, companion: companion) {
+                    let bgColor = bubbleBackground(style)
+                    let fgColor = style == .comic ? Color.black : Color.white
+                    let subColor = style == .comic ? Color.black.opacity(0.65) : Color.white.opacity(0.68)
+
+                    VStack(alignment: .trailing, spacing: 0) {
+                        if style != .minimal {
+                            BubbleTail()
+                                .fill(bgColor)
+                                .frame(width: 9, height: 4)
+                                .padding(.trailing, 12)
+                        }
+
+                        let isLong = item.title.count > 28 || (item.subtitle?.count ?? 0) > 32
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: item.icon)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(item.tint)
+                                .padding(.top, 1.5)
+
+                            VStack(alignment: .leading, spacing: 1.5) {
+                                Text(item.title)
+                                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(fgColor)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+
+                                if let sub = item.subtitle, !sub.isEmpty {
+                                    Text(sub)
+                                        .font(.system(size: 9.5, weight: .medium))
+                                        .foregroundStyle(subColor)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .frame(maxWidth: isLong ? 195 : nil, alignment: .leading)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5.5)
+                        .fixedSize(horizontal: !isLong, vertical: true)
+                        .background(
+                            RoundedRectangle(cornerRadius: style == .minimal ? 999 : 11, style: .continuous)
+                                .fill(bgColor)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: style == .minimal ? 999 : 11, style: .continuous)
+                                        .strokeBorder(bubbleBorder(style, tint: item.tint), lineWidth: style == .neon ? 1.1 : 0.7)
+                                )
+                        )
+                        .shadow(
+                            color: style == .neon ? item.tint.opacity(0.45) : .black.opacity(0.38),
+                            radius: style == .neon ? 8 : 6,
+                            y: 2
+                        )
+                    }
+                    .id(item.title + (item.subtitle ?? ""))
+                    .transition(.scale(scale: 0.92, anchor: .topTrailing).combined(with: .opacity))
+                    .animation(.snappy(duration: 0.22), value: item)
+                }
+            }
+        }
+    }
+
+    private func bubbleBackground(_ style: NotchiBubbleStyle) -> Color {
+        switch style {
+        case .glass: return Color(red: 0.08, green: 0.09, blue: 0.13).opacity(0.95)
+        case .neon: return Color(red: 0.05, green: 0.06, blue: 0.10).opacity(0.96)
+        case .minimal: return Color.black.opacity(0.86)
+        case .comic: return Color.white.opacity(0.96)
+        case .off: return .clear
+        }
+    }
+
+    private func bubbleBorder(_ style: NotchiBubbleStyle, tint: Color) -> Color {
+        switch style {
+        case .glass: return tint.opacity(0.38)
+        case .neon: return tint.opacity(0.85)
+        case .minimal: return Color.white.opacity(0.12)
+        case .comic: return Color.black.opacity(0.22)
+        case .off: return .clear
+        }
+    }
+}
+
+private struct BubbleTail: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        p.closeSubpath()
+        return p
     }
 }
