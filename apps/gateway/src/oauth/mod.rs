@@ -853,6 +853,43 @@ pub fn kiro_model_id(model: &str) -> String {
     base.to_string()
 }
 
+/// Imports the login the Codex CLI keeps in ~/.codex/auth.json (`codex login`), including its
+/// refresh token, so the account keeps working after the access token expires.
+/// Replaces an existing Codex account for the same ChatGPT account.
+pub fn import_codex_from_cli(store: &GatewayStore) -> Result<String, String> {
+    let home = std::path::PathBuf::from(std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_default());
+    let codex_home = std::env::var("CODEX_HOME").map(std::path::PathBuf::from).unwrap_or_else(|_| home.join(".codex"));
+    let raw = std::fs::read_to_string(codex_home.join("auth.json"))
+        .map_err(|_| "No Codex CLI login found (~/.codex/auth.json); run `codex login` first.".to_string())?;
+    let auth: Value = serde_json::from_str(&raw).map_err(|_| "~/.codex/auth.json is not valid JSON".to_string())?;
+    let t = &auth["tokens"];
+    let access = t["access_token"].as_str().ok_or("The Codex CLI login has no access token; run `codex login` again.")?;
+    if t["refresh_token"].as_str().is_none() {
+        return Err("The Codex CLI login has no refresh token; run `codex login` again.".into());
+    }
+    let claims = t["id_token"].as_str().and_then(extract_jwt_claims).or_else(|| extract_jwt_claims(access)).unwrap_or(json!({}));
+    let auth_claims = &claims["https://api.openai.com/auth"];
+    let account_id = t["account_id"].as_str().or(auth_claims["chatgpt_account_id"].as_str());
+    let email = claims["email"].as_str().map(String::from);
+    let cred = json!({
+        "access_token": access,
+        "refresh_token": t["refresh_token"],
+        "id_token": t["id_token"],
+        "account_id": account_id,
+        "plan": auth_claims["chatgpt_plan_type"].as_str().unwrap_or("free"),
+        "email": email,
+        "expires_at": extract_jwt_claims(access).and_then(|c| c["exp"].as_i64()).map(|s| s * 1000),
+    });
+    // Same ChatGPT account already connected (or one saved without a refresh token): update it.
+    let existing = store.list_accounts().into_iter().find(|a| {
+        a.provider == "codex"
+            && (a.cred["account_id"].as_str().is_some_and(|id| Some(id) == account_id) || a.cred["refresh_token"].is_null())
+    });
+    store
+        .update_or_save_account("codex", &cred, None, email.as_deref(), existing.as_ref().map(|a| a.id.as_str()))
+        .map_err(|e| format!("Failed to save account: {e}"))
+}
+
 /// Imports the token the Kiro IDE stored in ~/.aws/sso/cache.
 pub fn import_kiro_from_ide(store: &GatewayStore) -> Result<String, String> {
     let home = std::path::PathBuf::from(std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_default());

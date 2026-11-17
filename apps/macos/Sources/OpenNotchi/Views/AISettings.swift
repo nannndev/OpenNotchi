@@ -684,20 +684,20 @@ private struct NotchiGatewayManagerView: View {
                 .controlSize(.small)
                 .disabled(oauthWorking)
 
-                if selectedOAuthProvider == "kiro" {
+                if let source = ["kiro": "Kiro IDE", "codex": "Codex CLI"][selectedOAuthProvider] {
                     Button {
                         Task {
                             do {
-                                try await gateway.importLocalKey(providerId: "kiro")
+                                try await gateway.importLocalKey(providerId: selectedOAuthProvider)
                                 await reload()
                                 onModelsChanged()
-                                statusMessage = (true, "Imported login from Kiro IDE.")
+                                statusMessage = (true, "Imported login from \(source).")
                             } catch {
                                 statusMessage = (false, error.localizedDescription)
                             }
                         }
                     } label: {
-                        Label("Import from Kiro IDE", systemImage: "square.and.arrow.down")
+                        Label("Import from \(source)", systemImage: "square.and.arrow.down")
                             .font(.system(size: 11.5, weight: .medium))
                     }
                     .buttonStyle(.bordered)

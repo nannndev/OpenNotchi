@@ -210,8 +210,13 @@ pub async fn handle_import_local_key(State(engine): State<GatewayEngine>, Path(i
     let home = std::path::PathBuf::from(std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_default());
     let appdata = std::env::var("APPDATA").map(std::path::PathBuf::from).unwrap_or_else(|_| home.clone());
     // (candidate files, JSON pointer to the key, optional pointer to a base URL, login hint)
-    if id == "kiro" {
-        let acc_id = crate::oauth::import_kiro_from_ide(&engine.store).map_err(GatewayError::NotFound)?;
+    if id == "kiro" || id == "codex" {
+        let imported = if id == "kiro" {
+            crate::oauth::import_kiro_from_ide(&engine.store)
+        } else {
+            crate::oauth::import_codex_from_cli(&engine.store)
+        };
+        let acc_id = imported.map_err(GatewayError::NotFound)?;
         return Ok(Json(json!({ "status": "imported", "id": acc_id })));
     }
     let (files, key_ptr, base_ptr, hint) = match id.as_str() {

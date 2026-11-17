@@ -62,7 +62,7 @@ interface Stats {
 type Tab = "overview" | "providers" | "accounts" | "routing"
 
 /** Providers whose own login can be imported from disk. */
-const IMPORTABLE: Record<string, string> = { commandcode: "Command Code CLI", "xiaomi-mimo": "MiMo Desktop", kiro: "Kiro IDE" }
+const IMPORTABLE: Record<string, string> = { commandcode: "Command Code CLI", "xiaomi-mimo": "MiMo Desktop", kiro: "Kiro IDE", codex: "Codex CLI" }
 /** Subscription providers that expose a model list. */
 const SYNCABLE_OAUTH = ["copilot", "kimi", "kilocode", "nous", "cline", "grok-cli"]
 
