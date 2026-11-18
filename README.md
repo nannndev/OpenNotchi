@@ -60,6 +60,9 @@ on first launch go to **System Settings → Privacy & Security** and click
 
 - macOS 14 Sonoma or later (works best on a MacBook with a notch)
 - Xcode 16+ / Swift 5.10+ toolchain
+- Rust (https://rustup.rs) and a checkout of [eay-gateway](https://github.com/nannndev/eay-gateway)
+  next to this repo (`../eay-gateway`), which the build bundles as the Ask AI gateway.
+  Set `EAY_GATEWAY_DIR` to use another path, or `SKIP_GATEWAY=1` for a UI-only build.
 
 ## Build & run
 
@@ -83,6 +86,17 @@ browser, for YouTube). For YouTube, also turn on **Allow JavaScript from Apple
 Events** in the browser (Chrome: View → Developer; Safari: Develop menu). If you said
 no, re-enable it in **System Settings → Privacy & Security → Automation**.
 Ad-hoc signed debug builds may ask again after a rebuild.
+
+### Ask AI gateway
+
+The AI tab routes through [eay-gateway](https://github.com/nannndev/eay-gateway), built from the
+`../eay-gateway` checkout and bundled into the app. CI checks out the tag in the
+`EAY_GATEWAY_REF` repository variable. To move to a new eay-gateway release:
+
+```bash
+scripts/bump-gateway.sh 0.2.0            # local checkout + CI now use v0.2.0
+scripts/bump-gateway.sh 0.2.0 --require  # also refuse older running gateways (commit the change)
+```
 
 ### Scripting
 
