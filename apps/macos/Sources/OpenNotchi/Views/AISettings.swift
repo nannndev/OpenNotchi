@@ -310,6 +310,7 @@ private struct NotchiGatewayManagerView: View {
     @State private var apiKeyInput = ""
     @State private var baseURLInput = ""
     @State private var newModelName = ""
+    @State private var extraKeyInput = ""
     @State private var selectedOAuthProvider = "claude"
     @State private var activeOAuth: GatewayOAuthStart?
     @State private var oauthCallbackInput = ""
@@ -600,6 +601,9 @@ private struct NotchiGatewayManagerView: View {
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 5)
                                     .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.04)))
+                                if p.connected {
+                                    extraKeysSection(p)
+                                }
                             }
                         }
 
@@ -1117,6 +1121,93 @@ private struct NotchiGatewayManagerView: View {
                 }
             }
         }
+    }
+
+    /// More keys for one API-key provider: they rotate with the main key per the routing strategy.
+    @ViewBuilder
+    private func extraKeysSection(_ p: GatewayProviderInfo) -> some View {
+        let keys = p.extraKeys ?? []
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("More keys").font(.system(size: 11.5, weight: .semibold))
+                Spacer()
+                Text("\(keys.count + 1) total · rotate per Routing").font(.caption2).foregroundStyle(.secondary)
+            }
+            ForEach(Array(keys.enumerated()), id: \.element.id) { idx, k in
+                HStack(spacing: 8) {
+                    Toggle("", isOn: Binding(
+                        get: { k.enabled },
+                        set: { next in
+                            Task {
+                                try? await gateway.toggleAccount(provider: p.id, id: k.id, enabled: next)
+                                await reload()
+                            }
+                        }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(k.label ?? k.id).font(.system(size: 12, weight: .medium).monospaced())
+                        if let until = k.coolingUntil, until > Date().timeIntervalSince1970 {
+                            statusBadge(text: "Cooling \(Int(until - Date().timeIntervalSince1970))s", color: .yellow)
+                        } else if let err = k.lastError {
+                            Text(err).font(.caption2).foregroundStyle(.red).lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    if keys.count > 1 {
+                        moveButtons(index: idx, count: keys.count) { from, to in
+                            var ids = keys.map(\.id)
+                            ids.swapAt(from, to)
+                            Task {
+                                try? await gateway.reorderAccounts(provider: p.id, ids: ids)
+                                await reload()
+                            }
+                        }
+                    }
+                    Button(role: .destructive) {
+                        Task {
+                            try? await gateway.removeAccount(provider: p.id, id: k.id)
+                            await reload()
+                        }
+                    } label: {
+                        Image(systemName: "trash").font(.system(size: 11))
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Remove this key")
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.03)))
+            }
+            HStack(spacing: 6) {
+                SecureField("Paste another API key…", text: $extraKeyInput)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.05)))
+                Button("Add key") {
+                    Task {
+                        busy = true
+                        defer { busy = false }
+                        do {
+                            try await gateway.addProviderKey(providerId: p.id, apiKey: extraKeyInput)
+                            extraKeyInput = ""
+                            await reload()
+                            statusMessage = (true, "Added another \(p.name) key.")
+                        } catch {
+                            statusMessage = (false, error.localizedDescription)
+                        }
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(busy || extraKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(.top, 4)
     }
 
     private func modelSourceText(_ p: GatewayProviderInfo, customCount: Int) -> String {

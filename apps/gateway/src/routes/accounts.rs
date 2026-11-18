@@ -88,7 +88,8 @@ pub async fn handle_accounts_usage(State(engine): State<GatewayEngine>, Query(q)
     let days = q.days.unwrap_or(7).clamp(1, 90);
     let offset = q.tz_offset_min.unwrap_or(0) * 60;
     let by_provider = engine.store.daily_tokens_by_provider(days, offset);
-    let accounts = engine.store.list_accounts();
+    let accounts: Vec<_> =
+        engine.store.list_accounts().into_iter().filter(|a| crate::providers::find_oauth_by_id(&a.provider).is_some()).collect();
     // Paused accounts still show their quota: it's how users decide when to turn them back on.
     let quotas = futures::future::join_all(accounts.iter().map(|a| {
         let engine = engine.clone();

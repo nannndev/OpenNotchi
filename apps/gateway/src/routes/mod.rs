@@ -35,6 +35,7 @@ pub fn gateway_router(engine: GatewayEngine) -> Router {
         .route("/gateway/admin/providers/:id/connect", post(providers::handle_connect_provider))
         .route("/gateway/admin/providers/:id/disconnect", post(providers::handle_disconnect_provider))
         .route("/gateway/admin/providers/:id/key", post(providers::handle_save_provider_key))
+        .route("/gateway/admin/providers/:id/keys", post(providers::handle_add_provider_key))
         .route(
             "/gateway/admin/providers/:id/models",
             get(providers::handle_get_provider_models)

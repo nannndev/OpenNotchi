@@ -20,6 +20,7 @@ interface Provider {
   synced_count?: number
   models_synced_at?: number | null
   cooling?: boolean
+  extra_keys?: { id: string; label: string | null; enabled: boolean; last_error: string | null; cooling_until: number | null }[]
 }
 
 interface Account {
@@ -184,6 +185,7 @@ function Providers({ providers, busy, act }: { providers: Provider[]; busy: bool
   const [key, setKey] = useState("")
   const [baseUrl, setBaseUrl] = useState("")
   const [newModel, setNewModel] = useState("")
+  const [extraKey, setExtraKey] = useState("")
   const p = providers.find((x) => x.id === selected) ?? providers[0]
 
   useEffect(() => {
@@ -263,6 +265,57 @@ function Providers({ providers, busy, act }: { providers: Provider[]; busy: bool
             </button>
           )}
         </div>
+      )}
+
+      {p.needs_key && p.connected && (
+        <>
+          <div className="toggle-row">
+            <div className="toggle-info">
+              <div className="toggle-title">More keys</div>
+              <div className="toggle-desc">{(p.extra_keys?.length ?? 0) + 1} total · they rotate per Routing</div>
+            </div>
+          </div>
+          {(p.extra_keys ?? []).map((k, i, list) => (
+            <div key={k.id} className={`toggle-row gw-account ${k.enabled ? "" : "ai-card-inactive"}`}>
+              <label className="gw-switch" title={k.enabled ? "Pause" : "Use again"}>
+                <input
+                  type="checkbox"
+                  checked={k.enabled}
+                  onChange={(e) => act(() => admin("PATCH", `/gateway/admin/accounts/${p.id}/${encodeURIComponent(k.id)}/toggle`, { enabled: e.target.checked }))}
+                />
+              </label>
+              <div className="toggle-info">
+                <div className="toggle-title gw-mono">{k.label ?? k.id}</div>
+                {k.last_error && <div className="toggle-desc ai-error">{k.last_error.slice(0, 80)}</div>}
+              </div>
+              {list.length > 1 && (
+                <MoveButtons
+                  index={i}
+                  count={list.length}
+                  onSwap={(from, to) => {
+                    const ids = list.map((x) => x.id)
+                    ;[ids[from], ids[to]] = [ids[to], ids[from]]
+                    act(() => admin("POST", `/gateway/admin/accounts/${p.id}/reorder`, { account_ids: ids }))
+                  }}
+                />
+              )}
+              <button className="ai-icon-btn" title="Remove this key" aria-label="Remove this key"
+                onClick={() => act(() => admin("DELETE", `/gateway/admin/accounts/${p.id}/${encodeURIComponent(k.id)}`))}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+          <div className="toggle-row">
+            <input className="settings-input ai-wide" type="password" placeholder="Paste another API key…" value={extraKey} onChange={(e) => setExtraKey(e.target.value)} />
+            <button
+              className="ai-settings-btn"
+              disabled={busy || !extraKey.trim()}
+              onClick={() => act(() => admin("POST", `/gateway/admin/providers/${p.id}/keys`, { api_key: extraKey.trim() }).then(() => setExtraKey("")), `Added another ${p.name} key.`)}
+            >
+              Add key
+            </button>
+          </div>
+        </>
       )}
 
       <div className="toggle-row">

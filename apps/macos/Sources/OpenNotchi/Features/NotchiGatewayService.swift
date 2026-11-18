@@ -17,10 +17,13 @@ struct GatewayProviderInfo: Identifiable, Decodable {
     let error: String?
     let syncedCount: Int?
     let modelsSyncedAt: Double?
+    /// Additional keys after the main one, rotated like accounts.
+    let extraKeys: [GatewayExtraKey]?
 
     enum CodingKeys: String, CodingKey {
         case id, alias, name, family, enabled, connected, models, error
         case syncedCount = "synced_count"
+        case extraKeys = "extra_keys"
         case modelsSyncedAt = "models_synced_at"
         case defaultBaseUrl = "default_base_url"
         case baseUrl = "base_url"
@@ -28,6 +31,20 @@ struct GatewayProviderInfo: Identifiable, Decodable {
         case customModels = "custom_models"
         case seedModels = "seed_models"
         case latencyMs = "latency_ms"
+    }
+}
+
+struct GatewayExtraKey: Identifiable, Decodable {
+    let id: String
+    let label: String?
+    let enabled: Bool
+    let lastError: String?
+    let coolingUntil: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id, label, enabled
+        case lastError = "last_error"
+        case coolingUntil = "cooling_until"
     }
 }
 
@@ -453,6 +470,13 @@ final class NotchiGatewayService: ObservableObject {
         guard let url = URL(string: "\(Self.baseURL)/gateway/admin/providers/\(providerId)/models/sync") else { return 0 }
         let json = try await sendJSONReturningDict(url: url, method: "POST", body: [:])
         return (json["synced_models"] as? [Any])?.count ?? 0
+    }
+
+    /// Adds another API key for a provider (verified first); it rotates with the main key.
+    func addProviderKey(providerId: String, apiKey: String) async throws {
+        _ = await ensureRunning()
+        guard let url = URL(string: "\(Self.baseURL)/gateway/admin/providers/\(providerId)/keys") else { return }
+        _ = try await sendJSONReturningDict(url: url, method: "POST", body: ["api_key": apiKey.trimmingCharacters(in: .whitespacesAndNewlines)])
     }
 
     func reorderAccounts(provider: String, ids: [String]) async throws {

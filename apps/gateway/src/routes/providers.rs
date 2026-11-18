@@ -309,6 +309,36 @@ pub async fn handle_connect_provider(
     }
 }
 
+#[derive(Deserialize)]
+pub struct ExtraKeyPayload {
+    api_key: String,
+    label: Option<String>,
+}
+
+/// Adds another key for an API-key provider. Extra keys are stored as accounts, so they get the
+/// same rotation, cooldown, pause and reorder as subscription accounts.
+pub async fn handle_add_provider_key(
+    State(engine): State<GatewayEngine>,
+    Path(id): Path<String>,
+    Json(payload): Json<ExtraKeyPayload>,
+) -> Result<Json<Value>, GatewayError> {
+    let prov = find_provider_by_id(&id).ok_or_else(|| GatewayError::NotFound(format!("Unknown provider {id}")))?;
+    let key = payload.api_key.trim();
+    if key.is_empty() {
+        return Err(GatewayError::BadRequest("API key is required".into()));
+    }
+    let base = engine.store.get_provider_record(&id).and_then(|r| r.base_url).filter(|b| !b.trim().is_empty());
+    let base = base.as_deref().unwrap_or(prov.base_url);
+    if base.is_empty() {
+        return Err(GatewayError::BadRequest(format!("Connect {} with a base URL first", prov.name)));
+    }
+    verify_upstream_provider(&engine.http_client, &id, key, base).await.map_err(GatewayError::BadRequest)?;
+    // Label shows which key this is without exposing it.
+    let label = payload.label.filter(|l| !l.trim().is_empty()).unwrap_or_else(|| format!("Key …{}", &key[key.len().saturating_sub(4)..]));
+    let acc_id = engine.store.save_account(&id, &json!({ "api_key": key }), Some(&label), None).map_err(GatewayError::Internal)?;
+    Ok(Json(json!({ "status": "added", "id": acc_id })))
+}
+
 pub async fn handle_disconnect_provider(State(engine): State<GatewayEngine>, Path(id): Path<String>) -> Json<Value> {
     let _ = engine.store.disconnect_provider(&id);
     let providers = build_gateway_providers(&engine.store);

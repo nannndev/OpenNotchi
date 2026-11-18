@@ -113,8 +113,10 @@ impl GatewayEngine {
             if find_oauth_by_id(id).is_some() {
                 return accounts.iter().any(|a| a.provider == id && a.enabled);
             }
+            let extra_key = accounts.iter().any(|a| a.provider == id && a.enabled);
             match (find_provider_by_id(id), records.get(id)) {
-                (Some(p), Some(r)) => r.has_key || !p.needs_key,
+                (Some(p), Some(r)) => r.has_key || !p.needs_key || extra_key,
+                (Some(_), None) => extra_key,
                 _ => false,
             }
         };
@@ -156,11 +158,21 @@ impl GatewayEngine {
         // Consecutive targets of one provider form a group, so combos keep their interleaving.
         for group in targets.chunk_by(|a, b| a.provider == b.provider) {
             let prov = &group[0].provider;
+            let accs = ordered.entry(prov.clone()).or_insert_with(|| self.ordered_accounts(prov, &all_accounts, s)).clone();
             if group[0].kind != "oauth" {
-                out.extend(group.iter().map(|t| (t.clone(), None)));
+                // API-key providers: the main key (None) first, then any extra keys, in routing order.
+                let keys: Vec<Option<AccountRecord>> = std::iter::once(None).chain(accs.into_iter().map(Some)).collect();
+                if s.fallback_order == "account_first" {
+                    for k in &keys {
+                        out.extend(group.iter().map(|t| (t.clone(), k.clone())));
+                    }
+                } else {
+                    for t in group {
+                        out.extend(keys.iter().map(|k| (t.clone(), k.clone())));
+                    }
+                }
                 continue;
             }
-            let accs = ordered.entry(prov.clone()).or_insert_with(|| self.ordered_accounts(prov, &all_accounts, s)).clone();
             if s.fallback_order == "account_first" {
                 for a in &accs {
                     out.extend(group.iter().map(|t| (t.clone(), Some(a.clone()))));
@@ -238,7 +250,7 @@ impl GatewayEngine {
             let cool = cool_key(&target, acc.as_ref());
             let t0 = std::time::Instant::now();
             let mut resp = None;
-            if let Some(acc) = &acc {
+            if let Some(acc) = acc.as_ref().filter(|_| target.kind == "oauth") {
                 // One forced refresh + retry when the upstream rejects the token.
                 for force in [false, true] {
                     let cred = match crate::oauth::fresh_credential(&self.http_client, &self.store, acc, force).await {
@@ -274,7 +286,11 @@ impl GatewayEngine {
                     continue;
                 }
                 let Some(p) = find_provider_by_id(&target.provider) else { continue };
-                let key = self.store.get_provider_key(&target.provider);
+                // An extra key (stored as an account) overrides the provider's main key.
+                let key = match &acc {
+                    Some(a) => a.cred["api_key"].as_str().map(String::from),
+                    None => self.store.get_provider_key(&target.provider),
+                };
                 if p.needs_key && key.is_none() {
                     continue;
                 }
@@ -578,6 +594,8 @@ pub fn get_oauth_accounts_state(store: &GatewayStore) -> Value {
     let accounts = store.list_accounts();
     let client_accounts: Vec<Value> = accounts
         .into_iter()
+        // Extra API keys are stored as accounts but belong to their provider, not this list.
+        .filter(|a| find_oauth_by_id(&a.provider).is_some())
         .map(|a| {
             let expires_at = a.cred.get("expires_at").and_then(|v| v.as_f64());
             let plan = a.display_plan();
@@ -624,11 +642,22 @@ pub fn build_gateway_providers(store: &GatewayStore) -> Vec<Value> {
     let stored_records = store.list_providers();
     let record_map: std::collections::HashMap<String, ProviderRecord> = stored_records.into_iter().map(|r| (r.id.clone(), r)).collect();
 
+    let accounts = store.list_accounts();
     let mut out = Vec::new();
     for p in PROVIDERS {
         let rec = record_map.get(p.id);
         let enabled = rec.map(|r| r.enabled).unwrap_or(true);
-        let connected = rec.map(|r| r.has_key).unwrap_or(false) || !p.needs_key;
+        let extra_keys: Vec<Value> = accounts
+            .iter()
+            .filter(|a| a.provider == p.id)
+            .map(|a| {
+                json!({
+                    "id": a.id, "label": a.label, "enabled": a.enabled, "last_error": a.last_error,
+                    "cooling_until": store.cooling_until(&a.id),
+                })
+            })
+            .collect();
+        let connected = rec.map(|r| r.has_key).unwrap_or(false) || !p.needs_key || !extra_keys.is_empty();
         let base_url = rec.and_then(|r| r.base_url.clone());
         let verified_at = rec.and_then(|r| r.verified_at);
         let latency_ms = rec.and_then(|r| r.latency_ms);
@@ -646,6 +675,7 @@ pub fn build_gateway_providers(store: &GatewayStore) -> Vec<Value> {
             "needs_key": p.needs_key,
             "enabled": enabled,
             "connected": connected,
+            "extra_keys": extra_keys,
             "base_url": base_url,
             "api_key": if connected && p.needs_key { Some("••••••••") } else { None },
             "models": models,
@@ -803,6 +833,17 @@ mod tests {
             let (e, _d, _a, _b) = two_accounts();
             e.store.set_setting("routing_strategy", "round_robin").unwrap();
             assert_ne!(plan(&e)[0].1, plan(&e)[0].1);
+        }
+
+        #[test]
+        fn an_apikey_provider_tries_its_main_key_then_extra_keys() {
+            let (e, _d) = engine();
+            e.store.save_provider_key("deepseek", "sk-main").unwrap();
+            let extra = e.store.save_account("deepseek", &json!({"api_key":"sk-2"}), Some("Key …sk-2"), None).unwrap();
+            let t = Target { provider: "deepseek".into(), model: "m".into(), kind: "apikey".into() };
+            let s = e.store.get_gateway_settings();
+            let plan: Vec<Option<String>> = e.plan_attempts(&[t], &s).into_iter().map(|(_, a)| a.map(|a| a.id)).collect();
+            assert_eq!(plan, vec![None, Some(extra)]);
         }
 
         #[test]
