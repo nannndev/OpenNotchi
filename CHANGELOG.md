@@ -4,6 +4,37 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.22.0] - 2026-11-18
+
+### Added
+- **Notchi Gateway, a built-in AI gateway (macOS and Windows)**, replacing 9router. It runs
+  locally as [eay-gateway](https://github.com/nannndev/eay-gateway) and serves an OpenAI-compatible
+  endpoint at `http://127.0.0.1:20129/v1`:
+  - 14 subscription logins (Claude, ChatGPT/Codex, GitHub Copilot, Gemini CLI, Kimi, Cline, Kiro, …)
+    and 52 API-key providers (OpenAI, Anthropic, DeepSeek, OpenRouter, Groq, NVIDIA, …).
+  - Routing: `auto` across everything, one provider (`cx/auto`), or your own combos; priority,
+    round-robin or fill-first; cooldown after rate limits; reorderable accounts and several API keys
+    per provider.
+  - Live quota per account (remaining %, reset time, plan), usage history, estimated cost and
+    cached tokens in Analytics.
+  - Model lists synced from each provider; model pickers list only connected providers, grouped.
+  - Import logins from the Codex CLI, Kiro IDE, Command Code CLI and MiMo Desktop.
+  - Settings › Gateway on Windows and the gateway section in Settings › AI on macOS.
+- **Command palette** (`⌘K` in the open notch, and on Windows): switch tabs, run AI and gateway
+  actions, control media and audio, developer tools.
+- **One-click client setup**: route Claude Code through the gateway and copy ready configs for
+  Cursor, Cline, Continue and shell tools.
+
+### Changed
+- 9router support is removed; existing 9router settings move to the gateway automatically.
+- The gateway keeps running when OpenNotchi quits so other apps can share it, and exits on its own
+  after 30 idle minutes.
+
+### Fixed
+- Pasting into Settings text fields (⌘V, ⌘C, ⌘X, ⌘A) on macOS.
+- Codex browser login saved the wrong token and expired right away.
+- Account quotas sometimes missing, including for paused accounts.
+
 ## [0.21.0] - 2026-11-07
 
 ### Added
