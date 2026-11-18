@@ -277,6 +277,93 @@ struct CommandPaletteView: View {
         }
     }
 
+    private func searchHeader(list: [CommandItem]) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(accent.highlight)
+            TextField("Type a command, tab, theme, or port…", text: $query)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13, weight: .medium))
+                .focused($isSearchFocused)
+                .onSubmit { runHighlighted(in: list) }
+
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                close()
+            } label: {
+                Text("ESC")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(RoundedRectangle(cornerRadius: 5).fill(.white.opacity(0.1)))
+            }
+            .buttonStyle(.plain)
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    }
+
+    private func row(_ item: CommandItem, selected isSelected: Bool) -> some View {
+        Button {
+            execute(item)
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: item.icon)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(item.tint)
+                    .frame(width: 22, height: 22)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(item.tint.opacity(0.15)))
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    if let sub = item.subtitle {
+                        Text(sub)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 6)
+
+                if let badge = item.badge {
+                    Text(badge)
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .foregroundStyle(badge == "Active" ? .green : .secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule().fill(badge == "Active" ? Color.green.opacity(0.16) : Color.white.opacity(0.08))
+                        )
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.white.opacity(0.15) : Color.clear)
+            )
+            .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .id(item.id)
+    }
+
     var body: some View {
         let list = filteredItems
 
@@ -286,42 +373,7 @@ struct CommandPaletteView: View {
                 .onTapGesture { close() }
 
             VStack(spacing: 0) {
-                // Search header
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(accent.highlight)
-                    TextField("Type a command, tab, theme, or port…", text: $query)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13, weight: .medium))
-                        .focused($isSearchFocused)
-                        .onSubmit { runHighlighted(in: list) }
-
-                    if !query.isEmpty {
-                        Button {
-                            query = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    Button {
-                        close()
-                    } label: {
-                        Text("ESC")
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(RoundedRectangle(cornerRadius: 5).fill(.white.opacity(0.1)))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                searchHeader(list: list)
 
                 Divider().overlay(Color.white.opacity(0.1))
 
@@ -350,56 +402,10 @@ struct CommandPaletteView: View {
                                             .padding(.bottom, 2)
                                     }
 
-                                    let isSelected = idx == min(selectedIndex, list.count - 1)
-                                    Button {
-                                        execute(item)
-                                    } label: {
-                                        HStack(spacing: 9) {
-                                            Image(systemName: item.icon)
-                                                .font(.system(size: 11.5, weight: .semibold))
-                                                .foregroundStyle(item.tint)
-                                                .frame(width: 22, height: 22)
-                                                .background(RoundedRectangle(cornerRadius: 6).fill(item.tint.opacity(0.15)))
-
-                                            VStack(alignment: .leading, spacing: 1) {
-                                                Text(item.title)
-                                                    .font(.system(size: 12, weight: .semibold))
-                                                    .foregroundStyle(.white)
-                                                    .lineLimit(1)
-                                                if let sub = item.subtitle {
-                                                    Text(sub)
-                                                        .font(.system(size: 10))
-                                                        .foregroundStyle(.secondary)
-                                                        .lineLimit(1)
-                                                }
-                                            }
-
-                                            Spacer(minLength: 6)
-
-                                            if let badge = item.badge {
-                                                Text(badge)
-                                                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                                                    .foregroundStyle(badge == "Active" ? .green : .secondary)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(
-                                                        Capsule().fill(badge == "Active" ? Color.green.opacity(0.16) : Color.white.opacity(0.08))
-                                                    )
-                                            }
+                                    row(item, selected: idx == min(selectedIndex, list.count - 1))
+                                            .onHover { hovering in
+                                            if hovering { selectedIndex = idx }
                                         }
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(isSelected ? Color.white.opacity(0.15) : Color.clear)
-                                        )
-                                        .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .id(item.id)
-                                    .onHover { hovering in
-                                        if hovering { selectedIndex = idx }
-                                    }
                                 }
                             }
                             .padding(.horizontal, 6)
