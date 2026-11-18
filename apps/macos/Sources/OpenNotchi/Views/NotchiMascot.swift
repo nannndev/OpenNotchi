@@ -1769,6 +1769,11 @@ struct NotchiFloatingBubble: View {
     @ObservedObject private var settings = AppSettings.shared
     let accent: Color
 
+    // A private stored property makes the memberwise init private; newer Swift rejects calling it.
+    init(accent: Color) {
+        self.accent = accent
+    }
+
     var body: some View {
         let style = settings.notchiBubbleStyle
         if !settings.notchiBubbleEnabled || style == .off {
