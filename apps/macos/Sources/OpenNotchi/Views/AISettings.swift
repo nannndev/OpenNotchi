@@ -1121,7 +1121,9 @@ private struct NotchiGatewayManagerView: View {
 
     private func modelSourceText(_ p: GatewayProviderInfo, customCount: Int) -> String {
         guard let synced = p.syncedCount, synced > 0, let at = p.modelsSyncedAt else {
-            return "\(p.seedModels?.count ?? 0) built-in · \(customCount) custom"
+            // The full list is fetched from the provider once a key is connected.
+            let note = p.connected ? "tap ⟳ to fetch the full list" : "full list loads after Connect"
+            return "\(p.seedModels?.count ?? 0) built-in · \(customCount) custom · \(note)"
         }
         let ago = RelativeDateTimeFormatter().localizedString(for: Date(timeIntervalSince1970: at), relativeTo: Date())
         return "\(synced) from provider · \(customCount) custom · synced \(ago)"
