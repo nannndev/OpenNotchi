@@ -40,7 +40,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var settingsWindow: NSWindow?
 
     func applicationWillTerminate(_ notification: Notification) {
-        NotchiGatewayService.shared.stop()
+        // eay-gateway may be serving other apps; it exits by itself once idle (--idle-exit).
+        if NotchiGatewayService.shared.binaryURL?.lastPathComponent != "eay-gateway" {
+            NotchiGatewayService.shared.stop()
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

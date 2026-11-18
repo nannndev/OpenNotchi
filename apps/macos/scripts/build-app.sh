@@ -21,31 +21,35 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/OpenNotchi" "$APP/Contents/MacOS/OpenNotchi"
 
-# Build and bundle the notchi-gateway sidecar (the Ask AI gateway). The app needs it, so a
-# missing Rust toolchain is an error rather than a silently smaller app.
+# Build and bundle the gateway sidecar (the Ask AI gateway). The app needs it, so a missing
+# Rust toolchain is an error rather than a silently smaller app.
+# Source: $EAY_GATEWAY_DIR, else a sibling checkout of github.com/nannndev/eay-gateway.
 # Set SKIP_GATEWAY=1 only for quick UI-only local builds.
-GATEWAY_DIR="../gateway"
+GATEWAY_DIR="${EAY_GATEWAY_DIR:-../../../eay-gateway}"
+GATEWAY_BIN=eay-gateway
 if [[ "${SKIP_GATEWAY:-0}" != "1" ]]; then
     command -v cargo >/dev/null 2>&1 || { echo "error: cargo not found; install Rust (https://rustup.rs) or set SKIP_GATEWAY=1" >&2; exit 1; }
+    [[ -f "$GATEWAY_DIR/Cargo.toml" ]] || { echo "error: eay-gateway not found at $GATEWAY_DIR; clone github.com/nannndev/eay-gateway next to OpenNotchi, set EAY_GATEWAY_DIR, or set SKIP_GATEWAY=1" >&2; exit 1; }
     CARGO_PROFILE_FLAG=()
     GATEWAY_SUBDIR="debug"
     if [[ "$CONFIG" == "release" ]]; then
         CARGO_PROFILE_FLAG=(--release)
         GATEWAY_SUBDIR="release"
     fi
+    echo "Bundling $GATEWAY_BIN from $GATEWAY_DIR"
 
     if [[ "${UNIVERSAL:-0}" == "1" ]]; then
         rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
         for T in aarch64-apple-darwin x86_64-apple-darwin; do
-            cargo build --locked --manifest-path "$GATEWAY_DIR/Cargo.toml" ${CARGO_PROFILE_FLAG[@]+"${CARGO_PROFILE_FLAG[@]}"} --target "$T"
+            cargo build --locked --manifest-path "$GATEWAY_DIR/Cargo.toml" --bin "$GATEWAY_BIN" ${CARGO_PROFILE_FLAG[@]+"${CARGO_PROFILE_FLAG[@]}"} --target "$T"
         done
         lipo -create \
-            "$GATEWAY_DIR/target/aarch64-apple-darwin/$GATEWAY_SUBDIR/notchi-gateway" \
-            "$GATEWAY_DIR/target/x86_64-apple-darwin/$GATEWAY_SUBDIR/notchi-gateway" \
-            -output "$APP/Contents/MacOS/notchi-gateway"
+            "$GATEWAY_DIR/target/aarch64-apple-darwin/$GATEWAY_SUBDIR/$GATEWAY_BIN" \
+            "$GATEWAY_DIR/target/x86_64-apple-darwin/$GATEWAY_SUBDIR/$GATEWAY_BIN" \
+            -output "$APP/Contents/MacOS/$GATEWAY_BIN"
     else
-        cargo build --locked --manifest-path "$GATEWAY_DIR/Cargo.toml" ${CARGO_PROFILE_FLAG[@]+"${CARGO_PROFILE_FLAG[@]}"}
-        cp "$GATEWAY_DIR/target/$GATEWAY_SUBDIR/notchi-gateway" "$APP/Contents/MacOS/notchi-gateway"
+        cargo build --locked --manifest-path "$GATEWAY_DIR/Cargo.toml" --bin "$GATEWAY_BIN" ${CARGO_PROFILE_FLAG[@]+"${CARGO_PROFILE_FLAG[@]}"}
+        cp "$GATEWAY_DIR/target/$GATEWAY_SUBDIR/$GATEWAY_BIN" "$APP/Contents/MacOS/$GATEWAY_BIN"
     fi
 fi
 
@@ -60,9 +64,9 @@ ditto "$SPARKLE" "$APP/Contents/Frameworks/Sparkle.framework"
 # Ad-hoc signature so macOS can show the Automation (Apple Events) prompt.
 # Ad-hoc builds get a new identity every build, so macOS forgets Accessibility and Keychain access each time.
 # Set SIGN_IDENTITY (e.g. "Apple Development: you@example.com (TEAMID)") for local builds that keep them.
-if [[ -f "$APP/Contents/MacOS/notchi-gateway" ]]; then
-    codesign --force --options runtime --sign "${SIGN_IDENTITY:--}" "$APP/Contents/MacOS/notchi-gateway"
-fi
+for helper in "$APP/Contents/MacOS/eay-gateway" "$APP/Contents/MacOS/notchi-gateway"; do
+    if [[ -f "$helper" ]]; then codesign --force --options runtime --sign "${SIGN_IDENTITY:--}" "$helper"; fi
+done
 codesign --force --deep --sign "${SIGN_IDENTITY:--}" "$APP"
 
 echo "Built $APP"

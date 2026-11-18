@@ -1,4 +1,4 @@
-//! Notchi Gateway: the bundled `notchi-gateway` sidecar (apps/gateway) that routes Ask AI
+//! The bundled `eay-gateway` sidecar (github.com/nannndev/eay-gateway) that routes Ask AI
 //! across the user's AI accounts and API keys. This module starts it and talks to its HTTP API.
 
 use serde::{Deserialize, Serialize};
@@ -21,17 +21,24 @@ fn agent(timeout_secs: u64) -> ureq::Agent {
     ureq::Agent::config_builder().http_status_as_error(false).timeout_global(Some(Duration::from_secs(timeout_secs))).build().into()
 }
 
-const EXE: &str = if cfg!(windows) { "notchi-gateway.exe" } else { "notchi-gateway" };
+/// The gateway binary (renamed from notchi-gateway); bundled via Tauri `externalBin`.
+const EXE: &str = if cfg!(windows) { "eay-gateway.exe" } else { "eay-gateway" };
+/// Names a running gateway may report in `/health`, newest first.
+const SERVICES: [&str; 2] = ["eay-gateway", "notchi-gateway"];
+/// Oldest gateway version this app's admin calls work with.
+const MIN_VERSION: &str = "0.1.0";
 
-/// The sidecar next to the app binary (Tauri `externalBin`), or a dev build in apps/gateway.
+/// `EAY_GATEWAY_BIN`, the sidecar next to the app binary, or a dev build of a sibling eay-gateway checkout.
 fn binary() -> Option<PathBuf> {
+    if let Some(p) = std::env::var_os("EAY_GATEWAY_BIN").map(PathBuf::from).filter(|p| p.is_file()) {
+        return Some(p);
+    }
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
     let mut candidates = vec![exe_dir.join(EXE)];
-    // `tauri dev` runs from src-tauri/target/<profile>; the gateway builds into apps/gateway/target.
-    for up in exe_dir.ancestors().take(6) {
+    // `tauri dev` runs from src-tauri/target/<profile>; a sibling eay-gateway checkout builds into its own target.
+    for up in exe_dir.ancestors().take(7) {
         for profile in ["release", "debug"] {
-            candidates.push(up.join("gateway").join("target").join(profile).join(EXE));
-            candidates.push(up.join("apps").join("gateway").join("target").join(profile).join(EXE));
+            candidates.push(up.join("eay-gateway").join("target").join(profile).join(EXE));
         }
     }
     candidates.into_iter().find(|p| p.is_file())
@@ -41,29 +48,50 @@ pub fn is_available() -> bool {
     healthy() || binary().is_some()
 }
 
+/// True when a compatible gateway answers on the port. Another app may have started it; we share
+/// it rather than run a second one (they'd fight over the same accounts).
 pub fn healthy() -> bool {
-    agent(2).get(format!("{BASE_URL}/health")).call().is_ok_and(|r| r.status().is_success())
+    let Ok(mut r) = agent(2).get(format!("{BASE_URL}/health")).call() else { return false };
+    if !r.status().is_success() {
+        return false;
+    }
+    let v: Value = r.body_mut().read_json().unwrap_or(Value::Null);
+    SERVICES.contains(&v["service"].as_str().unwrap_or("")) && version_at_least(v["version"].as_str().unwrap_or("0"), MIN_VERSION)
 }
 
-/// Starts the sidecar unless one is already answering on the port (e.g. another instance).
+/// Dotted numeric version comparison ("0.10.0" >= "0.9.1").
+fn version_at_least(v: &str, min: &str) -> bool {
+    let parse = |s: &str| s.split('.').map(|p| p.chars().take_while(char::is_ascii_digit).collect::<String>().parse::<u64>().unwrap_or(0)).collect::<Vec<_>>();
+    let (a, b) = (parse(v), parse(min));
+    for i in 0..a.len().max(b.len()) {
+        let (x, y) = (a.get(i).copied().unwrap_or(0), b.get(i).copied().unwrap_or(0));
+        if x != y {
+            return x > y;
+        }
+    }
+    true
+}
+
+/// Starts the sidecar unless a compatible one already answers on the port.
 pub fn ensure_running() -> Result<(), String> {
     if healthy() {
         return Ok(());
     }
-    let bin = binary().ok_or("notchi-gateway was not found next to OpenNotchi. Reinstall the app.")?;
+    let bin = binary().ok_or("eay-gateway was not found next to OpenNotchi. Reinstall the app.")?;
     {
         let mut child = CHILD.lock().map_err(|e| e.to_string())?;
         let alive = child.as_mut().is_some_and(|c| matches!(c.try_wait(), Ok(None)));
         if !alive {
             let mut cmd = Command::new(&bin);
-            cmd.args(["--port", &PORT.to_string()]);
+            // Shared with other apps, so it isn't killed on quit; it exits after 30 idle minutes.
+            cmd.args(["--port", &PORT.to_string(), "--idle-exit", "30"]);
             #[cfg(windows)]
             {
                 use std::os::windows::process::CommandExt;
                 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
                 cmd.creation_flags(CREATE_NO_WINDOW);
             }
-            *child = Some(cmd.spawn().map_err(|e| format!("Couldn't start notchi-gateway: {e}"))?);
+            *child = Some(cmd.spawn().map_err(|e| format!("Couldn't start eay-gateway: {e}"))?);
         }
     }
     for _ in 0..25 {
@@ -72,17 +100,7 @@ pub fn ensure_running() -> Result<(), String> {
         }
         std::thread::sleep(Duration::from_millis(120));
     }
-    Err(format!("notchi-gateway didn't answer on port {PORT}"))
-}
-
-/// Stops the sidecar this app started (one started by someone else keeps running).
-pub fn stop() {
-    if let Ok(mut child) = CHILD.lock() {
-        if let Some(mut c) = child.take() {
-            let _ = c.kill();
-            let _ = c.wait();
-        }
-    }
+    Err(format!("eay-gateway didn't answer on port {PORT}; another program may be using it"))
 }
 
 fn get(path: &str) -> Result<Value, String> {
@@ -323,6 +341,16 @@ pub fn admin(method: &str, path: &str, body: Option<Value>) -> Result<Value, Str
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn newer_versions_satisfy_the_minimum() {
+        assert!(version_at_least("0.10.0", "0.9.1"));
+    }
+
+    #[test]
+    fn older_versions_do_not() {
+        assert!(!version_at_least("0.1.0", "0.2.0"));
+    }
 
     #[test]
     fn iso_formats_the_unix_epoch() {

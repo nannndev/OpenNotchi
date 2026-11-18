@@ -517,12 +517,7 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building OpenNotchi")
-        .run(|_app, event| {
-            // The gateway sidecar must not outlive the app.
-            if let tauri::RunEvent::Exit = event {
-                gateway::stop();
-            }
-        });
+        .run(|_, _| {});
 }
 
 #[cfg(test)]

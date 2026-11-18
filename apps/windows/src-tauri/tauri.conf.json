@@ -102,7 +102,7 @@
     ],
     "shortDescription": "Now playing, synced lyrics and live activities in a pill at the top of your screen.",
     "externalBin": [
-      "binaries/notchi-gateway"
+      "binaries/eay-gateway"
     ]
   }
 }

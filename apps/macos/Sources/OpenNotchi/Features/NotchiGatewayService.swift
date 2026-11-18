@@ -146,7 +146,7 @@ struct GatewayAccountsState: Decodable {
     }
 }
 
-/// Manages the bundled/local `notchi-gateway` Rust daemon and its HTTP admin/inference APIs.
+/// Manages the bundled/local `eay-gateway` daemon (formerly notchi-gateway) and its HTTP admin/inference APIs.
 final class NotchiGatewayService: ObservableObject {
     static let shared = NotchiGatewayService()
 
@@ -163,36 +163,37 @@ final class NotchiGatewayService: ObservableObject {
 
     private init() {}
 
-    /// Locates the `notchi-gateway` binary in the app bundle or local dev paths.
+    /// Binary names, newest first: the gateway was renamed from notchi-gateway to eay-gateway.
+    static let binaryNames = ["eay-gateway", "notchi-gateway"]
+
+    /// Oldest gateway version this app's admin calls work with.
+    static let minimumVersion = "0.1.0"
+
+    /// Locates the gateway binary: `EAY_GATEWAY_BIN`, the app bundle, common install paths,
+    /// then a dev build in a sibling eay-gateway checkout.
     var binaryURL: URL? {
-        if let exeDir = Bundle.main.executableURL?.deletingLastPathComponent() {
-            let bundled = exeDir.appendingPathComponent("notchi-gateway")
-            if fileManager.isExecutableFile(atPath: bundled.path) {
-                return bundled
+        if let override = ProcessInfo.processInfo.environment["EAY_GATEWAY_BIN"], fileManager.isExecutableFile(atPath: override) {
+            return URL(fileURLWithPath: override)
+        }
+        let home = fileManager.homeDirectoryForCurrentUser
+        var dirs: [URL] = []
+        if let exeDir = Bundle.main.executableURL?.deletingLastPathComponent() { dirs.append(exeDir) }
+        dirs.append(Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS"))
+        dirs += [home.appendingPathComponent(".local/bin"), URL(fileURLWithPath: "/usr/local/bin"), URL(fileURLWithPath: "/opt/homebrew/bin")]
+        for dir in dirs {
+            for name in Self.binaryNames {
+                let url = dir.appendingPathComponent(name)
+                if fileManager.isExecutableFile(atPath: url.path) { return url }
             }
         }
-        let bundleMacOS = Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/notchi-gateway")
-        if fileManager.isExecutableFile(atPath: bundleMacOS.path) {
-            return bundleMacOS
-        }
 
-        let home = fileManager.homeDirectoryForCurrentUser
-        let candidates = [
-            home.appendingPathComponent(".local/bin/notchi-gateway"),
-            URL(fileURLWithPath: "/usr/local/bin/notchi-gateway"),
-            URL(fileURLWithPath: "/opt/homebrew/bin/notchi-gateway"),
-        ]
-        for url in candidates where fileManager.isExecutableFile(atPath: url.path) {
-            return url
-        }
-
-        // Dev fallback when running from the OpenNotchi repo (`apps/macos` -> `apps/gateway`).
+        // Dev fallback when running from a checkout next to eay-gateway.
         var dir = URL(fileURLWithPath: fileManager.currentDirectoryPath)
-        for _ in 0..<5 {
+        for _ in 0..<6 {
             for profile in ["release", "debug"] {
-                let candidate = dir.appendingPathComponent("apps/gateway/target/\(profile)/notchi-gateway")
-                if fileManager.isExecutableFile(atPath: candidate.path) {
-                    return candidate
+                for rel in ["eay-gateway/target/\(profile)/eay-gateway"] {
+                    let candidate = dir.appendingPathComponent(rel)
+                    if fileManager.isExecutableFile(atPath: candidate.path) { return candidate }
                 }
             }
             let parent = dir.deletingLastPathComponent()
@@ -226,7 +227,7 @@ final class NotchiGatewayService: ObservableObject {
         guard let bin = binaryURL else {
             await MainActor.run {
                 self.isRunning = false
-                self.lastError = "notchi-gateway binary not found"
+                self.lastError = "eay-gateway binary not found"
             }
             return false
         }
@@ -237,7 +238,10 @@ final class NotchiGatewayService: ObservableObject {
             }
             let p = Process()
             p.executableURL = bin
-            p.arguments = ["--port", "\(Self.defaultPort)"]
+            // eay-gateway is shared with other apps: it exits on its own after 30 idle minutes.
+            p.arguments = bin.lastPathComponent == "eay-gateway"
+                ? ["--port", "\(Self.defaultPort)", "--idle-exit", "30"]
+                : ["--port", "\(Self.defaultPort)"]
             p.standardOutput = FileHandle.nullDevice
             p.standardError = FileHandle.nullDevice
             p.terminationHandler = { [weak self] _ in
@@ -274,7 +278,7 @@ final class NotchiGatewayService: ObservableObject {
 
         await MainActor.run {
             self.isRunning = false
-            self.lastError = "Timed out waiting for notchi-gateway on port \(Self.defaultPort)"
+            self.lastError = self.portConflict ?? "Timed out waiting for eay-gateway on port \(Self.defaultPort)"
         }
         return false
     }
@@ -297,19 +301,43 @@ final class NotchiGatewayService: ObservableObject {
         _ = await ensureRunning()
     }
 
+    /// Why the port can't be used, when something other than a usable gateway answers on it.
+    private(set) var portConflict: String?
+
+    /// True when a compatible gateway answers on the port. Another app may have started it:
+    /// we share it rather than starting a second one (they'd fight over the same accounts).
     func checkHealth() async -> Bool {
         guard let url = URL(string: "\(Self.baseURL)/health") else { return false }
         var req = URLRequest(url: url)
         req.timeoutInterval = 1.5
-        do {
-            let (data, resp) = try await URLSession.shared.data(for: req)
-            guard (resp as? HTTPURLResponse)?.statusCode == 200 else { return false }
-            // Something else may own the port; only adopt a real notchi-gateway.
-            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-            return json?["service"] as? String == "notchi-gateway"
-        } catch {
+        guard let (data, resp) = try? await URLSession.shared.data(for: req), (resp as? HTTPURLResponse)?.statusCode == 200 else {
+            portConflict = nil
             return false
         }
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        let service = json?["service"] as? String ?? ""
+        let version = json?["version"] as? String ?? "0"
+        guard Self.binaryNames.contains(service) else {
+            portConflict = "Port \(Self.defaultPort) is used by another program (\(service.isEmpty ? "unknown" : service))."
+            return false
+        }
+        guard Self.isVersion(version, atLeast: Self.minimumVersion) else {
+            portConflict = "The running \(service) \(version) is too old (needs \(Self.minimumVersion)+). Quit it so OpenNotchi can start its own."
+            return false
+        }
+        portConflict = nil
+        return true
+    }
+
+    /// Dotted numeric version comparison ("0.10.0" >= "0.9.1").
+    static func isVersion(_ v: String, atLeast min: String) -> Bool {
+        let a = v.split(separator: ".").map { Int($0.prefix { $0.isNumber }) ?? 0 }
+        let b = min.split(separator: ".").map { Int($0.prefix { $0.isNumber }) ?? 0 }
+        for i in 0..<max(a.count, b.count) {
+            let x = i < a.count ? a[i] : 0, y = i < b.count ? b[i] : 0
+            if x != y { return x > y }
+        }
+        return true
     }
 
     // MARK: - Models & Providers Admin APIs
@@ -616,7 +644,7 @@ final class NotchiGatewayService: ObservableObject {
                 id: Self.stableUUID(id),
                 name: label ?? email ?? GatewayProvider.name(provider),
                 tool: AgentTool(rawValue: provider) ?? .claude,
-                dir: "~/.notchi-gateway",
+                dir: "~/.eay-gateway",
                 connectionId: id,
                 email: email,
                 priority: (a["sort_order"] as? Int).map { $0 + 1 },
