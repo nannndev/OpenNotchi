@@ -582,7 +582,8 @@ pub async fn complete_codex_pkce_flow(
     let token_or_code = parse_callback_code_or_token(callback_input);
 
     // Check if user directly pasted an access token (JWT or sess- token)
-    if token_or_code.starts_with("sess-") || (token_or_code.contains('.') && token_or_code.len() > 100) {
+    // OpenAI auth codes are also long and dotted, so only a decodable JWT counts as a pasted token.
+    if token_or_code.starts_with("sess-") || extract_jwt_claims(&token_or_code).is_some_and(|c| c["exp"].is_number()) {
         let claims = extract_jwt_claims(&token_or_code);
         let mut email = None;
         let mut account_id = None;
@@ -2338,6 +2339,17 @@ pub fn subscription_models_request(client: &Client, provider: &str, cred: &Value
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod extract_jwt_claims {
+        use super::*;
+
+        #[test]
+        fn an_openai_auth_code_is_not_mistaken_for_a_token() {
+            // Real codes look like "ac_<base64>.<base64>": long and dotted, but not a JWT.
+            let code = format!("ac_{}.{}", "A".repeat(80), "B".repeat(40));
+            assert!(extract_jwt_claims(&code).is_none_or(|c| !c["exp"].is_number()));
+        }
+    }
 
     mod parse_callback_code_or_token {
         use super::*;
