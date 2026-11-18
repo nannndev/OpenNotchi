@@ -451,6 +451,8 @@ pub struct UsageReport {
     pub is_from_gateway: bool,
     /// The gateway provider id (e.g. "codex", "kimi"); None for local session folders.
     pub provider: Option<String>,
+    /// Unix ms until this account is cooling down after a rate limit.
+    pub cooling_until: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -666,6 +668,7 @@ fn claude_report(account: &Account, now: i64, tz: i64) -> UsageReport {
         last_error: None,
         is_from_gateway: false,
         provider: None,
+        cooling_until: None,
     }
 }
 
@@ -742,6 +745,7 @@ fn codex_report(account: &Account, now: i64, tz: i64) -> UsageReport {
         last_error: None,
         is_from_gateway: false,
         provider: None,
+        cooling_until: None,
     }
 }
 
@@ -817,6 +821,7 @@ fn antigravity_report(account: &Account, now: i64, tz: i64) -> UsageReport {
         last_error: None,
         is_from_gateway: false,
         provider: None,
+        cooling_until: None,
     }
 }
 
@@ -1061,7 +1066,11 @@ fn merge_hooks(settings: Value) -> Result<Value, String> {
     Ok(s)
 }
 
-fn edit_settings(dir: &Path, install: bool) -> Result<(), String> {
+fn update_settings_json(
+    dir: &Path,
+    backup_name: &str,
+    transform: impl FnOnce(Value) -> Result<Value, String>,
+) -> Result<(), String> {
     let path = dir.join("settings.json");
     let raw = match fs::read_to_string(&path) {
         Ok(s) => Some(s),
@@ -1072,16 +1081,22 @@ fn edit_settings(dir: &Path, install: bool) -> Result<(), String> {
         Some(s) if !s.is_empty() => serde_json::from_str(s).map_err(|e| format!("settings.json isn't valid JSON, so it was left alone ({e})"))?,
         _ => json!({}),
     };
-    let next = if install { merge_hooks(current.clone())? } else { strip_hooks(current.clone()) };
+    let next = transform(current.clone())?;
     if next == current {
         return Ok(());
     }
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     if let Some(raw) = &raw {
-        fs::write(dir.join("settings.json.bak"), raw).map_err(|e| format!("Couldn't write the backup: {e}"))?;
+        fs::write(dir.join(backup_name), raw).map_err(|e| format!("Couldn't write the backup: {e}"))?;
     }
     let text = serde_json::to_string_pretty(&next).map_err(|e| e.to_string())?;
     fs::write(&path, text + "\n").map_err(|e| e.to_string())
+}
+
+fn edit_settings(dir: &Path, install: bool) -> Result<(), String> {
+    update_settings_json(dir, "settings.json.bak", |current| {
+        if install { merge_hooks(current) } else { Ok(strip_hooks(current)) }
+    })
 }
 
 /// Installs (or removes) our hooks in `<dir>/settings.json`; returns whether they're installed now.
@@ -1094,6 +1109,47 @@ pub fn claude_hooks(dir: String, install: bool) -> Result<bool, String> {
 #[tauri::command]
 pub fn claude_hooks_installed(dir: String) -> bool {
     fs::read_to_string(expand(&dir).join("settings.json")).is_ok_and(|s| s.contains(HOOK_URL))
+}
+
+#[tauri::command]
+pub fn claude_gateway_routed(dir: Option<String>) -> bool {
+    let path = expand(dir.as_deref().unwrap_or("~/.claude")).join("settings.json");
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+        .is_some_and(|v| v["env"]["ANTHROPIC_BASE_URL"].as_str() == Some(crate::gateway::BASE_URL))
+}
+
+#[tauri::command]
+pub fn claude_gateway_route(dir: Option<String>, enable: bool) -> Result<bool, String> {
+    let d = dir.unwrap_or_else(|| "~/.claude".to_string());
+    update_settings_json(&expand(&d), "settings.json.gateway.bak", |mut current| {
+        let obj = current.as_object_mut().ok_or("settings.json isn't a JSON object")?;
+        if enable {
+            let env = obj
+                .entry("env")
+                .or_insert_with(|| json!({}))
+                .as_object_mut()
+                .ok_or("\"env\" in settings.json isn't an object")?;
+            env.insert("ANTHROPIC_BASE_URL".into(), json!(crate::gateway::BASE_URL));
+            let key_empty = env.get("ANTHROPIC_API_KEY").and_then(Value::as_str).is_none_or(|k| k.trim().is_empty());
+            if key_empty {
+                env.insert("ANTHROPIC_API_KEY".into(), json!("eay-gateway"));
+            }
+        } else if let Some(env) = obj.get_mut("env").and_then(Value::as_object_mut) {
+            if env.get("ANTHROPIC_BASE_URL").and_then(Value::as_str) == Some(crate::gateway::BASE_URL) {
+                env.remove("ANTHROPIC_BASE_URL");
+            }
+            if env.get("ANTHROPIC_API_KEY").and_then(Value::as_str) == Some("eay-gateway") {
+                env.remove("ANTHROPIC_API_KEY");
+            }
+            if env.is_empty() {
+                obj.remove("env");
+            }
+        }
+        Ok(current)
+    })?;
+    Ok(claude_gateway_routed(Some(d)))
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -215,6 +215,7 @@ pub fn reports(tz_offset_min: i64) -> Vec<UsageReport> {
                 last_error,
                 is_from_gateway: true,
                 provider: Some(provider),
+                cooling_until: cooling.map(|s| (s * 1000.0) as i64),
             }
         })
         .collect()

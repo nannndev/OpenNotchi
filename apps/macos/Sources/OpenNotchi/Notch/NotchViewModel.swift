@@ -104,6 +104,8 @@ final class NotchViewModel: ObservableObject {
     @Published var isAiExpanded = false
     /// Home shows music search instead of the player.
     @Published var musicSearchOpen = false
+    @Published var isCommandPaletteOpen = false
+    @Published var closedActivityIndex: Int = 0
 
     static let openWidth: CGFloat = 680
     static let defaultOpenHeight: CGFloat = 200
@@ -111,7 +113,7 @@ final class NotchViewModel: ObservableObject {
     static let maxOpenHeight: CGFloat = 470
 
     var openSize: CGSize {
-        let height: CGFloat
+        var height: CGFloat
         if isStudioOpen {
             height = Self.maxOpenHeight
         } else if tab == .mirror && settings.mirrorTabEnabled {
@@ -128,6 +130,9 @@ final class NotchViewModel: ObservableObject {
             height = 280
         } else {
             height = Self.defaultOpenHeight
+        }
+        if isCommandPaletteOpen {
+            height = max(height, 290)
         }
         return CGSize(width: tab == .ai ? 720 : Self.openWidth, height: height)
     }
@@ -274,6 +279,7 @@ final class NotchViewModel: ObservableObject {
         guard isOpen else { return }
         isOpen = false
         musicSearchOpen = false
+        isCommandPaletteOpen = false
         if let deferred = deferredBanner {
             deferredBanner = nil
             if Date.now.timeIntervalSince(deferred.at) < 5 * 60 {
@@ -308,5 +314,36 @@ final class NotchViewModel: ObservableObject {
             isOpen = true
             scheduleClose(after: duration)
         }
+    }
+}
+
+/// Prevents the notch from auto-closing while a SwiftUI child-window popover is open.
+private struct NotchPopoverLockModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    @State private var locked = false
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: isPresented) { _, open in
+                if open && !locked {
+                    locked = true
+                    NotchViewModel.activePopoverCount += 1
+                } else if !open && locked {
+                    locked = false
+                    NotchViewModel.activePopoverCount = max(0, NotchViewModel.activePopoverCount - 1)
+                }
+            }
+            .onDisappear {
+                if locked {
+                    locked = false
+                    NotchViewModel.activePopoverCount = max(0, NotchViewModel.activePopoverCount - 1)
+                }
+            }
+    }
+}
+
+extension View {
+    func lockNotchWhilePresented(_ isPresented: Binding<Bool>) -> some View {
+        modifier(NotchPopoverLockModifier(isPresented: isPresented))
     }
 }

@@ -32,6 +32,7 @@ final class NotchScreenManager: ObservableObject {
     private var lastTabSwipeTriggerTime: Date = .distantPast
     private var globalSwipeMonitor: Any?
     private var localSwipeMonitor: Any?
+    private var localKeyMonitor: Any?
 
     private let media: MediaManager
     private let tray: TrayStore
@@ -109,6 +110,41 @@ final class NotchScreenManager: ObservableObject {
             return event
         }
 
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            let openCtrl = (self.activeController?.viewModel.isOpen == true)
+                ? self.activeController
+                : self.controllers.first(where: { $0.viewModel.isOpen })
+            guard let ctrl = openCtrl else { return event }
+
+            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if mods == .command, let chars = event.charactersIgnoringModifiers?.lowercased() {
+                if chars == "k" {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.86)) {
+                        ctrl.viewModel.isCommandPaletteOpen.toggle()
+                    }
+                    ctrl.panel.makeKeyAndOrderFront(nil)
+                    return nil
+                }
+                if let digit = Int(chars), (1...9).contains(digit) {
+                    let tabs = self.settings.visibleTabs
+                    let idx = digit - 1
+                    if idx < tabs.count {
+                        ctrl.viewModel.isCommandPaletteOpen = false
+                        ctrl.viewModel.selectTab(tabs[idx])
+                        return nil
+                    }
+                }
+            }
+            if event.keyCode == 53, ctrl.viewModel.isCommandPaletteOpen {
+                withAnimation(.spring(response: 0.22, dampingFraction: 0.88)) {
+                    ctrl.viewModel.isCommandPaletteOpen = false
+                }
+                return nil
+            }
+            return event
+        }
+
         DistributedNotificationCenter.default().addObserver(
             self,
             selector: #selector(handleCommand(_:)),
@@ -133,6 +169,9 @@ final class NotchScreenManager: ObservableObject {
             NSEvent.removeMonitor(monitor)
         }
         if let monitor = localSwipeMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = localKeyMonitor {
             NSEvent.removeMonitor(monitor)
         }
         cursorCheckTimer?.invalidate()

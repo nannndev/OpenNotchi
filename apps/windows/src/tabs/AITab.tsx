@@ -1,13 +1,13 @@
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
-import { Bot, ExternalLink, LayoutGrid, List, Rows3, Sparkles, Terminal } from "lucide-react"
+import { Bot, ChevronDown, ExternalLink, LayoutGrid, List, RefreshCw, Rows3, Sparkles, Terminal, Wrench, Zap } from "lucide-react"
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import {
   formatCost,
   formatTokens,
+  gatewayProviderName,
   getAccountQuota,
   mergeSessions,
-  transitionPeek,
   resetsIn,
   STATE_LABELS,
   timeAgo,
@@ -19,14 +19,30 @@ import {
   type RateWindow,
   type UsageReport,
 } from "../ai"
+import { GatewayClientConfig } from "../GatewayClientConfig"
 import type { NowPlaying } from "../media"
 import { useSettings } from "../settings"
 import { ChatPanel } from "./ChatPanel"
 export { askAi } from "./ChatPanel"
 import { transitionBanner, type Banner } from "../banner"
 
-type Section = "usage" | "analytics" | "agents" | "ask"
+export type AiSection = "usage" | "analytics" | "agents" | "ask"
+type Section = AiSection
 type UsageLayout = "cards" | "compact" | "list"
+
+interface GatewayRoutingState {
+  settings: {
+    routing_strategy: string
+    fallback_order: string
+  }
+  auto_order: string[]
+}
+
+const STRATEGY_LABELS: Record<string, string> = {
+  priority: "Priority",
+  round_robin: "Round-Robin",
+  fill_first: "Fill-First",
+}
 
 const SECTION_LABELS: Record<Section, string> = { usage: "Quota & Accounts", analytics: "Analytics", agents: "Agents", ask: "Ask" }
 
@@ -54,12 +70,16 @@ export function AITab({
   sessions,
   usage,
   onToggleActive,
+  onRefresh,
+  sectionRequest,
   lyricLine,
   np,
 }: {
   sessions: AgentSession[]
   usage: UsageReport[] | null
   onToggleActive?: (id: string, active: boolean) => void
+  onRefresh?: () => Promise<void> | void
+  sectionRequest?: { section: AiSection; seq: number } | null
   lyricLine: string | null
   np: NowPlaying | null
 }) {
@@ -71,10 +91,45 @@ export function AITab({
       ? "agents"
       : "usage"
   )
+  const [routing, setRouting] = useState<GatewayRoutingState | null>(null)
+  const [panelMode, setPanelMode] = useState<"none" | "routing" | "tools">("none")
+  const [refreshing, setRefreshing] = useState(false)
   const layout: UsageLayout = settings.usageLayout
   const setLayout = (l: UsageLayout) => setSettings({ usageLayout: l })
   const now = Date.now()
 
+  useEffect(() => {
+    if (sectionRequest) setSection(sectionRequest.section)
+  }, [sectionRequest?.seq])
+
+  const loadRouting = () => {
+    invoke<GatewayRoutingState>("gateway_admin", { method: "GET", path: "/gateway/admin/settings", body: null })
+      .then(setRouting)
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    loadRouting()
+  }, [])
+
+  const updateRouting = async (patch: Record<string, string>) => {
+    try {
+      await invoke("gateway_admin", { method: "POST", path: "/gateway/admin/settings", body: patch })
+      loadRouting()
+    } catch {}
+  }
+
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) return
+    setRefreshing(true)
+    try {
+      await onRefresh()
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const hasGateway = Boolean(usage?.some((r) => r.isFromGateway) || routing)
   const totalTokensToday = usage?.reduce((sum, r) => sum + r.today.tokens, 0) ?? 0
   const totalCostToday = usage?.reduce((sum, r) => sum + r.today.cost, 0) ?? 0
   const activeCount = usage?.filter((r) => r.found && r.isActive !== false).length ?? 0
@@ -91,8 +146,26 @@ export function AITab({
       <div className="ai-body">
         {section === "usage" && (
           <div className="ai-usage-wrap">
-            {usage && usage.length > 0 && (
+            {(usage && usage.length > 0) || hasGateway ? (
               <div className="ai-summary-bar">
+                {hasGateway && (
+                  <button
+                    type="button"
+                    className={`gw-routing-pill ${panelMode !== "none" ? "open" : ""}`}
+                    onClick={() => {
+                      if (panelMode === "none") loadRouting()
+                      setPanelMode((m) => (m === "none" ? "routing" : "none"))
+                    }}
+                    title="Gateway routing strategy & tool configurator"
+                  >
+                    <i className="gw-pill-dot" />
+                    <span>Gateway</span>
+                    {routing && (
+                      <small>· {STRATEGY_LABELS[routing.settings.routing_strategy] ?? routing.settings.routing_strategy}</small>
+                    )}
+                    <ChevronDown size={10} />
+                  </button>
+                )}
                 <div className="ai-summary-item">
                   <span className="ai-summary-label">Today</span>
                   <b className="ai-summary-val">{formatTokens(totalTokensToday)} tokens</b>
@@ -107,6 +180,17 @@ export function AITab({
                   <span className="ai-summary-label">Accounts</span>
                   <b className="ai-summary-val">{activeCount} active</b>
                 </div>
+                {onRefresh && (
+                  <button
+                    type="button"
+                    className={`ai-refresh-btn ${refreshing ? "spin" : ""}`}
+                    onClick={handleRefresh}
+                    title="Refresh quotas & usage"
+                    aria-label="Refresh quotas"
+                  >
+                    <RefreshCw size={11} />
+                  </button>
+                )}
                 <div className="ai-layout-picker" role="group" aria-label="Layout">
                   {([["cards", LayoutGrid], ["compact", Rows3], ["list", List]] as const).map(([l, Icon]) => (
                     <button key={l} className={layout === l ? "active" : ""} onClick={() => setLayout(l)} title={`${l} layout`} aria-label={`${l} layout`}>
@@ -114,6 +198,87 @@ export function AITab({
                     </button>
                   ))}
                 </div>
+              </div>
+            ) : null}
+
+            {panelMode === "routing" && (
+              <div className="gw-inline-popover">
+                <div className="gw-inline-head">
+                  <strong>Gateway Routing</strong>
+                  <div className="gw-inline-head-actions">
+                    <button type="button" className="ai-settings-btn" onClick={() => setPanelMode("tools")}>
+                      <Wrench size={10} /> Connect Tools…
+                    </button>
+                    <button type="button" className="ai-settings-btn" onClick={() => setPanelMode("none")}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+                {routing ? (
+                  <div className="gw-routing-controls">
+                    <div className="gw-routing-row">
+                      <span>Strategy</span>
+                      <div className="segmented">
+                        {(["priority", "round_robin", "fill_first"] as const).map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            className={routing.settings.routing_strategy === s ? "active" : ""}
+                            onClick={() => updateRouting({ routing_strategy: s })}
+                          >
+                            {STRATEGY_LABELS[s]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="gw-routing-row">
+                      <span>Fallback Order</span>
+                      <div className="segmented">
+                        <button
+                          type="button"
+                          className={routing.settings.fallback_order === "model_first" ? "active" : ""}
+                          onClick={() => updateRouting({ fallback_order: "model_first" })}
+                        >
+                          Model First
+                        </button>
+                        <button
+                          type="button"
+                          className={routing.settings.fallback_order === "account_first" ? "active" : ""}
+                          onClick={() => updateRouting({ fallback_order: "account_first" })}
+                        >
+                          Account First
+                        </button>
+                      </div>
+                    </div>
+                    {routing.auto_order.length > 0 && (
+                      <div className="gw-auto-chain">
+                        <span>Auto Chain:</span>
+                        {routing.auto_order.map((p, idx) => (
+                          <span key={p} className="gw-chain-pill">
+                            {idx > 0 ? "› " : ""}
+                            {gatewayProviderName(p)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="ai-card-note">Loading Gateway routing state…</div>
+                )}
+              </div>
+            )}
+
+            {panelMode === "tools" && (
+              <div className="gw-inline-popover gw-inline-scroll">
+                <div className="gw-inline-head">
+                  <button type="button" className="ai-settings-btn" onClick={() => setPanelMode("routing")}>
+                    ← Back to Routing
+                  </button>
+                  <button type="button" className="ai-settings-btn" onClick={() => setPanelMode("none")}>
+                    Close
+                  </button>
+                </div>
+                <GatewayClientConfig activeModel={settings.aiGatewayModel} />
               </div>
             )}
 
@@ -172,15 +337,42 @@ function UsageCard({
   onToggleActive?: (id: string, active: boolean) => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [pinging, setPinging] = useState(false)
+  const [pingResult, setPingResult] = useState<{ ok: boolean; text: string } | null>(null)
   const max = Math.max(1, ...r.days)
   const quota = getAccountQuota(r, now)
   const isActive = r.isActive !== false
+  const coolingSecs = r.coolingUntil && r.coolingUntil > now ? Math.max(1, Math.ceil((r.coolingUntil - now) / 1000)) : 0
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation()
     const targetId = r.connectionId || r.id
     if (targetId && onToggleActive) {
       onToggleActive(targetId, !isActive)
+    }
+  }
+
+  const handlePing = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const accountId = r.connectionId || r.id
+    if (!accountId || pinging) return
+    setPinging(true)
+    setPingResult(null)
+    try {
+      const res = await invoke<{ valid?: boolean; latency_ms?: number; error?: string }>("gateway_admin", {
+        method: "POST",
+        path: `/gateway/admin/accounts/${r.provider || r.tool}/test`,
+        body: { account_id: accountId },
+      })
+      if (res.valid) {
+        setPingResult({ ok: true, text: res.latency_ms != null ? `Works (${res.latency_ms} ms)` : "Works" })
+      } else {
+        setPingResult({ ok: false, text: res.error || "Test failed" })
+      }
+    } catch (err) {
+      setPingResult({ ok: false, text: String(err) })
+    } finally {
+      setPinging(false)
     }
   }
 
@@ -193,8 +385,21 @@ function UsageCard({
         <AgentToolIcon tool={r.tool} />
         <div className="ai-card-title-group">
           <strong className="ai-card-title">{r.name}</strong>
-          <span className="ai-card-email">{TOOL_NAMES[r.tool] || r.tool}</span>
+          <span className="ai-card-email">{r.provider ? gatewayProviderName(r.provider) : TOOL_NAMES[r.tool] || r.tool}</span>
         </div>
+
+        {r.isFromGateway && (r.connectionId || r.id) && (
+          <button
+            type="button"
+            className="ai-ping-btn"
+            onClick={handlePing}
+            disabled={pinging}
+            title="Test live Gateway connection"
+          >
+            <Zap size={9} />
+            {pinging ? "…" : "Ping"}
+          </button>
+        )}
 
         {r.isFromGateway && (
           <button
@@ -215,6 +420,24 @@ function UsageCard({
           </span>
         )}
       </div>
+
+      {coolingSecs > 0 && (
+        <div className="ai-cooldown-pill">
+          ⏳ Cooldown · {coolingSecs}s
+        </div>
+      )}
+
+      {r.lastError && (
+        <div className="ai-last-error" title={r.lastError}>
+          ⚠ {r.lastError}
+        </div>
+      )}
+
+      {pingResult && (
+        <div className={`ai-ping-result ${pingResult.ok ? "ok" : "err"}`} title={pingResult.text}>
+          {pingResult.ok ? "✓" : "✕"} {pingResult.text}
+        </div>
+      )}
 
       {!r.found ? (
         <div className="ai-card-empty">No sessions found in {r.dir}</div>
@@ -479,6 +702,8 @@ function AnalyticsPanel() {
     (t, d) => ({ requests: t.requests + d.requests, input: t.input + d.input, cached: t.cached + d.cached, output: t.output + d.output, cost: t.cost + d.cost }),
     { requests: 0, input: 0, cached: 0, output: 0, cost: 0 },
   )
+  const cacheHitRate =
+    total.input + total.cached > 0 ? Math.round((total.cached / (total.input + total.cached)) * 100) : null
   const value = (d: DayStat) => (metric === "Tokens" ? d.input + d.output : metric === "Requests" ? d.requests : d.cost)
   const values = data.days.map(value)
   const peak = Math.max(1, ...values)
@@ -489,7 +714,17 @@ function AnalyticsPanel() {
       <div className="ai-an-stats">
         <div><span>Requests</span><b>{total.requests.toLocaleString()}</b></div>
         <div><span>Input</span><b className="ai-c-orange">{formatTokens(total.input)}</b></div>
-        <div><span>Cached</span><b className="ai-c-cyan">{formatTokens(total.cached)}</b></div>
+        <div
+          title={
+            cacheHitRate != null
+              ? `Prompt cache hit rate: ${cacheHitRate}% (${formatTokens(total.cached)} of ${formatTokens(total.input + total.cached)} input tokens)`
+              : "Cached input tokens"
+          }
+        >
+          <span>Cached</span>
+          <b className="ai-c-cyan">{formatTokens(total.cached)}</b>
+          {cacheHitRate != null && <small className="ai-an-hit">{cacheHitRate}% hit</small>}
+        </div>
         <div><span>Output</span><b className="ai-c-green">{formatTokens(total.output)}</b></div>
         <div><span>Est. cost</span><b className="ai-c-yellow">{formatCost(total.cost)}</b></div>
       </div>
@@ -526,14 +761,23 @@ function AnalyticsPanel() {
         </div>
         <div className="ai-an-recent">
           <span className="ai-an-title">Recent requests</span>
-          {data.recent.map((r) => (
-            <div key={r.id} className={`ai-an-req ${r.ok ? "" : "fail"}`}>
-              <AgentToolIcon tool={r.provider} size={12} />
-              <span className="ai-an-model">{r.model}</span>
-              <span className="muted">{formatTokens(r.input)}↑ {formatTokens(r.output)}↓</span>
-              <span className="ai-agent-time">{timeAgo(Date.parse(r.timestamp), now)}</span>
-            </div>
-          ))}
+          {data.recent.map((r) => {
+            const pName = gatewayProviderName(r.provider)
+            return (
+              <div
+                key={r.id}
+                className={`ai-an-req ${r.ok ? "" : "fail"}`}
+                title={`${r.model}\nProvider: ${pName} · Status: ${r.ok ? "OK" : "Error"}\nTokens: ${r.input.toLocaleString()} in / ${r.output.toLocaleString()} out\nTime: ${new Date(r.timestamp).toLocaleString()}`}
+              >
+                <AgentToolIcon tool={r.provider} size={12} />
+                <span className="ai-an-model">{r.model}</span>
+                <span className="ai-an-provider">{pName}</span>
+                <span className={`ai-an-status ${r.ok ? "ok" : "err"}`}>{r.ok ? "OK" : "ERR"}</span>
+                <span className="muted">{formatTokens(r.input)}↑ {formatTokens(r.output)}↓</span>
+                <span className="ai-agent-time">{timeAgo(Date.parse(r.timestamp), now)}</span>
+              </div>
+            )
+          })}
           {data.topModels.length > 0 && <span className="ai-an-title">Top models today</span>}
           {data.topModels.map((m) => (
             <div key={m.model} className="ai-an-req">

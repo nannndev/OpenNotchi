@@ -324,6 +324,7 @@ private struct NotchiGatewayManagerView: View {
     @State private var newComboTargets = ""
 
     @State private var copiedEndpoint = false
+    @State private var showConnectToolsPopover = false
     @State private var busy = false
     @State private var statusMessage: (ok: Bool, text: String)?
 
@@ -437,6 +438,19 @@ private struct NotchiGatewayManagerView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+
+                Button {
+                    showConnectToolsPopover = true
+                } label: {
+                    Label("Connect Tools…", systemImage: "wrench.and.screwdriver.fill")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .popover(isPresented: $showConnectToolsPopover, arrowEdge: .bottom) {
+                    GatewayClientConfigView()
+                        .environmentObject(AppSettings.shared)
+                }
 
                 Button {
                     Task {

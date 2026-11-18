@@ -6,6 +6,8 @@ struct UsageCard: View {
     @EnvironmentObject private var usage: AIUsageManager
     @EnvironmentObject private var vm: NotchViewModel
     @State private var isHovering = false
+    @State private var testingAccount = false
+    @State private var testFeedback: (ok: Bool, text: String)?
 
     private var toolTint: Color { report.tint }
 
@@ -53,6 +55,43 @@ struct UsageCard: View {
 
                 Spacer(minLength: 4)
 
+                if report.isFromGateway && (isHovering || testingAccount), let connId = report.account.connectionId {
+                    Button {
+                        testingAccount = true
+                        testFeedback = nil
+                        Task {
+                            let res = await NotchiGatewayService.shared.testAccount(
+                                provider: report.provider ?? report.sourceKey,
+                                id: connId
+                            )
+                            testingAccount = false
+                            testFeedback = (res.ok, res.message)
+                        }
+                    } label: {
+                        HStack(spacing: 2.5) {
+                            if testingAccount {
+                                ProgressView().controlSize(.mini).scaleEffect(0.6)
+                            } else {
+                                Image(systemName: "bolt.horizontal.fill")
+                                    .font(.system(size: 7.5, weight: .bold))
+                            }
+                            Text(testingAccount ? "…" : "Ping")
+                                .font(.system(size: 8, weight: .bold))
+                        }
+                        .foregroundStyle(Color.cyan)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(Color.cyan.opacity(0.15))
+                                .overlay(Capsule().stroke(Color.cyan.opacity(0.35), lineWidth: 0.8))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(testingAccount)
+                    .help("Test live Gateway connection for this account")
+                }
+
                 // Interactive Gateway ON / OFF Toggle Pill
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
@@ -85,6 +124,52 @@ struct UsageCard: View {
                     .padding(.horizontal, 4.5)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(healthColor.opacity(0.18)).overlay(Capsule().stroke(healthColor.opacity(0.35), lineWidth: 0.8)))
+            }
+
+            if let coolingUntil = report.coolingUntil, coolingUntil > .now {
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                    let secs = Int(coolingUntil.timeIntervalSince(ctx.date))
+                    if secs > 0 {
+                        HStack(spacing: 4) {
+                            Text("⏳ Cooldown · \(secs)s")
+                                .font(.system(size: 9, weight: .bold).monospacedDigit())
+                        }
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2.5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.orange.opacity(0.14))
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.orange.opacity(0.35), lineWidth: 0.8))
+                        )
+                    }
+                }
+            }
+
+            if let err = report.lastError, !err.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 8.5))
+                    Text(err)
+                        .font(.system(size: 9, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .foregroundStyle(.orange)
+                .help(err)
+            }
+
+            if let feedback = testFeedback {
+                HStack(spacing: 4) {
+                    Image(systemName: feedback.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .font(.system(size: 8.5))
+                    Text(feedback.text)
+                        .font(.system(size: 9, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(feedback.ok ? .green : .red)
+                .help(feedback.text)
             }
 
             if !report.found {

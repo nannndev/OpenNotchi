@@ -262,30 +262,47 @@ struct AnalyticsSection: View {
         VStack(alignment: .leading, spacing: 4) {
             sectionTitle("Recent requests")
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 3) {
+                VStack(spacing: 3.5) {
                     ForEach(recent) { r in
-                        HStack(spacing: 5) {
+                        let providerName = r.provider.isEmpty ? "Auto" : GatewayProvider.name(r.provider)
+                        HStack(spacing: 4) {
                             if let tool = AgentTool(rawValue: r.provider) {
                                 ToolLogo(tool: tool, size: 12)
                             } else {
                                 Circle().fill(r.ok ? Color.green : .red).frame(width: 5, height: 5)
                             }
                             Text(r.model)
-                                .font(.system(size: 9.5, design: .monospaced))
+                                .font(.system(size: 9, design: .monospaced))
                                 .foregroundStyle(r.ok ? Color.primary : .red)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
-                            Spacer(minLength: 4)
+                            Text(providerName)
+                                .font(.system(size: 7.5, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .padding(.horizontal, 3.5)
+                                .padding(.vertical, 1)
+                                .background(Capsule().fill(.white.opacity(0.08)))
+                            Text(r.ok ? "OK" : "ERR")
+                                .font(.system(size: 7.5, weight: .heavy, design: .monospaced))
+                                .foregroundStyle(r.ok ? Color.green : .red)
+                                .padding(.horizontal, 3.5)
+                                .padding(.vertical, 1)
+                                .background(Capsule().fill((r.ok ? Color.green : Color.red).opacity(0.16)))
+                            Spacer(minLength: 2)
                             Text("\(formatTokens(r.input))↑ \(formatTokens(r.output))↓")
-                                .font(.system(size: 9).monospacedDigit())
+                                .font(.system(size: 8.5).monospacedDigit())
                                 .foregroundStyle(.secondary)
                             TimelineView(.periodic(from: .now, by: 30)) { ctx in
                                 Text(ago(r.date, now: ctx.date))
-                                    .font(.system(size: 9).monospacedDigit())
+                                    .font(.system(size: 8.5).monospacedDigit())
                                     .foregroundStyle(.tertiary)
-                                    .frame(width: 26, alignment: .trailing)
+                                    .frame(width: 24, alignment: .trailing)
                             }
                         }
+                        .help(
+                            "\(r.model)\nProvider: \(providerName) · Status: \(r.ok ? "OK" : "Error")\nTokens: \(r.input.formatted()) in / \(r.output.formatted()) out\nTime: \(r.date.formatted(date: .abbreviated, time: .standard))"
+                        )
                     }
                 }
             }
@@ -308,27 +325,49 @@ struct AnalyticsSection: View {
         let now = total(days)
         // An empty previous period still counts (as zero) unless the range is All.
         let before = range.days == nil ? nil : total(previous)
+        let cacheHitRate: Int? = (now.input + now.cached > 0)
+            ? Int((Double(now.cached) / Double(now.input + now.cached) * 100).rounded())
+            : nil
         return HStack(spacing: 6) {
             stat(
                 "Requests", now.requests.formatted(), .primary, Double(now.requests), before.map { Double($0.requests) }
             )
             stat("Input", formatTokens(now.input), .orange, Double(now.input), before.map { Double($0.input) })
-            stat("Cached", formatTokens(now.cached), .cyan, Double(now.cached), before.map { Double($0.cached) })
+            stat(
+                "Cached",
+                formatTokens(now.cached),
+                .cyan,
+                Double(now.cached),
+                before.map { Double($0.cached) },
+                sublabel: cacheHitRate.map { "\($0)% hit" },
+                helpText: cacheHitRate.map { "Prompt cache hit rate: \($0)% (\(formatTokens(now.cached)) of \(formatTokens(now.input + now.cached)) input tokens)" }
+            )
             stat("Output", formatTokens(now.output), .green, Double(now.output), before.map { Double($0.output) })
             stat("Est. cost", formatCost(now.cost), .yellow, now.cost, before?.cost)
         }
     }
 
     /// A total with its change against the previous period of the same length, when there is one.
-    private func stat(_ label: String, _ value: String, _ tint: Color, _ now: Double, _ before: Double?) -> some View {
-        VStack(spacing: 2) {
+    private func stat(
+        _ label: String,
+        _ value: String,
+        _ tint: Color,
+        _ now: Double,
+        _ before: Double?,
+        sublabel: String? = nil,
+        helpText: String? = nil
+    ) -> some View {
+        let changeText = Self.change(now, before)
+        let secondaryLine = [sublabel, changeText].compactMap { $0 }.joined(separator: " · ")
+        return VStack(spacing: 2) {
             Text(label).font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary).textCase(.uppercase)
             Text(value).font(.system(size: 13, weight: .bold).monospacedDigit()).foregroundStyle(tint).lineLimit(1)
-            if let change = Self.change(now, before) {
-                Text(change)
+            if !secondaryLine.isEmpty {
+                Text(secondaryLine)
                     .font(.system(size: 8, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.tertiary)
-                    .help("vs the previous \(range.rawValue == "Today" ? "day" : range.rawValue)")
+                    .lineLimit(1)
+                    .help(helpText ?? "vs the previous \(range.rawValue == "Today" ? "day" : range.rawValue)")
             }
         }
         .frame(maxWidth: .infinity)

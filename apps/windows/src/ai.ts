@@ -67,6 +67,8 @@ export interface UsageReport {
   isFromGateway?: boolean
   /** Gateway provider id ("codex", "kimi", …); absent for local session folders. */
   provider?: string | null
+  /** Unix ms until this account is cooling down after a rate limit. */
+  coolingUntil?: number | null
 }
 
 export interface QuotaInfo {
@@ -84,6 +86,28 @@ export const TOOL_NAMES: Record<string, string> = {
   codex: "Codex",
   antigravity: "Antigravity",
   commandcode: "Command Code",
+}
+
+export const GATEWAY_PROVIDER_NAMES: Record<string, string> = {
+  claude: "Claude",
+  codex: "ChatGPT / Codex",
+  copilot: "GitHub Copilot",
+  "gemini-cli": "Gemini CLI",
+  kimi: "Kimi Code",
+  muse: "Muse Code",
+  nous: "Nous Research",
+  kilocode: "Kilo Code",
+  cline: "Cline",
+  "minimax-code": "MiniMax Code",
+  "minimax-code-global": "MiniMax Code (Global)",
+  antigravity: "Antigravity",
+  "grok-cli": "Grok CLI",
+  kiro: "Kiro",
+}
+
+export function gatewayProviderName(id: string): string {
+  if (!id) return "Auto"
+  return GATEWAY_PROVIDER_NAMES[id] ?? id.charAt(0).toUpperCase() + id.slice(1)
 }
 export const STATE_LABELS: Record<AgentState, string> = { working: "working", needs_you: "needs you", done: "done", idle: "idle" }
 

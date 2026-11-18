@@ -438,6 +438,8 @@ pub fn run() {
             ai::set_hook_server,
             ai::claude_hooks,
             ai::claude_hooks_installed,
+            ai::claude_gateway_routed,
+            ai::claude_gateway_route,
             ai::ai_key_set,
             ai::ai_key_exists,
             ai::ask_ai,

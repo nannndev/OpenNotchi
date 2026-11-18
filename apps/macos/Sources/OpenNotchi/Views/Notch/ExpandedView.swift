@@ -22,6 +22,12 @@ struct ExpandedView: View {
                                 .combined(with: .opacity)
                         )
                     )
+
+                if vm.isCommandPaletteOpen {
+                    CommandPaletteView()
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                        .zIndex(20)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()

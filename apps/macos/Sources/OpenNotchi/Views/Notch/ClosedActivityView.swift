@@ -1,7 +1,12 @@
+import AppKit
 import SwiftUI
 
+enum ActiveClosedSlot: Equatable {
+    case timer, music, ciBuild, ambient, network, aiMeter
+}
+
 /// Compact "live activity" shown beside the physical notch.
-/// Priority: a peek (charger, device, HUD), then an AirDrop transfer, then a running timer, then music.
+/// Priority: a peek (charger, device, HUD), then an AirDrop transfer, then the selected active slot.
 struct ClosedActivityView: View {
     @EnvironmentObject private var vm: NotchViewModel
     @EnvironmentObject private var airDrop: AirDropService
@@ -15,6 +20,42 @@ struct ClosedActivityView: View {
     @Environment(\.notchAccent) private var accent
     let height: CGFloat
 
+    static func activeSlots(
+        settings: AppSettings,
+        timer: TimerManager,
+        media: MediaManager,
+        ciMonitor: CIBuildMonitor,
+        ambient: AmbientSoundManager,
+        stats: SystemStatsManager,
+        aiUsage: AIUsageManager
+    ) -> [ActiveClosedSlot] {
+        var slots: [ActiveClosedSlot] = []
+        if timer.isActive { slots.append(.timer) }
+        if media.info?.isPlaying == true { slots.append(.music) }
+        if settings.ciLiveActivity, ciMonitor.closedActivitySummary != nil { slots.append(.ciBuild) }
+        if ambient.isPlaying { slots.append(.ambient) }
+        if settings.networkLiveActivity, stats.isNetworkActive { slots.append(.network) }
+        if settings.aiEnabled, settings.aiClosedMeter, aiUsage.closedMeter != nil { slots.append(.aiMeter) }
+        return slots
+    }
+
+    private var slots: [ActiveClosedSlot] {
+        Self.activeSlots(
+            settings: settings,
+            timer: timer,
+            media: media,
+            ciMonitor: ciMonitor,
+            ambient: ambient,
+            stats: stats,
+            aiUsage: aiUsage
+        )
+    }
+
+    private var activeSlot: ActiveClosedSlot? {
+        guard !slots.isEmpty else { return nil }
+        return slots[vm.closedActivityIndex % slots.count]
+    }
+
     var body: some View {
         if case .banner(let banner) = vm.peek {
             BannerView(banner: banner, height: height)
@@ -26,7 +67,10 @@ struct ClosedActivityView: View {
     }
 
     private var row: some View {
-        HStack {
+        let currentSlots = slots
+        let current = activeSlot
+
+        return HStack(spacing: 4) {
             if let peek = vm.peek {
                 PeekView(peek: peek, height: height)
             } else if airDrop.isTransferring {
@@ -49,12 +93,9 @@ struct ClosedActivityView: View {
                     }
                 }
                 .frame(width: height - 14, height: height - 14)
-            } else if timer.isActive {
+            } else if current == .timer {
                 ClosedTimerView(height: height)
-            } else if settings.ciLiveActivity,
-                !(media.info?.isPlaying ?? false),
-                let ciSummary = ciMonitor.closedActivitySummary
-            {
+            } else if current == .ciBuild, let ciSummary = ciMonitor.closedActivitySummary {
                 HStack(spacing: 4) {
                     ProgressView()
                         .controlSize(.mini)
@@ -77,7 +118,7 @@ struct ClosedActivityView: View {
                         .foregroundStyle(.white)
                 }
                 .frame(width: height + 36, alignment: .trailing)
-            } else if ambient.isPlaying && !(media.info?.isPlaying ?? false) {
+            } else if current == .ambient {
                 HStack(spacing: 3) {
                     Image(systemName: ambient.activeSounds.first?.icon ?? "waveform")
                         .font(.system(size: height * 0.42, weight: .semibold))
@@ -97,7 +138,7 @@ struct ClosedActivityView: View {
                         .onTapGesture { ambient.toggleMuteAll() }
                         .help("Pause Focus Soundscapes")
                 }
-            } else if settings.networkLiveActivity && stats.isNetworkActive && !(media.info?.isPlaying ?? false) {
+            } else if current == .network {
                 HStack(spacing: 3) {
                     Image(systemName: "arrow.down")
                         .font(.system(size: 8, weight: .bold))
@@ -119,9 +160,7 @@ struct ClosedActivityView: View {
                         .foregroundStyle(.white)
                 }
                 .frame(width: height + 36, alignment: .trailing)
-            } else if settings.aiEnabled && settings.aiClosedMeter && !(media.info?.isPlaying ?? false),
-                let meter = aiUsage.closedMeter
-            {
+            } else if current == .aiMeter, let meter = aiUsage.closedMeter {
                 Group {
                     if settings.showMascot {
                         NotchiLive(size: height - 4)
@@ -143,7 +182,7 @@ struct ClosedActivityView: View {
                         .frame(width: 18)
                 }
                 .frame(width: height + 36, alignment: .trailing)
-            } else if settings.showMascot && !(media.info?.isPlaying ?? false) {
+            } else if current == nil && settings.showMascot {
                 NotchiIdleRow(height: height)
             } else {
                 let isPlaying = media.info?.isPlaying ?? false
@@ -167,6 +206,30 @@ struct ClosedActivityView: View {
                         .onTapGesture { media.playPause() }
                         .help(isPlaying ? "Pause music" : "Play music")
                 }
+            }
+
+            if vm.peek == nil && !airDrop.isTransferring && currentSlots.count > 1 {
+                let activeIdx = vm.closedActivityIndex % currentSlots.count
+                Button {
+                    if settings.hapticsEnabled {
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                    }
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                        vm.closedActivityIndex = (vm.closedActivityIndex + 1) % currentSlots.count
+                    }
+                } label: {
+                    VStack(spacing: 2.5) {
+                        ForEach(0..<currentSlots.count, id: \.self) { i in
+                            Circle()
+                                .fill(i == activeIdx ? accent.highlight : Color.white.opacity(0.35))
+                                .frame(width: i == activeIdx ? 4 : 3, height: i == activeIdx ? 4 : 3)
+                        }
+                    }
+                    .frame(width: 10, height: height - 4)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Switch active Live Activity (\(activeIdx + 1)/\(currentSlots.count))")
             }
         }
         .frame(height: height)

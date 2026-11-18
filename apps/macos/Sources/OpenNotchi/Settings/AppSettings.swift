@@ -595,20 +595,38 @@ final class AppSettings: ObservableObject {
     }
 
     var visibleTabs: [NotchTab] {
-        NotchTab.allCases.filter { tab in
-            switch tab {
-            case .home, .tray: return true
-            case .prompter: return prompterTabEnabled
-            case .clipboard: return clipboardEnabled
-            case .timer: return timerTabEnabled
-            case .mirror: return mirrorTabEnabled
-            case .markets: return marketsEnabled
-            case .dev: return devToolsEnabled
-            case .notes: return notesTabEnabled
-            case .calc: return calcTabEnabled
-            case .smarthome: return smarthomeEnabled
-            case .ai: return aiEnabled
-            }
+        NotchTab.allCases.filter(isTabEnabled)
+    }
+
+    func isTabEnabled(_ tab: NotchTab) -> Bool {
+        switch tab {
+        case .home, .tray: return true
+        case .prompter: return prompterTabEnabled
+        case .clipboard: return clipboardEnabled
+        case .timer: return timerTabEnabled
+        case .mirror: return mirrorTabEnabled
+        case .markets: return marketsEnabled
+        case .dev: return devToolsEnabled
+        case .notes: return notesTabEnabled
+        case .calc: return calcTabEnabled
+        case .smarthome: return smarthomeEnabled
+        case .ai: return aiEnabled
+        }
+    }
+
+    func setTabEnabled(_ tab: NotchTab, _ enabled: Bool) {
+        switch tab {
+        case .home, .tray: break
+        case .prompter: prompterTabEnabled = enabled
+        case .clipboard: clipboardEnabled = enabled
+        case .timer: timerTabEnabled = enabled
+        case .mirror: mirrorTabEnabled = enabled
+        case .markets: marketsEnabled = enabled
+        case .dev: devToolsEnabled = enabled
+        case .notes: notesTabEnabled = enabled
+        case .calc: calcTabEnabled = enabled
+        case .smarthome: smarthomeEnabled = enabled
+        case .ai: aiEnabled = enabled
         }
     }
 

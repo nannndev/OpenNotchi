@@ -54,23 +54,35 @@ struct NotchRootView: View {
                 height: size.height + DeviceBannerView.contentHeight)
         }
         if showActivity {
-            // HUD peeks need room for a level bar on the right. Network speed / CI build needs room for text.
-            let isNetOnly =
-                (isCIBuildVisible || isNetworkSpeedVisible || isAIMeterVisible || isMascotVisible) && !timer.isActive
-                && !(media.info?.isPlaying ?? false) && !ambient.isPlaying && vm.peek == nil && !airDrop.isTransferring
+            let slots = ClosedActivityView.activeSlots(
+                settings: settings,
+                timer: timer,
+                media: media,
+                ciMonitor: ciMonitor,
+                ambient: ambient,
+                stats: stats,
+                aiUsage: aiUsage
+            )
+            let selectedSlot: ActiveClosedSlot? = slots.isEmpty ? nil : slots[vm.closedActivityIndex % slots.count]
+            let multiExtra: CGFloat = (vm.peek == nil && !airDrop.isTransferring && slots.count > 1) ? 14 : 0
             let extraForSleeve: CGFloat =
-                (settings.artworkStyle == .vinylSleeve && (media.info?.isPlaying ?? false)) ? 6 : 0
-            // Notchi only needs a square on each side unless it's speaking a speech bubble; text-heavy activities need more.
-            let notchiOnly = isMascotVisible && companion.speechBubble == nil && !isCIBuildVisible && !isNetworkSpeedVisible && !isAIMeterVisible
-            // The timer's countdown ("24:55") is text, wider than an artwork square; keep it clear of the camera.
-            let isTimerOnly = timer.isActive && vm.peek == nil && !airDrop.isTransferring
-            let side =
-                vm.peek?.isHUD == true
-                ? size.height + 76
-                : isTimerOnly
-                    ? size.height + 28
-                    : notchiOnly && isNetOnly
-                        ? size.height + 12 : isNetOnly ? size.height + 44 : size.height + 8 + extraForSleeve
+                (settings.artworkStyle == .vinylSleeve && (selectedSlot == .music || (slots.isEmpty && !isMascotVisible)) && (media.info?.isPlaying ?? false)) ? 6 : 0
+            let side: CGFloat
+            if vm.peek?.isHUD == true {
+                side = size.height + 76
+            } else if selectedSlot == .timer && vm.peek == nil && !airDrop.isTransferring {
+                side = size.height + 28 + multiExtra
+            } else if (selectedSlot == .ciBuild || selectedSlot == .network || selectedSlot == .aiMeter)
+                && vm.peek == nil && !airDrop.isTransferring
+            {
+                side = size.height + 44 + multiExtra
+            } else if slots.isEmpty && isMascotVisible && companion.speechBubble == nil {
+                side = size.height + 12
+            } else if slots.isEmpty && isMascotVisible {
+                side = size.height + 44
+            } else {
+                side = size.height + 8 + extraForSleeve + multiExtra
+            }
             size.width += 2 * side
         }
         return size
@@ -222,6 +234,7 @@ struct NotchRootView: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: vm.peek?.isBanner)
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: vm.peek?.isDeviceCard)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showActivity)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: vm.closedActivityIndex)
         .animation(settings.openAnimation.springAnimation, value: vm.isOpen)
     }
 

@@ -5,6 +5,9 @@ struct UsageSection: View {
     @EnvironmentObject private var usage: AIUsageManager
     @EnvironmentObject private var vm: NotchViewModel
     @State private var selectedFilter: String = "ALL"
+    @State private var routingState: GatewayRoutingState?
+    @State private var showRoutingPopover = false
+    @State private var showConnectToolsPopover = false
     @AppStorage("usageLayout") private var layout: UsageLayout = .cards
 
     enum UsageLayout: String, CaseIterable {
@@ -69,21 +72,49 @@ struct UsageSection: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(spacing: 8) {
-                // Aggregated Summary Strip with Gateway status, Totals, and Live Refresh
+                // Aggregated Summary Strip with Gateway status, Routing, Totals, and Live Refresh
                 HStack(spacing: 10) {
-                    if usage.isGatewayConnected {
-                        HStack(spacing: 4) {
-                            Circle().fill(Color.green).frame(width: 6, height: 6)
-                            Text("Gateway")
-                                .font(.system(size: 9.5, weight: .bold))
-                                .foregroundStyle(.green)
-                            Text("(\(usage.reports.count))")
-                                .font(.system(size: 8.5, weight: .semibold))
-                                .foregroundStyle(.secondary)
+                    if usage.isGatewayConnected || NotchiGatewayService.shared.isRunning {
+                        Button {
+                            Task {
+                                routingState = await NotchiGatewayService.shared.fetchRouting()
+                            }
+                            showRoutingPopover.toggle()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Circle().fill(Color.green).frame(width: 6, height: 6)
+                                Text("Gateway")
+                                    .font(.system(size: 9.5, weight: .bold))
+                                    .foregroundStyle(.green)
+                                if let strat = routingState?.settings.routingStrategy {
+                                    Text("· \(strategyLabel(strat))")
+                                        .font(.system(size: 8.5, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Text("(\(usage.reports.count))")
+                                        .font(.system(size: 8.5, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 7.5, weight: .bold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3.5)
+                            .background(Capsule().fill(Color.green.opacity(0.14)))
+                            .overlay(Capsule().stroke(Color.green.opacity(0.28), lineWidth: 0.8))
                         }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.green.opacity(0.12)))
+                        .buttonStyle(.plain)
+                        .help("Routing strategy & tool configurator")
+                        .lockNotchWhilePresented($showRoutingPopover)
+                        .popover(isPresented: $showRoutingPopover, arrowEdge: .bottom) {
+                            routingPopoverContent
+                        }
+                        .lockNotchWhilePresented($showConnectToolsPopover)
+                        .popover(isPresented: $showConnectToolsPopover, arrowEdge: .bottom) {
+                            GatewayClientConfigView()
+                                .environmentObject(settings)
+                        }
                     }
 
                     summaryItem(label: "Today's Tokens", val: formatTokens(totalTokens))
@@ -184,7 +215,112 @@ struct UsageSection: View {
                 }
             }
             .onAppear { usage.refresh() }
+            .task { routingState = await NotchiGatewayService.shared.fetchRouting() }
         }
+    }
+
+    private func strategyLabel(_ raw: String) -> String {
+        switch raw {
+        case "round_robin": return "Round-Robin"
+        case "fill_first": return "Fill-First"
+        default: return "Priority"
+        }
+    }
+
+    private var routingPopoverContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Gateway Routing", systemImage: "arrow.triangle.branch")
+                    .font(.system(size: 12, weight: .bold))
+                Spacer()
+                Button {
+                    showRoutingPopover = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        showConnectToolsPopover = true
+                    }
+                } label: {
+                    Label("Connect Tools…", systemImage: "wrench.and.screwdriver.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+            }
+
+            if let routing = routingState {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Strategy")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Picker("", selection: Binding(
+                        get: { routing.settings.routingStrategy },
+                        set: { next in
+                            Task {
+                                try? await NotchiGatewayService.shared.updateRouting(["routing_strategy": next])
+                                routingState = await NotchiGatewayService.shared.fetchRouting()
+                            }
+                        }
+                    )) {
+                        Text("Priority").tag("priority")
+                        Text("Round-Robin").tag("round_robin")
+                        Text("Fill-First").tag("fill_first")
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Fallback Order")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Picker("", selection: Binding(
+                        get: { routing.settings.fallbackOrder },
+                        set: { next in
+                            Task {
+                                try? await NotchiGatewayService.shared.updateRouting(["fallback_order": next])
+                                routingState = await NotchiGatewayService.shared.fetchRouting()
+                            }
+                        }
+                    )) {
+                        Text("Model First").tag("model_first")
+                        Text("Account First").tag("account_first")
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+
+                if !routing.autoOrder.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Active Auto Chain")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 4) {
+                                ForEach(Array(routing.autoOrder.enumerated()), id: \.offset) { idx, provider in
+                                    if idx > 0 {
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    Text(GatewayProvider.name(provider))
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2.5)
+                                        .background(Capsule().fill(Color.primary.opacity(0.08)))
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Loading routing settings…").font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 6)
+            }
+        }
+        .padding(12)
+        .frame(width: 300)
     }
 
     private var layoutPicker: some View {

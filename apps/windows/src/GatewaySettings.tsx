@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core"
-import { ArrowDown, ArrowUp, Copy, LogIn, RefreshCw, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowUp, Copy, LogIn, RefreshCw, Trash2, Wrench } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
+import { GatewayClientConfig } from "./GatewayClientConfig"
 import { openExternalUrl } from "./updater"
 
 /** Settings › Gateway: the bundled Notchi Gateway's providers, accounts and routing. */
@@ -149,6 +150,7 @@ export function GatewaySettings() {
 
 function Overview({ endpoint, stats }: { endpoint: string; stats: Stats | null }) {
   const [copied, setCopied] = useState(false)
+  const [showTools, setShowTools] = useState(false)
   return (
     <div className="toggle-list">
       <div className="toggle-row">
@@ -166,7 +168,15 @@ function Overview({ endpoint, stats }: { endpoint: string; stats: Stats | null }
         >
           <Copy size={12} /> {copied ? "Copied" : "Copy"}
         </button>
+        <button
+          className="ai-settings-btn"
+          onClick={() => setShowTools((v) => !v)}
+          aria-expanded={showTools}
+        >
+          <Wrench size={12} /> {showTools ? "Hide Tools" : "Connect Tools…"}
+        </button>
       </div>
+      {showTools && <GatewayClientConfig />}
       {stats && (
         <div className="gw-stats">
           <div><span>Connected</span><b>{stats.connected_providers}</b></div>
