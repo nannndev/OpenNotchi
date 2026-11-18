@@ -80,9 +80,24 @@ impl QuotaCache {
                 }
             }
         }
-        let q = fetch(client, store, acc).await?;
-        self.entries.lock().insert(acc.id.clone(), (Instant::now(), q.clone()));
-        Some(q)
+        let fresh = fetch(client, store, acc).await?;
+        let mut entries = self.entries.lock();
+        let (shown, cache) = keep_last_good(entries.get(&acc.id).map(|(_, q)| q), fresh);
+        if cache {
+            entries.insert(acc.id.clone(), (Instant::now(), shown.clone()));
+        }
+        Some(shown)
+    }
+}
+
+/// A failed read (no windows, an error message) must not hide windows we already had:
+/// show the last good windows with the new message, and don't cache the failure so the
+/// next poll retries. Returns (what to show, whether to cache it).
+fn keep_last_good(prev: Option<&AccountQuota>, fresh: AccountQuota) -> (AccountQuota, bool) {
+    let failed = fresh.quotas.is_empty() && fresh.message.is_some();
+    match prev {
+        Some(p) if failed && !p.quotas.is_empty() => (AccountQuota { message: fresh.message, ..p.clone() }, false),
+        _ => (fresh, !failed),
     }
 }
 
@@ -434,6 +449,34 @@ mod tests {
         #[test]
         fn ignores_nulls() {
             assert_eq!(to_unix_secs(&Value::Null), None);
+        }
+    }
+
+    mod keep_last_good {
+        use super::*;
+
+        fn good() -> AccountQuota {
+            AccountQuota { quotas: vec![Quota::used_percent("weekly", 10.0, None)], ..Default::default() }
+        }
+
+        fn failed() -> AccountQuota {
+            AccountQuota { message: Some("usage API HTTP 503".into()), ..Default::default() }
+        }
+
+        #[test]
+        fn a_failure_keeps_the_previous_windows() {
+            assert_eq!(keep_last_good(Some(&good()), failed()).0.quotas.len(), 1);
+        }
+
+        #[test]
+        fn a_failure_is_not_cached() {
+            assert!(!keep_last_good(Some(&good()), failed()).1);
+        }
+
+        #[test]
+        fn a_success_replaces_and_is_cached() {
+            let (shown, cache) = keep_last_good(Some(&failed()), good());
+            assert_eq!((shown.quotas.len(), cache), (1, true));
         }
     }
 

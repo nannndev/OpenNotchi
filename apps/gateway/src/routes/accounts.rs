@@ -89,16 +89,11 @@ pub async fn handle_accounts_usage(State(engine): State<GatewayEngine>, Query(q)
     let offset = q.tz_offset_min.unwrap_or(0) * 60;
     let by_provider = engine.store.daily_tokens_by_provider(days, offset);
     let accounts = engine.store.list_accounts();
-    // Fetch every enabled account's quota in parallel; disabled ones aren't worth the request.
+    // Paused accounts still show their quota: it's how users decide when to turn them back on.
     let quotas = futures::future::join_all(accounts.iter().map(|a| {
         let engine = engine.clone();
         let force = q.force.unwrap_or(false);
-        async move {
-            if !a.enabled {
-                return None;
-            }
-            engine.quotas.get(&engine.http_client, &engine.store, a, force).await
-        }
+        async move { engine.quotas.get(&engine.http_client, &engine.store, a, force).await }
     }))
     .await;
     let usage: Vec<Value> = accounts

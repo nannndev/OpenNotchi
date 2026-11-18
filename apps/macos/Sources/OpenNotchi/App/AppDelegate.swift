@@ -44,6 +44,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Start the gateway first: building the media stack can block on a Keychain prompt.
+        if settings.aiProvider == .gateway || (settings.aiEnabled && NotchiGatewayService.shared.isAvailable) {
+            NotchiGatewayService.shared.startIfNeeded()
+        }
         screenManager = NotchScreenManager(
             media: media,
             tray: tray,
@@ -65,10 +69,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateLyricsOverlay()
         nowPlayingScreen = NowPlayingScreenController(media: media, lyrics: lyrics, settings: settings)
         updateAI()
-        // The gateway also serves usage for connected accounts, so start it whenever AI is on.
-        if settings.aiProvider == .gateway || (settings.aiEnabled && NotchiGatewayService.shared.isAvailable) {
-            NotchiGatewayService.shared.startIfNeeded()
-        }
 
         if CommandLine.arguments.contains("--settings") || CommandLine.arguments.contains("-s") {
             showSettings()
