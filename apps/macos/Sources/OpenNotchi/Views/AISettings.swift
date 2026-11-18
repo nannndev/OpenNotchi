@@ -133,6 +133,7 @@ struct ProviderSettings: View {
     @State private var test: (ok: Bool, text: String)?
     @State private var testing = false
     @State private var routerModels: [String] = []
+    @State private var routerProviders: [String: (id: String, name: String)] = [:]
 
     private var provider: AIProvider { settings.aiProvider }
 
@@ -144,12 +145,15 @@ struct ProviderSettings: View {
         case .gateway:
             LabeledContent("Model") {
                 SearchableDropdown(
-                    options: Self.modelDropdownOptions(routerModels, autoLabel: "Automatic (auto fallback)"),
+                    options: Self.modelDropdownOptions(routerModels, autoLabel: "Automatic (auto fallback)", providerNames: routerProviders),
                     selectedId: settings.aiGatewayModel,
                     placeholder: "Search models…"
                 ) { settings.aiGatewayModel = $0 }
             }
-            .task { routerModels = await NotchiGatewayService.shared.models() }
+            .task {
+                routerModels = await NotchiGatewayService.shared.models()
+                routerProviders = await NotchiGatewayService.shared.providerNames()
+            }
             Text("Managed in the Notchi Gateway section above.").font(.caption).foregroundStyle(.secondary)
         case .apple:
             Text("Runs on this Mac. Nothing leaves your computer. Its safety filter can block harmless prompts.").font(.caption).foregroundStyle(.secondary)
@@ -215,7 +219,9 @@ struct ProviderSettings: View {
         }
     }
 
-    static func modelDropdownOptions(_ models: [String], autoLabel: String) -> [SearchableDropdownOption] {
+    /// Picker options: Auto first, then each connected provider's models under its own header.
+    /// `providerNames` maps a model alias ("cc") to a provider name; the gateway lists only connected ones.
+    static func modelDropdownOptions(_ models: [String], autoLabel: String, providerNames: [String: (id: String, name: String)] = [:]) -> [SearchableDropdownOption] {
         var out = [
             SearchableDropdownOption(
                 id: "",
@@ -226,20 +232,37 @@ struct ProviderSettings: View {
                 icon: AnyView(Image(systemName: "sparkles").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.accentColor).frame(width: 20, height: 20))
             )
         ]
-        for m in models {
+        for m in models where m != "auto" {
             let parts = m.split(separator: "/", maxSplits: 1).map(String.init)
-            let prov = parts.count == 2 ? parts[0] : "model"
-            let name = parts.count == 2 ? parts[1] : m
+            guard parts.count == 2 else { continue }
+            if parts[0] == "auto" {
+                // auto/<combo>: the user's own mixes.
+                out.append(SearchableDropdownOption(id: m, title: parts[1], subtitle: m, badgeText: "Combo", badgeColor: .accentColor,
+                                                    icon: AnyView(Image(systemName: "square.stack.3d.up").frame(width: 18, height: 18)), section: "Combos"))
+                continue
+            }
+            let provider = providerNames[parts[0]]
+            let section = provider?.name ?? parts[0]
+            let isAuto = parts[1] == "auto"
             out.append(SearchableDropdownOption(
                 id: m,
-                title: name,
+                title: isAuto ? "Auto (\(section))" : parts[1],
                 subtitle: m,
-                badgeText: prov,
-                badgeColor: .secondary,
-                icon: AnyView(ProviderBrandIcon(providerId: prov, name: prov, size: 18))
+                badgeText: isAuto ? "Auto" : nil,
+                badgeColor: .accentColor,
+                icon: AnyView(ProviderBrandIcon(providerId: provider?.id ?? parts[0], name: section, size: 18)),
+                section: section
             ))
         }
-        return out
+        // Group by provider in the gateway's order (it lists providers by auto priority); combos last.
+        let order = out.compactMap(\.section).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        return [out[0]] + out.dropFirst().sorted {
+            let a = $0.section == "Combos" ? Int.max : order.firstIndex(of: $0.section ?? "") ?? 0
+            let b = $1.section == "Combos" ? Int.max : order.firstIndex(of: $1.section ?? "") ?? 0
+            if a != b { return a < b }
+            // Within a provider: its Auto first, then the list order from the gateway.
+            return ($0.badgeText == "Auto") && ($1.badgeText != "Auto")
+        }
     }
 
     private func runTest() {

@@ -35,6 +35,7 @@ struct AskSection: View {
     @State var streaming = false
     @State var attached: Set<ChatContext> = []
     @State var routerModels: [String] = []
+    @State var routerProviders: [String: (id: String, name: String)] = [:]
     /// Pending images (base64 JPEG) and files (name, text) for the next message.
     @State var pendingImages: [String] = []
     @State var pendingFiles: [(name: String, body: String)] = []

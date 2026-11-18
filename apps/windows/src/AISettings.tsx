@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core"
 import { Plus, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { ANTHROPIC_MODELS, PROVIDERS, type AiAccount, type AiProvider } from "./ai"
+import { ANTHROPIC_MODELS, groupGatewayModels, PROVIDERS, type AiAccount, type AiProvider } from "./ai"
 import { useSettings } from "./settings"
 import { askAi } from "./tabs/AITab"
 
@@ -225,8 +225,14 @@ function ProviderSettings() {
         {p === "gateway" ? (
           <select className="settings-select" value={settings.aiGatewayModel} onChange={(e) => setSettings({ aiGatewayModel: e.target.value })}>
             <option value="">Automatic (auto fallback)</option>
-            {routerModels.filter((m) => m !== "auto").map((m) => (
-              <option key={m}>{m}</option>
+            {groupGatewayModels(routerModels).map(({ group, models }) => (
+              <optgroup key={group} label={group}>
+                {models.map((m) => (
+                  <option key={m} value={m}>
+                    {m.endsWith("/auto") ? `Auto (${group})` : m.slice(m.indexOf("/") + 1)}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         ) : p === "anthropic" ? (

@@ -297,6 +297,14 @@ final class NotchiGatewayService: ObservableObject {
 
     // MARK: - Models & Providers Admin APIs
 
+    /// Model-id alias ("cc") -> provider id and display name, for grouping the model picker.
+    func providerNames() async -> [String: (id: String, name: String)] {
+        var out: [String: (id: String, name: String)] = [:]
+        for p in await fetchProviders() { out[p.alias] = (p.id, p.name) }
+        for o in (await fetchAccountsState())?.providers ?? [] { out[o.alias] = (o.id, o.name) }
+        return out
+    }
+
     func models() async -> [String] {
         _ = await ensureRunning()
         guard let url = URL(string: "\(Self.v1BaseURL)/models") else { return [] }

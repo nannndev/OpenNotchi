@@ -40,31 +40,20 @@ pub async fn handle_health() -> Json<Value> {
     Json(json!({ "status": "ok" }))
 }
 
+/// Models of connected providers only (enabled, with an account or key), `auto` modes first.
+/// `owned_by` is the provider id so clients can group the list.
 pub async fn handle_list_models_v1(State(engine): State<GatewayEngine>) -> Json<Value> {
     let mut data: Vec<Value> =
         engine.auto_model_ids().into_iter().map(|id| json!({ "id": id, "object": "model", "owned_by": "notchi-gateway" })).collect();
-    for op in OAUTH_PROVIDERS {
-        if !engine.store.is_provider_enabled(op.id) {
-            continue;
-        }
-        for m in engine.store.display_models(op.id, op.seed_models) {
-            data.push(json!({
-                "id": format!("{}/{}", op.alias, m),
-                "object": "model",
-                "owned_by": op.id,
-            }));
-        }
-    }
-    for p in PROVIDERS {
-        if !engine.store.is_provider_enabled(p.id) {
-            continue;
-        }
-        for m in engine.store.display_models(p.id, p.seed_models) {
-            data.push(json!({
-                "id": format!("{}/{}", p.alias, m),
-                "object": "model",
-                "owned_by": p.id,
-            }));
+    let settings = engine.store.get_gateway_settings();
+    for id in engine.auto_provider_order(&settings) {
+        let (alias, seeds) = match (OAUTH_PROVIDERS.iter().find(|o| o.id == id), PROVIDERS.iter().find(|p| p.id == id)) {
+            (Some(o), _) => (o.alias, o.seed_models),
+            (None, Some(p)) => (p.alias, p.seed_models),
+            _ => continue,
+        };
+        for m in engine.store.display_models(&id, seeds) {
+            data.push(json!({ "id": format!("{alias}/{m}"), "object": "model", "owned_by": id }));
         }
     }
     Json(json!({ "object": "list", "data": data }))

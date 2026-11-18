@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import { ArrowUp, Check, Clipboard, Copy, Image as ImageIcon, Music2, Paperclip, PenSquare, RotateCcw, Square, Trash2, Undo2, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import { formatTokens, type UsageReport } from "../ai"
+import { formatTokens, groupGatewayModels, type UsageReport } from "../ai"
 import { parseBlocks, type Inline } from "../chatMarkdown"
 import type { NowPlaying } from "../media"
 import { settingsChanges, splitReply, systemPrompt, type Change, type Options } from "../notchiBrain"
@@ -353,10 +353,14 @@ export function ChatPanel({
           title="Where your prompts go"
         >
           <option value="gw:">Gateway · auto</option>
-          {models.filter((m) => m !== "auto").map((m) => (
-            <option key={m} value={`gw:${m}`}>
-              Gateway · {m}
-            </option>
+          {groupGatewayModels(models).map(({ group, models: list }) => (
+            <optgroup key={group} label={`Gateway · ${group}`}>
+              {list.map((m) => (
+                <option key={m} value={`gw:${m}`}>
+                  {m.endsWith("/auto") ? `Auto (${group})` : m.slice(m.indexOf("/") + 1)}
+                </option>
+              ))}
+            </optgroup>
           ))}
           <option value="anthropic">Anthropic API</option>
           <option value="openai">OpenAI-compatible</option>

@@ -7,6 +7,8 @@ struct SearchableDropdownOption: Identifiable {
     var badgeText: String? = nil
     var badgeColor: Color = .secondary
     var icon: AnyView? = nil
+    /// Group header shown above consecutive options with the same section.
+    var section: String? = nil
 }
 
 /// Reusable searchable popover dropdown for long option lists across OpenNotchi modules.
@@ -121,8 +123,17 @@ struct SearchableDropdown: View {
                                 .foregroundStyle(.secondary)
                                 .padding(.vertical, 18)
                         } else {
-                            ForEach(filtered) { item in
+                            ForEach(Array(filtered.enumerated()), id: \.element.id) { index, item in
                                 let isSelected = item.id == selectedId
+                                if let section = item.section, index == 0 || filtered[index - 1].section != section {
+                                    Text(section)
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 8)
+                                        .padding(.top, index == 0 ? 2 : 8)
+                                        .padding(.bottom, 2)
+                                }
                                 let isHovered = hoveredId == item.id
                                 Button {
                                     onSelect(item.id)

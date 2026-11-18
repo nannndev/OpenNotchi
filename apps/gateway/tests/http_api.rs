@@ -130,6 +130,20 @@ mod combos {
     }
 }
 
+mod models {
+    use super::*;
+
+    #[tokio::test]
+    async fn lists_only_connected_providers() {
+        let (app, _d) = app();
+        call(&app, "POST", "/gateway/admin/providers/deepseek/key", Some(json!({ "api_key": "sk" })), None).await;
+        let (_, models) = call(&app, "GET", "/v1/models", None, None).await;
+        let owners: std::collections::HashSet<&str> =
+            models["data"].as_array().unwrap().iter().filter_map(|m| m["owned_by"].as_str()).collect();
+        assert_eq!(owners, ["notchi-gateway", "deepseek"].into_iter().collect());
+    }
+}
+
 mod providers {
     use super::*;
 

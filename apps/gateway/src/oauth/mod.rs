@@ -2330,6 +2330,12 @@ pub fn subscription_models_request(client: &Client, provider: &str, cred: &Value
         "kilocode" => client.get("https://api.kilo.ai/api/openrouter/models").bearer_auth(tok),
         "cline" => client.get(format!("{CLINE_API}/models")).bearer_auth(cline_bearer(tok)),
         "grok-cli" => grok_headers(client.get(format!("{GROK_API}/models")), cred, "models", 0, ""),
+        // Returns {models: {<id>: {displayName, isInternal, quotaInfo}}}; ids are Antigravity's own.
+        "antigravity" => client
+            .post(format!("{AG_CHAT_BASE}/v1internal:fetchAvailableModels"))
+            .bearer_auth(tok)
+            .header("User-Agent", AG_USER_AGENT)
+            .json(&json!({ "project": cred["project_id"] })),
         "nous" => client.get("https://inference-api.nousresearch.com/v1/models").bearer_auth(cred["api_key"].as_str().unwrap_or(tok)),
         // Claude, Codex, Gemini CLI and Muse have no model list for subscription tokens.
         _ => return None,

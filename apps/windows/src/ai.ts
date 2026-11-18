@@ -96,6 +96,28 @@ export const PROVIDERS: { id: AiProvider; name: string }[] = [
 export const ANTHROPIC_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"]
 
 /**
+ * Gateway model ids grouped for a picker: one group per alias prefix ("cc/…") in the order the
+ * gateway lists them (its auto priority), "auto/<combo>" mixes last. The bare "auto" is dropped:
+ * pickers show it as their own first option.
+ */
+export function groupGatewayModels(ids: string[]): { group: string; models: string[] }[] {
+  const groups = new Map<string, string[]>()
+  for (const id of ids) {
+    const slash = id.indexOf("/")
+    if (slash < 0) continue
+    const prefix = id.slice(0, slash)
+    const group = prefix === "auto" ? "Combos" : prefix
+    // Each provider's own "<alias>/auto" leads its group.
+    if (id === `${prefix}/auto`) groups.set(group, [id, ...(groups.get(group) ?? [])])
+    else groups.set(group, [...(groups.get(group) ?? []), id])
+  }
+  const combos = groups.get("Combos")
+  groups.delete("Combos")
+  const out = [...groups].map(([group, models]) => ({ group, models }))
+  return combos ? [...out, { group: "Combos", models: combos }] : out
+}
+
+/**
  * Log sessions with the latest hook event for each laid over them: a hook newer than the log's last write
  * wins (that's how "needs you" shows), sessions only known from hooks are added, done turns idle after 5 min.
  */

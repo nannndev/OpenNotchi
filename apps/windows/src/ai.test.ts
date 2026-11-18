@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import {
   closedMeter,
+  groupGatewayModels,
   formatCost,
   formatTokens,
   getAccountQuota,
@@ -87,6 +88,14 @@ test("getAccountQuota evaluates rate limits and blocks", () => {
     ],
   }
   assert.deepEqual(getAccountQuota(gatewayReport, now), { percent: 4, label: "4%", resetsText: "resets in 1h", health: "healthy" })
+})
+
+test("groupGatewayModels groups by provider, puts its auto first and combos last", () => {
+  assert.deepEqual(groupGatewayModels(["auto", "auto/mix", "cc/opus", "cc/auto", "ag/flash"]), [
+    { group: "cc", models: ["cc/auto", "cc/opus"] },
+    { group: "ag", models: ["ag/flash"] },
+    { group: "Combos", models: ["auto/mix"] },
+  ])
 })
 
 test("closedMeter prefers a hot gateway quota or Codex window over a Claude block", () => {

@@ -109,6 +109,17 @@ fn models_request(client: &reqwest::Client, provider_id: &str, key: &str, base: 
 
 /// Model ids from an OpenAI-style `{data:[{id}]}`, a `{models:[{id|name}]}` list, or Ollama tags.
 pub(crate) fn parse_model_ids(body: &Value) -> Vec<String> {
+    // Antigravity keys models by id: {models: {<id>: {isInternal, ...}}}.
+    if let Some(map) = body["models"].as_object() {
+        // `-disabled` and editor-only `tab_*` entries are listed but refuse chat requests.
+        let mut out: Vec<String> = map
+            .iter()
+            .filter(|(id, m)| m["isInternal"] != true && !id.ends_with("-disabled") && !id.starts_with("tab_"))
+            .map(|(id, _)| id.clone())
+            .collect();
+        out.sort();
+        return out;
+    }
     let list = body["data"].as_array().or(body["models"].as_array()).or(body.as_array());
     let mut out: Vec<String> = list
         .into_iter()
@@ -432,6 +443,14 @@ mod tests {
         #[test]
         fn skips_hidden_models() {
             assert_eq!(parse_model_ids(&json!({"data":[{"id":"a"},{"id":"b","hidden":true}]})), vec!["a"]);
+        }
+
+        #[test]
+        fn reads_antigravity_model_maps_without_internal_models() {
+            assert_eq!(
+                parse_model_ids(&json!({"models":{"gemini-3.8-flash-medium":{},"tab_flash":{"isInternal":true}}})),
+                vec!["gemini-3.8-flash-medium"]
+            );
         }
     }
 }

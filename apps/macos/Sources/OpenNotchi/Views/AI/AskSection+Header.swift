@@ -21,12 +21,13 @@ extension AskSection {
             .task(id: settings.aiProvider) {
                 if settings.aiProvider == .gateway {
                     routerModels = await NotchiGatewayService.shared.models()
+                    routerProviders = await NotchiGatewayService.shared.providerNames()
                 }
             }
 
             if settings.aiProvider == .gateway && !routerModels.isEmpty {
                 SearchableDropdown(
-                    options: ProviderSettings.modelDropdownOptions(routerModels, autoLabel: "Auto"),
+                    options: ProviderSettings.modelDropdownOptions(routerModels, autoLabel: "Auto", providerNames: routerProviders),
                     selectedId: settings.aiGatewayModel,
                     placeholder: "Search models…",
                     width: 280,
