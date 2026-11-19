@@ -4,6 +4,27 @@ All notable changes to OpenNotchi are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.23.0] - 2026-11-19
+
+### Added
+- **Source Code Live-Typing Lyrics (macOS & Windows)**:
+  - Render synced lyrics as 14 varied real-code constructs (`let line_01 = "..."`, `await stream.emit("...")`, `lyrics.push("...")`, `return Heart.echo("...")`, `@Live var chorus = "..."`, `Pulse::dispatch("...")`, etc.) with 24fps live character typing, blinking block cursor (`▋`), and Copilot-style ghost completion.
+  - Clean floating style with no heavy box background across the Open Notch/Pill, Floating Desktop Overlay, and Full-Screen Player, with uniform IDE font sizing across line numbers, syntax, and lyrics.
+- **Full-Screen IDE Workspace CodeLyric Mode (macOS & Windows)**:
+  - Dedicated full-screen IDE layout featuring a top command bar, Explorer & Track Inspector sidebar with album art and interactive scrubber, tabbed code editor buffer, live output terminal, and bottom status bar.
+  - Press `K` in full-screen to cycle **Standard → Floating Code → Full IDE Workspace**.
+- **5 Lyrics Animation Styles (Desktop Overlay & Full-Screen)**:
+  - Choose between **Smooth Spring**, **Typewriter Live**, **Glow Wave**, **Blur Reveal**, and **Kinetic Pop**. Press `A` in full-screen or click the animation icon on the desktop overlay.
+- **4 New Notch Open Animations & AI-Triggered Custom Themes (macOS & Windows)**:
+  - New open animations: **Liquid Morph**, **Elastic Drop**, **Neon Pulse**, and **3D Origami Unfold**.
+  - New themes: **Cyberpunk Neon**, **Sunset Glow**, **Emerald Matrix**, and **AI Custom Theme** (`custom`) with dynamic `#RRGGBB` gradient colors (`customThemeTop` / `customThemeBottom`) that Ask AI (`NotchiBrain`) can trigger live with Undo.
+- **Windows Feature & UI/UX Parity**:
+  - New **Calculator & Unit Converter** tab and **Live Crypto Markets** watchlist tab on Windows.
+  - Sleek **Album Cover vs Spinning Vinyl** artwork style toggle (click cover to switch), optional live CPU/RAM mini-pill in the header, larger open pill proportions (`620×232`), and unified music controls.
+
+### Changed
+- **Upgraded AI Chat Bubbles (macOS & Windows)**: glassmorphic assistant cards, AI avatar badges, fenced code blocks with one-click Copy, gradient user bubbles, and refined AI action pills with Undo.
+
 ## [0.22.0] - 2026-11-18
 
 ### Added

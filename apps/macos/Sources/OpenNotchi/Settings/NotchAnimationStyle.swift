@@ -10,6 +10,10 @@ enum NotchAnimationStyle: String, CaseIterable, Identifiable {
     case flip3D = "flip3D"       // 3D Trapdoor Flip (Realistic 3D hinge visor)
     case depth3D = "depth3D"     // 3D Holographic Depth (Spatial z-axis tilt & float)
     case cube3D = "cube3D"       // 3D Cube Roll (Steep 3D isometric roll)
+    case liquidMorph = "liquidMorph" // Silky liquid expansion
+    case elasticDrop = "elasticDrop" // Gravity drop with juicy rebound
+    case neonPulse = "neonPulse"     // Energetic scale-in with glow pulse
+    case origamiFold = "origamiFold" // Crisp 3D origami hinge unfold
 
     var id: String { rawValue }
 
@@ -24,6 +28,10 @@ enum NotchAnimationStyle: String, CaseIterable, Identifiable {
         case .flip3D: return "3D Trapdoor Flip"
         case .depth3D: return "3D Holographic Depth"
         case .cube3D: return "3D Cube Roll"
+        case .liquidMorph: return "Liquid Morph"
+        case .elasticDrop: return "Elastic Drop"
+        case .neonPulse: return "Neon Pulse"
+        case .origamiFold: return "3D Origami Unfold"
         }
     }
 
@@ -38,6 +46,10 @@ enum NotchAnimationStyle: String, CaseIterable, Identifiable {
         case .flip3D: return "Ayunan engsel 3D realistis berputar dari kamera atas"
         case .depth3D: return "Proyeksi spasial melayang keluar dari kedalaman z-space"
         case .cube3D: return "Rotasi sisi kubus 3D geometris dengan perspektif tajam"
+        case .liquidMorph: return "Melebar cair & organik seperti tetesan merkuri"
+        case .elasticDrop: return "Jatuh magnetik dengan pantulan kenyal dramatis"
+        case .neonPulse: return "Muncul berenergi dengan efek kilau lembut"
+        case .origamiFold: return "Lipatan 3D origami tajam membuka dari sisi atas"
         }
     }
 
@@ -52,12 +64,16 @@ enum NotchAnimationStyle: String, CaseIterable, Identifiable {
         case .flip3D: return "cube.transparent.fill"
         case .depth3D: return "view.3d"
         case .cube3D: return "shippingbox.fill"
+        case .liquidMorph: return "drop.fill"
+        case .elasticDrop: return "arrow.down.circle.fill"
+        case .neonPulse: return "sparkles"
+        case .origamiFold: return "rectangle.portrait.on.rectangle.portrait.angled.fill"
         }
     }
 
     var is3D: Bool {
         switch self {
-        case .flip3D, .depth3D, .cube3D:
+        case .flip3D, .depth3D, .cube3D, .origamiFold:
             return true
         default:
             return false
@@ -69,6 +85,7 @@ enum NotchAnimationStyle: String, CaseIterable, Identifiable {
         case .flip3D: return -36.0
         case .depth3D: return -22.0
         case .cube3D: return -55.0
+        case .origamiFold: return -68.0
         default: return 0.0
         }
     }
@@ -78,6 +95,7 @@ enum NotchAnimationStyle: String, CaseIterable, Identifiable {
         case .flip3D: return 0.94
         case .depth3D: return 0.86
         case .cube3D: return 0.80
+        case .origamiFold: return 0.88
         default: return 1.0
         }
     }
@@ -102,6 +120,14 @@ enum NotchAnimationStyle: String, CaseIterable, Identifiable {
             return .spring(response: 0.58, dampingFraction: 0.62)
         case .cube3D:
             return .spring(response: 0.52, dampingFraction: 0.70)
+        case .liquidMorph:
+            return .spring(response: 0.56, dampingFraction: 0.74)
+        case .elasticDrop:
+            return .spring(response: 0.48, dampingFraction: 0.44)
+        case .neonPulse:
+            return .spring(response: 0.34, dampingFraction: 0.68)
+        case .origamiFold:
+            return .spring(response: 0.50, dampingFraction: 0.64)
         }
     }
 
@@ -167,6 +193,32 @@ enum NotchAnimationStyle: String, CaseIterable, Identifiable {
                     identity: Flip3DTransitionModifier(angle: 0, scale: 1.0, opacity: 1)
                 )
             )
+        case .liquidMorph:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.84, anchor: .center)),
+                removal: .opacity.combined(with: .scale(scale: 0.90, anchor: .top))
+            )
+        case .elasticDrop:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .offset(y: -80)).combined(with: .scale(scale: 0.86, anchor: .top)),
+                removal: .opacity.combined(with: .offset(y: -40))
+            )
+        case .neonPulse:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.90, anchor: .center)),
+                removal: .opacity.combined(with: .scale(scale: 1.03, anchor: .center))
+            )
+        case .origamiFold:
+            return .asymmetric(
+                insertion: .modifier(
+                    active: Flip3DTransitionModifier(angle: -78, scale: 0.82, opacity: 0),
+                    identity: Flip3DTransitionModifier(angle: 0, scale: 1.0, opacity: 1)
+                ),
+                removal: .modifier(
+                    active: Flip3DTransitionModifier(angle: -52, scale: 0.88, opacity: 0),
+                    identity: Flip3DTransitionModifier(angle: 0, scale: 1.0, opacity: 1)
+                )
+            )
         }
     }
 
@@ -187,12 +239,54 @@ enum NotchAnimationStyle: String, CaseIterable, Identifiable {
                 active: Notch3DCardModifier(progress: 0.0, targetAngle: -95, axis: (1, 0.40, 0.1), perspective: 0.55, minScale: 0.70, maxShade: 0.85),
                 identity: Notch3DCardModifier(progress: 1.0, targetAngle: -95, axis: (1, 0.40, 0.1), perspective: 0.55, minScale: 0.70, maxShade: 0.85)
             )
+        case .origamiFold:
+            return .modifier(
+                active: Notch3DCardModifier(progress: 0.0, targetAngle: -102, axis: (1, 0, 0), perspective: 0.48, minScale: 0.78, maxShade: 0.80),
+                identity: Notch3DCardModifier(progress: 1.0, targetAngle: -102, axis: (1, 0, 0), perspective: 0.48, minScale: 0.78, maxShade: 0.80)
+            )
         default:
             return .asymmetric(
                 insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top)),
                 removal: .opacity.combined(with: .scale(scale: 0.95, anchor: .top))
             )
         }
+    }
+}
+
+/// Selectable animation style for Desktop Lyrics Overlay and Full-Screen Lyrics.
+enum LyricsAnimationStyle: String, CaseIterable, Identifiable {
+    case smooth = "smooth"
+    case typewriter = "typewriter"
+    case glowWave = "glowWave"
+    case blurReveal = "blurReveal"
+    case kineticPop = "kineticPop"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .smooth: return "Smooth Spring"
+        case .typewriter: return "Typewriter Live"
+        case .glowWave: return "Glow Wave"
+        case .blurReveal: return "Blur Reveal"
+        case .kineticPop: return "Kinetic Pop"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .smooth: return "waveform.path"
+        case .typewriter: return "keyboard"
+        case .glowWave: return "sparkles"
+        case .blurReveal: return "aqi.medium"
+        case .kineticPop: return "bolt.fill"
+        }
+    }
+
+    var next: LyricsAnimationStyle {
+        let all = Self.allCases
+        guard let idx = all.firstIndex(of: self) else { return .smooth }
+        return all[(idx + 1) % all.count]
     }
 }
 

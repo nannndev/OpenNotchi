@@ -10,6 +10,10 @@ enum NotchTheme: String, CaseIterable, Identifiable {
     case albumArt
     case midnight
     case aurora
+    case cyberpunk
+    case sunset
+    case emerald
+    case custom
 
     var id: String { rawValue }
 
@@ -23,6 +27,10 @@ enum NotchTheme: String, CaseIterable, Identifiable {
         case .albumArt: return "Album Art"
         case .midnight: return "Midnight"
         case .aurora: return "Aurora"
+        case .cyberpunk: return "Cyberpunk Neon"
+        case .sunset: return "Sunset Glow"
+        case .emerald: return "Emerald Matrix"
+        case .custom: return "AI Custom Theme"
         }
     }
 
@@ -231,6 +239,30 @@ struct NotchBackground<S: Shape>: View {
                 RadialGradient(colors: [.purple.opacity(0.5), .clear], center: .topTrailing, startRadius: 0, endRadius: 320)
                 RadialGradient(colors: [.green.opacity(0.25), .clear], center: .bottom, startRadius: 0, endRadius: 260)
             }
+        case .cyberpunk:
+            ZStack {
+                Color(red: 0.06, green: 0.02, blue: 0.14)
+                RadialGradient(colors: [Color(red: 1.0, green: 0.12, blue: 0.56).opacity(0.52), .clear], center: .topTrailing, startRadius: 0, endRadius: 300)
+                RadialGradient(colors: [Color(red: 0.0, green: 0.85, blue: 1.0).opacity(0.42), .clear], center: .bottomLeading, startRadius: 0, endRadius: 300)
+            }
+        case .sunset:
+            LinearGradient(
+                colors: [
+                    Color(red: 0.16, green: 0.06, blue: 0.22),
+                    Color(red: 0.44, green: 0.14, blue: 0.24),
+                    Color(red: 0.62, green: 0.28, blue: 0.12),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .emerald:
+            ZStack {
+                Color(red: 0.02, green: 0.06, blue: 0.05)
+                RadialGradient(colors: [Color(red: 0.06, green: 0.72, blue: 0.50).opacity(0.48), .clear], center: .topLeading, startRadius: 0, endRadius: 310)
+                RadialGradient(colors: [Color(red: 0.10, green: 0.42, blue: 0.34).opacity(0.42), .clear], center: .bottomTrailing, startRadius: 0, endRadius: 290)
+            }
+        case .custom:
+            CustomNotchThemeGradient()
         }
     }
 
@@ -285,5 +317,44 @@ struct VisualEffectBlur: NSViewRepresentable {
     func updateNSView(_ view: NSVisualEffectView, context: Context) {
         view.material = material
         view.appearance = NSAppearance(named: .vibrantDark)
+    }
+}
+
+/// Dynamic gradient painted for `.custom` theme — customizable via Settings or triggered live by NotchiBrain AI.
+private struct CustomNotchThemeGradient: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        let top = Color(hexString: settings.customThemeTopHex) ?? Color(red: 0.10, green: 0.05, blue: 0.24)
+        let bottom = Color(hexString: settings.customThemeBottomHex) ?? Color(red: 0.45, green: 0.10, blue: 0.36)
+        ZStack {
+            Color.black
+            LinearGradient(
+                colors: [top.opacity(0.92), bottom.opacity(0.85)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            RadialGradient(
+                colors: [bottom.opacity(0.35), .clear],
+                center: .topTrailing,
+                startRadius: 0,
+                endRadius: 280
+            )
+        }
+        .animation(.easeInOut(duration: 0.6), value: settings.customThemeTopHex)
+        .animation(.easeInOut(duration: 0.6), value: settings.customThemeBottomHex)
+    }
+}
+
+extension Color {
+    /// Parses `#RRGGBB` or `RRGGBB` hex color strings (used by AI Custom Notch Themes).
+    init?(hexString: String) {
+        var hex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hex.hasPrefix("#") { hex.removeFirst() }
+        guard hex.count == 6, let val = UInt64(hex, radix: 16) else { return nil }
+        let r = Double((val >> 16) & 0xFF) / 255.0
+        let g = Double((val >> 8) & 0xFF) / 255.0
+        let b = Double(val & 0xFF) / 255.0
+        self.init(red: r, green: g, blue: b)
     }
 }

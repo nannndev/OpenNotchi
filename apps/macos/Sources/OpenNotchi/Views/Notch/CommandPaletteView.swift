@@ -183,6 +183,34 @@ struct CommandPaletteView: View {
                 keywords: ["lyrics", "desktop", "overlay", "floating", "karaoke"],
                 run: { settings.lyricsOverlayEnabled.toggle() }
             ),
+            CommandItem(
+                id: "media.lyrics_code_mode",
+                category: "Media & Audio",
+                title: "Toggle Source Code Lyrics Mode",
+                subtitle: settings.lyricsCodeMode ? "Live-typing code lyrics active" : "Switch lyrics to live-typing source code style",
+                icon: "chevron.left.forwardslash.chevron.right",
+                tint: .purple,
+                badge: settings.lyricsCodeMode ? "Code" : "Standard",
+                keywords: ["lyrics", "code", "source", "typing", "monospaced", "karaoke"],
+                run: { settings.lyricsCodeMode.toggle() }
+            ),
+            CommandItem(
+                id: "media.lyrics_code_workspace",
+                category: "Media & Audio",
+                title: "Full-Screen IDE Workspace CodeLyric",
+                subtitle: "Open full-screen player in dedicated IDE Workspace layout",
+                icon: "macwindow",
+                tint: .indigo,
+                badge: settings.lyricsCodeWorkspace ? "Active" : "IDE",
+                keywords: ["lyrics", "workspace", "ide", "vscode", "fullscreen", "code", "editor"],
+                run: {
+                    settings.nowPlayingScreenLyrics = true
+                    settings.lyricsCodeMode = true
+                    settings.lyricsCodeWorkspace = true
+                    vm.isCommandPaletteOpen = false
+                    AppDelegate.shared?.nowPlayingScreen?.show()
+                }
+            ),
         ])
 
         for device in audio.outputDevices {

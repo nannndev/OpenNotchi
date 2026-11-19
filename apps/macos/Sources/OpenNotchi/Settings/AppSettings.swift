@@ -141,6 +141,15 @@ final class AppSettings: ObservableObject {
     /// Screen to use: "main" or an NSScreen localizedName.
     @Published var nowPlayingScreenDisplay: String { didSet { defaults.set(nowPlayingScreenDisplay, forKey: "nowPlayingScreenDisplay") } }
     @Published var lyricsOverlayNextLine: Bool { didSet { defaults.set(lyricsOverlayNextLine, forKey: "lyricsOverlayNextLine") } }
+    /// Source code / IDE live-typing style for lyrics across desktop overlay, full-screen player, and notch view.
+    @Published var lyricsCodeMode: Bool { didSet { defaults.set(lyricsCodeMode, forKey: "lyricsCodeMode") } }
+    /// Dedicated full-screen IDE Workspace layout (sidebar + code editor + terminal + status bar) for Now Playing.
+    @Published var lyricsCodeWorkspace: Bool { didSet { defaults.set(lyricsCodeWorkspace, forKey: "lyricsCodeWorkspace") } }
+    /// Animation style for desktop lyrics overlay and full-screen lyrics.
+    @Published var lyricsAnimation: LyricsAnimationStyle { didSet { defaults.set(lyricsAnimation.rawValue, forKey: "lyricsAnimation") } }
+    /// AI-customizable notch theme gradient hex colors (used when `theme == .custom`).
+    @Published var customThemeTopHex: String { didSet { defaults.set(customThemeTopHex, forKey: "customThemeTopHex") } }
+    @Published var customThemeBottomHex: String { didSet { defaults.set(customThemeBottomHex, forKey: "customThemeBottomHex") } }
     @Published var lyricsTranslate: Bool {
         didSet {
             defaults.set(lyricsTranslate, forKey: "lyricsTranslate")
@@ -357,6 +366,11 @@ final class AppSettings: ObservableObject {
             "lyricsOverlayOpacity": 0.45,
             "lyricsOverlayLocked": false,
             "lyricsOverlayNextLine": true,
+            "lyricsCodeMode": false,
+            "lyricsCodeWorkspace": false,
+            "lyricsAnimation": LyricsAnimationStyle.smooth.rawValue,
+            "customThemeTopHex": "#1A0B2E",
+            "customThemeBottomHex": "#7A1E5A",
             "lyricsTranslate": false,
             "lyricsTranslateTarget": "id",
             "privacyPeekEnabled": true,
@@ -502,6 +516,11 @@ final class AppSettings: ObservableObject {
         lyricsOverlayOpacity = defaults.double(forKey: "lyricsOverlayOpacity")
         lyricsOverlayLocked = defaults.bool(forKey: "lyricsOverlayLocked")
         lyricsOverlayNextLine = defaults.bool(forKey: "lyricsOverlayNextLine")
+        lyricsCodeMode = defaults.bool(forKey: "lyricsCodeMode")
+        lyricsCodeWorkspace = defaults.bool(forKey: "lyricsCodeWorkspace")
+        lyricsAnimation = LyricsAnimationStyle(rawValue: defaults.string(forKey: "lyricsAnimation") ?? "") ?? .smooth
+        customThemeTopHex = defaults.string(forKey: "customThemeTopHex") ?? "#1A0B2E"
+        customThemeBottomHex = defaults.string(forKey: "customThemeBottomHex") ?? "#7A1E5A"
         lyricsTranslate = defaults.bool(forKey: "lyricsTranslate")
         lyricsTranslateTarget = defaults.string(forKey: "lyricsTranslateTarget") ?? "id"
         privacyPeekEnabled = defaults.bool(forKey: "privacyPeekEnabled")

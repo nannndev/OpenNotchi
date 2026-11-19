@@ -327,6 +327,8 @@ struct FeaturesPane: View {
             Section("Floating Desktop Lyrics Overlay") {
                 Toggle("Show floating lyrics widget on the desktop", isOn: $settings.lyricsOverlayEnabled)
                     .disabled(!settings.lyricsEnabled)
+                Toggle("Source code typing style (IDE mode)", isOn: $settings.lyricsCodeMode)
+                    .disabled(!settings.lyricsEnabled)
                 if settings.lyricsOverlayEnabled {
                     Slider(value: $settings.lyricsOverlayOpacity, in: 0...1) { Text("Widget background opacity") }
                     Toggle("Show upcoming next lyric line", isOn: $settings.lyricsOverlayNextLine)
@@ -371,6 +373,15 @@ struct FeaturesPane: View {
                 Toggle("Show synced lyrics", isOn: $settings.nowPlayingScreenLyrics)
                     .disabled(!settings.lyricsEnabled)
                 if settings.nowPlayingScreenLyrics {
+                    Toggle("Source code typing style (no background box)", isOn: $settings.lyricsCodeMode)
+                    if settings.lyricsCodeMode {
+                        Toggle("Full IDE Workspace CodeLyric mode", isOn: $settings.lyricsCodeWorkspace)
+                    }
+                    Picker("Lyrics animation", selection: $settings.lyricsAnimation) {
+                        ForEach(LyricsAnimationStyle.allCases) { style in
+                            Label(style.displayName, systemImage: style.icon).tag(style)
+                        }
+                    }
                     Picker("Lyrics size", selection: $settings.nowPlayingScreenTextScale) {
                         Text("Small").tag(0.8)
                         Text("Medium").tag(1.0)
@@ -388,7 +399,7 @@ struct FeaturesPane: View {
             } header: {
                 Text("Full-Screen Idle Player")
             } footer: {
-                Text("Shortcuts: Space play/pause, ← → skip, T translate, L lyrics, B background, Esc close.")
+                Text("Shortcuts: Space play/pause, ← → skip, T translate, L lyrics, K code typing style, B background, Esc close.")
             }
         }
     }

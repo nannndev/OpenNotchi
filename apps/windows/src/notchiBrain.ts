@@ -4,14 +4,20 @@
 // Type-only imports: settings.ts pulls in React and Tauri, which the Node test runner can't load.
 import type { AppSettings } from "./settings"
 
-type Kind = { type: "bool" } | { type: "number"; min: number; max: number } | { type: "choice"; values: { id: string; name: string }[] }
+type Kind =
+  | { type: "bool" }
+  | { type: "number"; min: number; max: number }
+  | { type: "choice"; values: { id: string; name: string }[] }
+  | { type: "hex" }
 type Option = { id: string; name: string }
 
 /** Choice lists come from settings.ts at runtime (see `withOptions`) so they never drift. */
 export type Options = { themes: Option[]; accents: Option[]; borders: Option[]; animations: Option[]; backgrounds: Option[] }
 
 export const editable = (o: Options): { key: keyof AppSettings; info: string; kind: Kind }[] => [
-  { key: "theme", info: "Notch look", kind: { type: "choice", values: o.themes } },
+  { key: "theme", info: "Notch look (use 'custom' with customThemeTop & customThemeBottom hex colors for bespoke AI themes)", kind: { type: "choice", values: o.themes } },
+  { key: "customThemeTop", info: "Top #RRGGBB gradient hex color when theme is custom", kind: { type: "hex" } },
+  { key: "customThemeBottom", info: "Bottom #RRGGBB gradient hex color when theme is custom", kind: { type: "hex" } },
   { key: "accentChoice", info: "Accent color", kind: { type: "choice", values: o.accents } },
   { key: "borderStyle", info: "Outline around the notch", kind: { type: "choice", values: o.borders } },
   { key: "openAnimation", info: "How the notch opens", kind: { type: "choice", values: o.animations } },
@@ -32,13 +38,35 @@ export const editable = (o: Options): { key: keyof AppSettings; info: string; ki
   { key: "nowPlayingIdleMinutes", info: "Idle minutes before the full-screen player", kind: { type: "number", min: 0.5, max: 30 } },
   { key: "nowPlayingBackground", info: "Full-screen player background", kind: { type: "choice", values: o.backgrounds } },
   { key: "nowPlayingLyrics", info: "Lyrics on the full-screen player", kind: { type: "bool" } },
+  { key: "lyricsCodeMode", info: "Source code live-typing lyrics style", kind: { type: "bool" } },
+  { key: "lyricsCodeWorkspace", info: "Dedicated full-screen IDE Workspace CodeLyric layout", kind: { type: "bool" } },
+  {
+    key: "lyricsAnimation",
+    info: "Lyrics animation style (overlay & full-screen)",
+    kind: {
+      type: "choice",
+      values: [
+        { id: "smooth", name: "Smooth Spring" },
+        { id: "typewriter", name: "Typewriter Live" },
+        { id: "glowWave", name: "Glow Wave" },
+        { id: "blurReveal", name: "Blur Reveal" },
+        { id: "kineticPop", name: "Kinetic Pop" },
+      ],
+    },
+  },
   { key: "nowPlayingClock", info: "Clock on the full-screen player", kind: { type: "bool" } },
   { key: "usageLayout", info: "AI quota layout", kind: { type: "choice", values: [{ id: "cards", name: "Cards" }, { id: "compact", name: "Compact" }, { id: "list", name: "List" }] } },
 ]
 
 export function systemPrompt(s: AppSettings, o: Options): string {
   const values = (k: Kind) =>
-    k.type === "bool" ? "true|false" : k.type === "number" ? `${k.min}...${k.max}` : k.values.map((v) => `${v.id} (${v.name})`).join("|")
+    k.type === "bool"
+      ? "true|false"
+      : k.type === "number"
+        ? `${k.min}...${k.max}`
+        : k.type === "hex"
+          ? "#RRGGBB hex color"
+          : k.values.map((v) => `${v.id} (${v.name})`).join("|")
   const lines = editable(o).map((e) => `- ${e.key} = ${String(s[e.key])} — ${e.info}. Values: ${values(e.kind)}`).join("\n")
   return `You are Notchi, the assistant inside OpenNotchi for Windows: a pill at the top of the screen that opens on hover. \
 You answer in a small panel: be concise, plain text, no markdown headings. Reply in the user's language.
@@ -90,6 +118,10 @@ export function settingsChanges(actions: Actions, s: AppSettings, o: Options): {
     } else if (e.kind.type === "number") {
       const n = Number(raw)
       value = Number.isFinite(n) && n >= e.kind.min && n <= e.kind.max ? n : undefined
+    } else if (e.kind.type === "hex") {
+      const str = String(raw).trim()
+      const norm = str.startsWith("#") ? str : `#${str}`
+      value = /^#[0-9a-fA-F]{6}$/.test(norm) ? norm.toUpperCase() : undefined
     } else {
       const v = String(raw).toLowerCase()
       value = e.kind.values.find((c) => c.id.toLowerCase() === v || c.name.toLowerCase() === v)?.id

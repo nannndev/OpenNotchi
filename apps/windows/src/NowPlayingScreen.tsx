@@ -1,12 +1,14 @@
 import { invoke } from "@tauri-apps/api/core"
-import { Camera, Captions, Languages, Pause, Play, SkipBack, SkipForward, Sparkles, Video, X } from "lucide-react"
+import { AppWindow, Camera, Captions, Code2, Languages, Pause, Play, SkipBack, SkipForward, Sparkles, Video, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { FullScreenCodeLyrics, FullWorkspaceCodeLyrics } from "./CodeLyrics"
+import { cursorVisible, typingSplit } from "./codeLyricsEngine"
 import { chatAi } from "./tabs/ChatPanel"
 import { currentIndex } from "./lyrics"
 import { control, formatTime, positionAt, useLyrics, useNowPlaying, useTick } from "./media"
 import { useAccent } from "./palette"
 import { buildCameraFilter, EFFECTS, savePng, type CameraAdjustments, type MirrorEffect } from "./photobox"
-import { NOW_PLAYING_BACKGROUNDS, useSettings, type AppSettings } from "./settings"
+import { LYRICS_ANIMATION_OPTIONS, NOW_PLAYING_BACKGROUNDS, useSettings, type AppSettings } from "./settings"
 
 const translationCache = new Map<string, Record<string, string>>()
 
@@ -47,7 +49,8 @@ export function NowPlayingScreen() {
   const [controlsVisible, setControlsVisible] = useState(true)
   const hideTimer = useRef<number | undefined>(undefined)
   const scroller = useRef<HTMLDivElement>(null)
-  useTick(250)
+  const anim = settings.lyricsAnimation ?? "smooth"
+  useTick(settings.lyricsCodeMode || anim === "typewriter" ? 42 : 250)
 
   const bg = settings.nowPlayingBackground
   const showLyrics = settings.nowPlayingLyrics
@@ -135,6 +138,21 @@ export function NowPlayingScreen() {
     setSettings({ nowPlayingBackground: NOW_PLAYING_BACKGROUNDS[(i + 1) % NOW_PLAYING_BACKGROUNDS.length].id })
   }
   const toggleTranslate = () => setSettings({ lyricsTranslateTarget: settings.lyricsTranslateTarget ? "" : navigator.language.split("-")[0] || "en" })
+
+  const cycleCodeLyricsMode = () => {
+    if (!settings.lyricsCodeMode) {
+      setSettings({ nowPlayingLyrics: true, lyricsCodeMode: true, lyricsCodeWorkspace: false })
+    } else if (!settings.lyricsCodeWorkspace) {
+      setSettings({ nowPlayingLyrics: true, lyricsCodeWorkspace: true })
+    } else {
+      setSettings({ lyricsCodeMode: false, lyricsCodeWorkspace: false })
+    }
+  }
+
+  const cycleLyricsAnimation = () => {
+    const i = LYRICS_ANIMATION_OPTIONS.findIndex((a) => a.id === anim)
+    setSettings({ lyricsAnimation: LYRICS_ANIMATION_OPTIONS[(i + 1) % LYRICS_ANIMATION_OPTIONS.length].id })
+  }
 
   const toggleMirrorMode = () => {
     if (!settings.nowPlayingCoverMirror && bg !== "mirror") {
@@ -321,6 +339,8 @@ export function NowPlayingScreen() {
       else if (e.key === "ArrowLeft") control("previous")
       else if (e.key.toLowerCase() === "t") toggleTranslate()
       else if (e.key.toLowerCase() === "l") setSettings({ nowPlayingLyrics: !settings.nowPlayingLyrics })
+      else if (e.key.toLowerCase() === "k") cycleCodeLyricsMode()
+      else if (e.key.toLowerCase() === "a") cycleLyricsAnimation()
       else if (e.key.toLowerCase() === "b") nextBackground()
       else if (e.key.toLowerCase() === "m") toggleMirrorMode()
       else if (e.key.toLowerCase() === "c") capturePhoto()
@@ -337,6 +357,30 @@ export function NowPlayingScreen() {
     const el = scroller.current?.querySelector<HTMLElement>(`[data-line="${current}"]`)
     if (el && scroller.current) scroller.current.scrollTo({ top: el.offsetTop - scroller.current.clientHeight * 0.35, behavior: "smooth" })
   }, [current])
+
+  const isFullWorkspace = Boolean(np && settings.lyricsCodeMode && settings.lyricsCodeWorkspace)
+
+  if (isFullWorkspace && np) {
+    return (
+      <div className="np-screen np-workspace-host" style={{ "--np-accent": accent, "--np-scale": settings.nowPlayingTextScale } as CSSProperties} onMouseMove={poke}>
+        <FullWorkspaceCodeLyrics
+          np={np}
+          lines={synced}
+          plainText={lyrics && lyrics !== "loading" ? lyrics.plain : null}
+          loading={lyrics === "loading"}
+          translations={translations}
+          settings={settings}
+          onToggleTranslate={toggleTranslate}
+          onExitWorkspace={() => setSettings({ lyricsCodeWorkspace: false })}
+          onCycleMode={cycleCodeLyricsMode}
+          onCapturePhoto={capturePhoto}
+          onClose={close}
+        />
+        {flash && <div className="np-flash" />}
+        {toast && <div className="np-toast">{toast}</div>}
+      </div>
+    )
+  }
 
   return (
     <div className={`np-screen bg-${bg} ${showLyrics ? "" : "no-lyrics"}`} style={{ "--np-accent": accent, "--np-scale": settings.nowPlayingTextScale } as CSSProperties} onMouseMove={poke}>
@@ -435,6 +479,36 @@ export function NowPlayingScreen() {
             </div>
             <div className={`np-extras ${controlsVisible ? "" : "faded"}`}>
               <button className={showLyrics ? "on" : ""} onClick={() => setSettings({ nowPlayingLyrics: !showLyrics })} title="Lyrics (L)" aria-label="Lyrics"><Captions size={16} /></button>
+              <button
+                className={settings.lyricsCodeMode && !settings.lyricsCodeWorkspace && showLyrics ? "on" : ""}
+                onClick={() => {
+                  if (settings.lyricsCodeMode && !settings.lyricsCodeWorkspace) {
+                    setSettings({ lyricsCodeMode: false })
+                  } else {
+                    setSettings({ nowPlayingLyrics: true, lyricsCodeMode: true, lyricsCodeWorkspace: false })
+                  }
+                }}
+                title="Floating source code lyrics (K)"
+                aria-label="Floating source code lyrics"
+              >
+                <Code2 size={16} />
+              </button>
+              <button
+                className={settings.lyricsCodeMode && settings.lyricsCodeWorkspace ? "on" : ""}
+                onClick={() => setSettings({ nowPlayingLyrics: true, lyricsCodeMode: true, lyricsCodeWorkspace: true })}
+                title="Full IDE Workspace CodeLyric (K)"
+                aria-label="Full IDE Workspace CodeLyric"
+              >
+                <AppWindow size={16} />
+              </button>
+              <button
+                className={anim !== "smooth" ? "on" : ""}
+                onClick={cycleLyricsAnimation}
+                title={`Lyrics animation: ${LYRICS_ANIMATION_OPTIONS.find((a) => a.id === anim)?.name ?? anim} (A)`}
+                aria-label="Cycle lyrics animation"
+              >
+                <Sparkles size={16} />
+              </button>
               <button className={settings.lyricsTranslateTarget ? "on" : ""} onClick={toggleTranslate} title="Translate lyrics (T)" aria-label="Translate lyrics"><Languages size={16} /></button>
               <button onClick={nextBackground} title={`Background: ${NOW_PLAYING_BACKGROUNDS.find((b) => b.id === bg)?.name} (B)`} aria-label="Switch background">
                 {bg === "blur" ? "🖼" : bg === "aurora" ? "✨" : bg === "gradient" ? "◐" : bg === "vinyl" ? "💿" : bg === "mirror" ? "📹" : "🌙"}
@@ -459,26 +533,48 @@ export function NowPlayingScreen() {
               {lyrics === "loading" ? (
                 <div className="np-lyrics-note">Loading lyrics…</div>
               ) : synced.length ? (
-                <>
-                  <div className="np-spacer" />
-                  {synced.map((l, i) => {
-                    const d = i - current
-                    const t = settings.lyricsTranslateTarget ? translations[l.text] : ""
-                    return (
-                      <div
-                        key={i}
-                        data-line={i}
-                        className={`np-line ${d === 0 ? "now" : d < 0 ? "past" : ""}`}
-                        style={{ "--d": Math.min(5, Math.abs(d)) } as CSSProperties}
-                        onClick={() => control("seek", l.time)}
-                      >
-                        <div>{l.text || "♪"}</div>
-                        {t && l.text && <div className="np-translation">{t}</div>}
-                      </div>
-                    )
-                  })}
-                  <div className="np-spacer" />
-                </>
+                settings.lyricsCodeMode ? (
+                  <FullScreenCodeLyrics
+                    np={np}
+                    lines={synced}
+                    translations={translations}
+                    translateOn={Boolean(settings.lyricsTranslateTarget)}
+                  />
+                ) : (
+                  <>
+                    <div className="np-spacer" />
+                    {synced.map((l, i) => {
+                      const d = i - current
+                      const t = settings.lyricsTranslateTarget ? translations[l.text] : ""
+                      const raw = l.text || "♪"
+                      const split = d === 0 && anim === "typewriter" ? typingSplit(raw, l.time, synced[i + 1]?.time ?? null, pos) : null
+                      const cursorOn = cursorVisible(Date.now(), np.isPlaying)
+                      return (
+                        <div
+                          key={i}
+                          data-line={i}
+                          className={`np-line ly-anim-${anim} ${d === 0 ? "now" : d < 0 ? "past" : ""}`}
+                          style={{ "--d": Math.min(5, Math.abs(d)) } as CSSProperties}
+                          onClick={() => control("seek", l.time)}
+                        >
+                          <div>
+                            {split ? (
+                              <>
+                                <span>{split.typed}</span>
+                                <span className={`cl-cursor ${cursorOn ? "on" : "off"}`}>▋</span>
+                                <span className="cl-ghost">{split.ghost}</span>
+                              </>
+                            ) : (
+                              raw
+                            )}
+                          </div>
+                          {t && l.text && <div className="np-translation">{t}</div>}
+                        </div>
+                      )
+                    })}
+                    <div className="np-spacer" />
+                  </>
+                )
               ) : lyrics?.plain ? (
                 <div className="np-plain">{lyrics.plain}</div>
               ) : (

@@ -12,6 +12,10 @@ export type NotchTheme =
   | "albumArt"
   | "midnight"
   | "aurora"
+  | "cyberpunk"
+  | "sunset"
+  | "emerald"
+  | "custom"
 
 export type AccentChoice =
   | "artwork"
@@ -36,6 +40,20 @@ export type NotchAnimationStyle =
   | "flip3D"
   | "depth3D"
   | "cube3D"
+  | "liquidMorph"
+  | "elasticDrop"
+  | "neonPulse"
+  | "origamiFold"
+
+export type LyricsAnimationStyle = "smooth" | "typewriter" | "glowWave" | "blurReveal" | "kineticPop"
+
+export const LYRICS_ANIMATION_OPTIONS: { id: LyricsAnimationStyle; name: string }[] = [
+  { id: "smooth", name: "Smooth Spring" },
+  { id: "typewriter", name: "Typewriter Live" },
+  { id: "glowWave", name: "Glow Wave" },
+  { id: "blurReveal", name: "Blur Reveal" },
+  { id: "kineticPop", name: "Kinetic Pop" },
+]
 
 /** Mirror tab height range; the pill window is 280px tall plus room for the floating gap. */
 export const MIRROR_MIN_HEIGHT = 210
@@ -73,6 +91,14 @@ export interface AppSettings {
   tabPrompter: boolean
   tabMirror: boolean
   tabDev: boolean
+  tabCalc: boolean
+  tabMarkets: boolean
+  /** Album artwork presentation inside the open pill: sleek rounded cover or spinning vinyl. */
+  artworkStyle: "cover" | "vinyl"
+  /** Show live CPU/RAM mini-pill in the open pill header. */
+  showStatsInHeader: boolean
+  /** Tracked crypto tickers for the Markets tab (e.g. BTCUSDT, ETHUSDT). */
+  marketSymbols: string[]
   // Teleprompter
   prompterScript: string
   /** Scroll speed in px/s. */
@@ -134,6 +160,17 @@ export interface AppSettings {
   nowPlayingLyrics: boolean
   nowPlayingClock: boolean
   nowPlayingTextScale: number
+  /** Source code live-typing style (no box background, 14 varied syntax constructs). */
+  lyricsCodeMode: boolean
+  /** Dedicated full-screen IDE Workspace layout for code lyrics. */
+  lyricsCodeWorkspace: boolean
+  /** Animation style for desktop lyrics overlay and full-screen lyrics. */
+  lyricsAnimation: LyricsAnimationStyle
+  /** AI-customizable notch theme gradient hex colors (used when theme === "custom"). */
+  customThemeTop: string
+  customThemeBottom: string
+  /** Show upcoming next lyric line in the floating desktop lyrics widget. */
+  lyricsOverlayNextLine: boolean
   /** Lyrics translation target ("" = off); Windows translates with the Ask AI provider. */
   lyricsTranslateTarget: string
   showMascot: boolean
@@ -151,6 +188,10 @@ export const THEME_OPTIONS: { id: NotchTheme; name: string; desc: string; previe
   { id: "albumArt", name: "Album Art", desc: "Blurred full artwork backdrop with soft vignette", previewClass: "theme-albumArt" },
   { id: "midnight", name: "Midnight", desc: "Deep cosmic indigo & violet nebula", previewClass: "theme-midnight" },
   { id: "aurora", name: "Aurora", desc: "Northern lights teal, purple & emerald mesh", previewClass: "theme-aurora" },
+  { id: "cyberpunk", name: "Cyberpunk Neon", desc: "Deep night purple with magenta & cyan neon glow", previewClass: "theme-cyberpunk" },
+  { id: "sunset", name: "Sunset Glow", desc: "Warm dusk violet, coral orange & amber horizon", previewClass: "theme-sunset" },
+  { id: "emerald", name: "Emerald Matrix", desc: "Obsidian dark with emerald & mint aurora mesh", previewClass: "theme-emerald" },
+  { id: "custom", name: "AI Custom Theme", desc: "Bespoke gradient colors triggered via Ask AI or Settings", previewClass: "theme-custom" },
 ]
 
 export const ACCENT_PRESETS: { id: AccentChoice; name: string; color: string }[] = [
@@ -180,6 +221,10 @@ export const ANIMATION_OPTIONS: {
   { id: "flip3D", name: "3D Trapdoor Flip", subtitle: "Ayunan engsel 3D berputar dari tepi atas", icon: "🚪", is3D: true },
   { id: "depth3D", name: "3D Holographic Depth", subtitle: "Proyeksi spasial melayang keluar dari kedalaman z-space", icon: "🔮", is3D: true },
   { id: "cube3D", name: "3D Cube Roll", subtitle: "Rotasi sisi kubus 3D geometris berperspektif tajam", icon: "🎲", is3D: true },
+  { id: "liquidMorph", name: "Liquid Morph", subtitle: "Melebar cair & organik seperti tetesan merkuri", icon: "🫧", is3D: false },
+  { id: "elasticDrop", name: "Elastic Drop", subtitle: "Jatuh magnetik dengan pantulan kenyal dramatis", icon: "🧲", is3D: false },
+  { id: "neonPulse", name: "Neon Pulse", subtitle: "Muncul berenergi dengan efek kilau lembut", icon: "🌟", is3D: false },
+  { id: "origamiFold", name: "3D Origami Unfold", subtitle: "Lipatan 3D origami tajam membuka dari sisi atas", icon: "📐", is3D: true },
 ]
 
 export const BORDER_OPTIONS: { id: BorderStyle; name: string }[] = [
@@ -210,6 +255,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tabPrompter: true,
   tabMirror: true,
   tabDev: true,
+  tabCalc: true,
+  tabMarkets: true,
+  artworkStyle: "cover",
+  showStatsInHeader: false,
+  marketSymbols: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"],
   prompterScript:
     "Hi everyone, thanks for joining today.\n\nKeep your eyes on this line, right under the camera, and your gaze looks natural.\n\nPress Edit to paste your own script. Scroll with the mouse wheel to jump around, and change the speed with the plus and minus buttons.",
   prompterSpeed: 28,
@@ -257,6 +307,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   nowPlayingLyrics: true,
   nowPlayingClock: true,
   nowPlayingTextScale: 1,
+  lyricsCodeMode: false,
+  lyricsCodeWorkspace: false,
+  lyricsAnimation: "smooth",
+  customThemeTop: "#1A0B2E",
+  customThemeBottom: "#7A1E5A",
+  lyricsOverlayNextLine: true,
   lyricsTranslateTarget: "",
   showMascot: true,
   notificationSounds: true,

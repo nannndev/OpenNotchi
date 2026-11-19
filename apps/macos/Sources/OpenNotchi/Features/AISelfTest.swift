@@ -282,6 +282,19 @@ enum AISelfTest {
         let claude = GatewayQuota.displayQuotas([quota("weekly (7d)", 2), quota("session (5h)", 82)])
         check(claude.map(\.name) == ["session (5h)", "weekly (7d)"], "no pools: every quota, sorted")
 
+        print("Source code lyrics typing split")
+        check(CodeLyricsStyle.fileSlug(title: "Evaluasi", artist: "Hindia") == "hindia/evaluasi.swift", "fileSlug formats artist/title")
+        let splitStart = CodeLyricsStyle.typingSplit(text: "Hello World", lineStart: 10.0, nextStart: 14.0, position: 10.0)
+        check(splitStart.typed.isEmpty && splitStart.ghost == "Hello World" && splitStart.column == 1 && !splitStart.isComplete, "at line start nothing is typed yet")
+        let splitMid = CodeLyricsStyle.typingSplit(text: "Hello World", lineStart: 10.0, nextStart: 14.0, position: 11.56)
+        check(!splitMid.typed.isEmpty && !splitMid.ghost.isEmpty && splitMid.typed + splitMid.ghost == "Hello World", "mid-line splits into typed + ghost completion")
+        let splitEnd = CodeLyricsStyle.typingSplit(text: "Hello World", lineStart: 10.0, nextStart: 14.0, position: 13.8)
+        check(splitEnd.typed == "Hello World" && splitEnd.ghost.isEmpty && splitEnd.isComplete, "near end of line finishes typing")
+        let tmpl0 = CodeLyricsStyle.template(for: 0, text: "Wajahmu", compact: false).prefix.map(\.text).joined()
+        let tmpl1 = CodeLyricsStyle.template(for: 1, text: "Kuingat selalu", compact: false).prefix.map(\.text).joined()
+        let tmpl2 = CodeLyricsStyle.template(for: 2, text: "Hal-hal yang menggangguku", compact: false).prefix.map(\.text).joined()
+        check(Set([tmpl0, tmpl1, tmpl2]).count >= 2, "code line templates vary across lines")
+
         print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) FAILED.")
 
         if args.count >= 2 {

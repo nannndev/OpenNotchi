@@ -65,45 +65,70 @@ private struct LyricsOverlayView: View {
     var body: some View {
         let accent = ResolvedAccent.resolve(settings.accent, palette: media.palette)
         GeometryReader { geo in
-            // Text scales with the window height, so resizing the widget resizes the lyrics.
-            let size = min(max(geo.size.height * (settings.lyricsOverlayNextLine ? 0.2 : 0.3), 12), 72)
-            TimelineView(.periodic(from: .now, by: 0.2)) { context in
-                let index = media.info.flatMap { info in info.isPlaying ? lyrics.currentIndex(at: info.position(at: context.date)) : nil }
-                VStack(spacing: size * 0.3) {
-                    if let index {
-                        Text(lyrics.lines[index].text.isEmpty ? "♪" : lyrics.lines[index].text)
-                            .font(.system(size: size, weight: .bold, design: .rounded))
-                            .foregroundStyle(accent.isNeutral ? .white : accent.color)
-                            .id(index)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                        if let translated = lyrics.translations[lyrics.lines[index].text] {
-                            TranslatedLine(text: translated, size: size * 0.68)
-                        } else if settings.lyricsOverlayNextLine, index + 1 < lyrics.lines.count {
-                            Text(lyrics.lines[index + 1].text)
-                                .font(.system(size: size * 0.68, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.55))
+            if settings.lyricsCodeMode {
+                DesktopCodeLyricsView(hovering: hovering, boxSize: geo.size)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay(WindowGrip(mode: .move))
+            } else {
+                // Text scales with the window height, so resizing the widget resizes the lyrics.
+                let size = min(max(geo.size.height * (settings.lyricsOverlayNextLine ? 0.2 : 0.3), 12), 72)
+                let anim = settings.lyricsAnimation
+                let interval: TimeInterval = anim == .typewriter ? (1.0 / 24.0) : 0.2
+                TimelineView(.periodic(from: .now, by: interval)) { context in
+                    let pos = media.info?.position(at: context.date) ?? 0
+                    let index = media.info.flatMap { info in info.isPlaying ? lyrics.currentIndex(at: pos) : nil }
+                    VStack(spacing: size * 0.3) {
+                        if let index {
+                            let rawText = lyrics.lines[index].text.isEmpty ? "♪" : lyrics.lines[index].text
+                            let nextTime = (index + 1 < lyrics.lines.count) ? lyrics.lines[index + 1].time : nil
+                            let accentCol = accent.isNeutral ? Color.white : accent.color
+                            if anim == .typewriter {
+                                let split = CodeLyricsStyle.typingSplit(text: rawText, lineStart: lyrics.lines[index].time, nextStart: nextTime, position: pos)
+                                let cursorOn = CodeLyricsStyle.cursorVisible(at: context.date, isPlaying: media.info?.isPlaying ?? false)
+                                (
+                                    Text(split.typed).foregroundColor(accentCol)
+                                    + Text("▋").foregroundColor(cursorOn ? accentCol : accentCol.opacity(0.15))
+                                    + Text(split.ghost).foregroundColor(.white.opacity(0.24))
+                                )
+                                .font(.system(size: size, weight: .bold, design: .rounded))
+                                .id(index)
+                            } else {
+                                Text(rawText)
+                                    .font(.system(size: size, weight: .bold, design: .rounded))
+                                    .foregroundStyle(accentCol)
+                                    .shadow(color: anim == .glowWave ? accentCol.opacity(0.8) : .clear, radius: anim == .glowWave ? 14 : 0)
+                                    .id(index)
+                                    .transition(overlayTransition(for: anim))
+                            }
+                            if let translated = lyrics.translations[lyrics.lines[index].text] {
+                                TranslatedLine(text: translated, size: size * 0.68)
+                            } else if settings.lyricsOverlayNextLine, index + 1 < lyrics.lines.count {
+                                Text(lyrics.lines[index + 1].text)
+                                    .font(.system(size: size * 0.68, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.55))
+                            }
+                        } else if hovering {
+                            Label(media.info == nil ? "Nothing playing" : "Waiting for lyrics…", systemImage: "music.note")
+                                .font(.system(size: size * 0.6, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.6))
                         }
-                    } else if hovering {
-                        Label(media.info == nil ? "Nothing playing" : "Waiting for lyrics…", systemImage: "music.note")
-                            .font(.system(size: size * 0.6, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.6))
                     }
-                }
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.6)
-                .shadow(color: .black.opacity(0.7), radius: 4)
-                .padding(.horizontal, size)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(WindowGrip(mode: .move))
-                .background {
-                    if index != nil || hovering {
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(.black.opacity(max(settings.lyricsOverlayOpacity, hovering ? 0.35 : 0)))
-                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(hovering ? 0.25 : 0), lineWidth: 1))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+                    .shadow(color: .black.opacity(0.7), radius: 4)
+                    .padding(.horizontal, size)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay(WindowGrip(mode: .move))
+                    .background {
+                        if index != nil || hovering {
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(.black.opacity(max(settings.lyricsOverlayOpacity, hovering ? 0.35 : 0)))
+                                .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(hovering ? 0.25 : 0), lineWidth: 1))
+                        }
                     }
+                    .animation(overlaySpring(for: anim), value: index)
                 }
-                .animation(.spring(response: 0.4, dampingFraction: 0.85), value: index)
             }
         }
         .overlay(alignment: .topTrailing) {
@@ -158,6 +183,12 @@ private struct LyricsOverlayView: View {
             control(settings.lyricsOverlayNextLine ? "text.line.2.summary" : "text.line.first.and.arrowtriangle.forward", help: "Toggle next line") {
                 settings.lyricsOverlayNextLine.toggle()
             }
+            control("chevron.left.forwardslash.chevron.right", help: settings.lyricsCodeMode ? "Standard lyrics style" : "Source code typing style") {
+                settings.lyricsCodeMode.toggle()
+            }
+            control(settings.lyricsAnimation.icon, help: "Lyrics animation: \(settings.lyricsAnimation.displayName)") {
+                settings.lyricsAnimation = settings.lyricsAnimation.next
+            }
             control("xmark", help: "Hide widget") {
                 settings.lyricsOverlayEnabled = false
             }
@@ -176,6 +207,34 @@ private struct LyricsOverlayView: View {
         }
         .buttonStyle(.plain)
         .help(help)
+    }
+
+    private func overlayTransition(for anim: LyricsAnimationStyle) -> AnyTransition {
+        switch anim {
+        case .smooth, .typewriter:
+            return .opacity.combined(with: .move(edge: .bottom))
+        case .glowWave:
+            return .opacity.combined(with: .scale(scale: 0.94))
+        case .blurReveal:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .offset(y: 16)).combined(with: .scale(scale: 0.96)),
+                removal: .opacity.combined(with: .offset(y: -12))
+            )
+        case .kineticPop:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.72)),
+                removal: .opacity.combined(with: .scale(scale: 1.08))
+            )
+        }
+    }
+
+    private func overlaySpring(for anim: LyricsAnimationStyle) -> Animation {
+        switch anim {
+        case .smooth, .typewriter: return .spring(response: 0.4, dampingFraction: 0.85)
+        case .glowWave: return .spring(response: 0.55, dampingFraction: 0.82)
+        case .blurReveal: return .easeOut(duration: 0.36)
+        case .kineticPop: return .spring(response: 0.36, dampingFraction: 0.52)
+        }
     }
 }
 

@@ -276,6 +276,8 @@ struct HeaderView: View {
                 }
                 Toggle("Desktop Lyrics", isOn: $settings.lyricsOverlayEnabled)
                     .disabled(!settings.lyricsEnabled)
+                Toggle("Code Style Lyrics", isOn: $settings.lyricsCodeMode)
+                    .disabled(!settings.lyricsEnabled)
                 if settings.lyricsOverlayEnabled {
                     Toggle("Lock Desktop Lyrics", isOn: $settings.lyricsOverlayLocked)
                     Button("Reset Desktop Lyrics Position") { AppDelegate.shared?.resetLyricsOverlay() }

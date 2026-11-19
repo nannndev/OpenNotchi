@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import {
-  BellRing, Bot, Boxes, Calculator, CalendarClock, Camera, CandlestickChart, ChartLine, CheckCircle2, Clipboard, CloudSun, Coffee, Disc3,
+  BellRing, Bot, Boxes, Calculator, CalendarClock, Camera, CandlestickChart, ChartLine, CheckCircle2, Clipboard, CloudSun, Code2, Coffee, Disc3,
   AudioWaveform, Expand, Hand, Headphones, Heart, Home, Inbox, Languages, MessageSquareQuote, MessagesSquare, Monitor, MoonStar, Palette, Paperclip,
   PictureInPicture2, ScrollText, Search, Share2, ShieldCheck, Sliders, Smile, Smartphone, Sparkles, StickyNote, Terminal, Timer,
   Wand2, Webcam,
@@ -25,11 +25,11 @@ const GROUPS: { id: string; label: string; features: Feature[] }[] = [
     id: "ai",
     label: "AI & Notchi",
     features: [
-      { icon: MessagesSquare, title: "Notchi chat", body: "Chat with your own 9router accounts (Claude, GPT, Gemini) right in the notch. Answers stream in, and every chat is saved as a session.", os: "all" },
-      { icon: Wand2, title: "Change settings by asking", body: "\"Make my notch look nicer\" or \"turn off the mascot\": Notchi knows every setting, changes it for you, and shows an Undo.", os: "all" },
+      { icon: MessagesSquare, title: "Notchi chat", body: "Chat with your connected Notchi Gateway accounts (Claude, GPT, Gemini) right in the notch with glassmorphic bubbles and one-click code copy.", os: "all" },
+      { icon: Wand2, title: "AI-triggered themes & settings", body: "\"Switch to Cyberpunk with Elastic Drop\" or \"custom theme #4A0E1C to #D4AF37\": Notchi changes themes, animations, and settings live with Undo.", os: "all", badgeText: "v0.23.0" },
       { icon: Paperclip, title: "Images, files & context", body: "Attach screenshots, images, PDFs and code, or add your clipboard, the song playing, or your AI usage to the next message.", os: "all" },
-      { icon: Sparkles, title: "AI Quotas & 9router", body: "Multi-account quota tracking with real provider logos, in Cards, Compact or List layouts, plus today's top models.", os: "all" },
-      { icon: ChartLine, title: "Usage analytics", body: "9router requests, tokens and cost as stacked daily bars: hover a day, see your top models, and compare with the previous period.", os: "all" },
+      { icon: Sparkles, title: "Notchi Gateway & Quotas", body: "Built-in local AI gateway (eay-gateway) with 14 OAuth logins, 52 API providers, live quotas, routing strategies, and one-click tool config.", os: "all", badgeText: "Gateway" },
+      { icon: ChartLine, title: "Usage analytics", body: "Gateway requests, tokens, cache hit rate, and cost as stacked daily bars: hover a day, see your top models, and compare with the previous period.", os: "all" },
       { icon: Bot, title: "Agents with their own Notchi", body: "Every Claude Code, Codex, Antigravity and Command Code session gets a Notchi acting out its state. Click one for the project, path and last message.", os: "macos" },
       { icon: Smile, title: "Notchi the mascot", body: "A little robot beside your notch with a dozen moods: focused during Pomodoro, buzzing on caffeine, dizzy if you poke it too much. Dress it up with ears, a crown or a halo.", os: "all" },
       { icon: Heart, title: "Interactive petting", body: "Squash/spring physics, WebAudio pop sounds, and floating hearts that level up with consecutive pets.", os: "all" },
@@ -44,7 +44,9 @@ const GROUPS: { id: string; label: string; features: Feature[] }[] = [
     id: "music",
     label: "Music & lyrics",
     features: [
-      { icon: Expand, title: "Full-screen player", body: "Opens when your computer sits idle while music plays: big cover, synced lyrics with translation, and a blurred, aurora, spinning-record or live camera mirror backdrop. Press M for the mirror.", os: "all", badgeText: "New: camera mirror" },
+      { icon: Code2, title: "Source code live-typing lyrics", body: "Synced lyrics rendered as 14 varied real-code statements with 24fps live typing, blinking cursor, ghost completion, and a dedicated Full-Screen IDE Workspace (press K).", os: "all", badgeText: "v0.23.0" },
+      { icon: Sparkles, title: "5 Lyrics animations", body: "Choose Smooth Spring, Typewriter Live, Glow Wave, Blur Reveal, or Kinetic Pop across both the Desktop Overlay and Full-Screen player (press A).", os: "all", badgeText: "v0.23.0" },
+      { icon: Expand, title: "Full-screen player", body: "Opens when your computer sits idle while music plays: big cover, synced lyrics with translation, IDE Workspace, or live camera mirror backdrop.", os: "all" },
       { icon: Search, title: "Search & play", body: "Search Spotify or your Music library from the notch and start a song in one click, or just ask Notchi to play it.", os: "macos", badgeText: "macOS" },
       { icon: Disc3, title: "Now playing turntable", body: "Spotify, Apple Music and YouTube on a vinyl you can scratch, with ballistic VU meters and a spectrum.", os: "all" },
       { icon: MessageSquareQuote, title: "Synced lyrics", body: "Time-synchronized LRC lines light up as they're sung. Click any line to seek immediately.", os: "all" },
@@ -65,8 +67,8 @@ const GROUPS: { id: string; label: string; features: Feature[] }[] = [
       { icon: Headphones, title: "AirPods battery HUD", body: "AirPods case and earbud battery levels, charging status, and audio routing HUD beside the hardware notch.", os: "macos", badgeText: "macOS Only" },
       { icon: Webcam, title: "Hardware camera alerts", body: "A glowing amber/green privacy pill lights up the moment any application activates your camera or microphone.", os: "macos", badgeText: "macOS Privacy" },
       { icon: Coffee, title: "Keep awake caffeine", body: "Prevent your Mac from sleeping for 15 minutes, 1 hour, or indefinitely with a single click from the menu bar.", os: "macos", badgeText: "macOS Only" },
-      { icon: Boxes, title: "3D spatial animations", body: "3D Trapdoor Flip, Holographic Depth, and Cube Roll swinging down with top-hinged physics on both platforms.", os: "all" },
-      { icon: Palette, title: "Adaptive themes", body: "Real Liquid Glass on macOS 26, Frosted Dark, and album-reactive themes. The idle notch follows your theme too.", os: "all" },
+      { icon: Boxes, title: "13 Notch open animations", body: "Liquid Morph, Elastic Drop, Neon Pulse, 3D Origami Unfold, 3D Trapdoor Flip, Holographic Depth, and Cube Roll on both macOS and Windows.", os: "all", badgeText: "v0.23.0" },
+      { icon: Palette, title: "Adaptive & AI custom themes", body: "Liquid Glass, Cyberpunk Neon, Sunset Glow, Emerald Matrix, album-reactive themes, and bespoke AI-generated hex gradient themes.", os: "all", badgeText: "v0.23.0" },
       { icon: ShieldCheck, title: "100% Private by design", body: "Zero accounts, no tracking, and zero telemetry. All agent monitoring and lyrics run locally.", os: "all" },
     ],
   },
@@ -93,8 +95,8 @@ const GROUPS: { id: string; label: string; features: Feature[] }[] = [
       { icon: MoonStar, title: "Prayer times & Imsak", body: "Calculates accurate local prayer times offline with discreet notifications at azan.", os: "all" },
       { icon: Home, title: "Smarthome & AC control", body: "Adjust AC temperature, lighting dimmers, and smart plugs via Home Assistant.", os: "all" },
       { icon: Camera, title: "TikTok mirror & studio", body: "14 trending looks (Glam, Y2K, Cyberpunk, Film, Matcha) with real-time beauty glow bloom, warmth, contrast, zoom, self-timer, 3×3 grid, and retro photo strips.", os: "all", badgeText: "v0.21.0" },
-      { icon: Calculator, title: "Smart calculator", body: "Type \"15% dari 200rb\", \"100 usd to idr\" with live rates, \"5 km to mi\" or \"hari sampai 25 des\" and see the answer as you type. Basic and scientific keypads included.", os: "macos", badgeText: "New" },
-      { icon: CandlestickChart, title: "Markets with live crypto", body: "IDX and global stocks and FX, with crypto (BTC, ETH) updating live every few seconds and each price showing how fresh it is.", os: "macos", badgeText: "Live crypto" },
+      { icon: Calculator, title: "Smart calculator", body: "Type \"20% of 450\", \"1024 mb to gb\", \"32 c to f\", or \"100 km to mi\" and see the answer as you type with instant history and copy.", os: "all", badgeText: "macOS & Windows" },
+      { icon: CandlestickChart, title: "Markets with live crypto", body: "Live crypto watchlist (BTC, ETH, SOL, BNB) with 24h change and range indicators on macOS and Windows, plus stocks & FX on macOS.", os: "all", badgeText: "Live crypto" },
     ],
   },
 ]
@@ -116,9 +118,9 @@ const PARITY_COMPARISON = [
     windows: "Windows System Media Transport Controls (SMTC) supporting Spotify, Chrome, Edge & VLC.",
   },
   {
-    dimension: "AI Monitoring & 9router",
-    macos: "Agent logs, 9router analytics and Notchi chat through 9router, Apple Intelligence, Anthropic, OpenAI or Ollama.",
-    windows: "Agent logs, 9router analytics and Notchi chat through 9router, Anthropic, OpenAI or Ollama.",
+    dimension: "AI Monitoring & Notchi Gateway",
+    macos: "Agent logs, Notchi Gateway (eay-gateway) analytics, and Notchi chat through Gateway, Apple Intelligence, Anthropic, OpenAI or Ollama.",
+    windows: "Agent logs, Notchi Gateway (eay-gateway) analytics, and Notchi chat through Gateway, Anthropic, OpenAI or Ollama.",
   },
   {
     dimension: "Security & Credential Vault",

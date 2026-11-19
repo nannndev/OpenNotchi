@@ -122,6 +122,12 @@ final class NowPlayingScreenController {
                 case " ": self.media.playPause(); return nil
                 case "t": self.settings.lyricsTranslate.toggle(); return nil
                 case "l": self.settings.nowPlayingScreenLyrics.toggle(); return nil
+                case "k":
+                    self.cycleCodeLyricsMode()
+                    return nil
+                case "a":
+                    self.settings.lyricsAnimation = self.settings.lyricsAnimation.next
+                    return nil
                 case "b": self.settings.nowPlayingScreenBackground = self.settings.nowPlayingScreenBackground.next; return nil
                 case "m":
                     NotificationCenter.default.post(name: .toggleNowPlayingMirror, object: nil)
@@ -138,6 +144,10 @@ final class NowPlayingScreenController {
             case 123: self.media.previousTrack()       // ←
             case 17: self.settings.lyricsTranslate.toggle() // T
             case 37: self.settings.nowPlayingScreenLyrics.toggle() // L
+            case 40: // K
+                self.cycleCodeLyricsMode()
+            case 0: // A
+                self.settings.lyricsAnimation = self.settings.lyricsAnimation.next
             case 11: self.settings.nowPlayingScreenBackground = self.settings.nowPlayingScreenBackground.next // B
             case 46: NotificationCenter.default.post(name: .toggleNowPlayingMirror, object: nil) // M
             case 8:  NotificationCenter.default.post(name: .captureNowPlayingPhoto, object: nil) // C
@@ -156,6 +166,21 @@ final class NowPlayingScreenController {
         if displayAssertion != 0 { IOPMAssertionRelease(displayAssertion) }
         displayAssertion = 0
         NSAnimationContext.runAnimationGroup({ $0.duration = 0.35; w.animator().alphaValue = 0 }, completionHandler: { w.orderOut(nil) })
+    }
+
+    /// Cycles Full-Screen lyrics mode: Standard -> Floating Code (No BG) -> Full IDE Workspace -> Standard.
+    private func cycleCodeLyricsMode() {
+        if !settings.lyricsCodeMode {
+            settings.nowPlayingScreenLyrics = true
+            settings.lyricsCodeMode = true
+            settings.lyricsCodeWorkspace = false
+        } else if !settings.lyricsCodeWorkspace {
+            settings.nowPlayingScreenLyrics = true
+            settings.lyricsCodeWorkspace = true
+        } else {
+            settings.lyricsCodeMode = false
+            settings.lyricsCodeWorkspace = false
+        }
     }
 }
 
@@ -186,26 +211,40 @@ private struct NowPlayingScreenView: View {
         // Leaves room for title, progress and controls (~300 pt) under the cover.
         let coverSize = max(220, min(size.height - 360, showLyrics ? (compact ? 380 : 480) : 560))
 
+        let isFullWorkspace = settings.lyricsCodeMode && settings.lyricsCodeWorkspace
+
         ZStack {
             if let info = media.info {
-                HStack(alignment: .center, spacing: compact ? 56 : 96) {
-                    player(info, coverSize: coverSize, compact: compact)
+                if isFullWorkspace {
+                    FullWorkspaceCodeLyricsView(
+                        info: info,
+                        tint: tint,
+                        size: size,
+                        controlsVisible: controlsVisible,
+                        onClose: onClose,
+                        onCapturePhoto: { capturePhoto() }
+                    )
+                    .transition(.opacity)
+                } else {
+                    HStack(alignment: .center, spacing: compact ? 56 : 96) {
+                        player(info, coverSize: coverSize, compact: compact)
 
-                    if showLyrics {
-                        lyricsColumn(info)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: size.height * 0.78)
-                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        if showLyrics {
+                            lyricsColumn(info)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: size.height * 0.78)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        }
                     }
+                    .padding(.horizontal, compact ? 72 : 140)
+                    .frame(width: size.width, height: size.height)
+                    .foregroundStyle(.white)
                 }
-                .padding(.horizontal, compact ? 72 : 140)
-                .frame(width: size.width, height: size.height)
-                .foregroundStyle(.white)
             } else {
                 Text("Nothing playing").font(.system(size: 28, weight: .semibold)).foregroundStyle(.white.opacity(0.6))
             }
 
-            if settings.nowPlayingScreenClock {
+            if settings.nowPlayingScreenClock && !isFullWorkspace {
                 clock
                     .padding(.top, 36)
                     .padding(.trailing, 44)
@@ -492,6 +531,30 @@ private struct NowPlayingScreenView: View {
                     .help("Shuffle")
                 button("quote.bubble", 15, on: settings.nowPlayingScreenLyrics) { settings.nowPlayingScreenLyrics.toggle() }
                     .help("Lyrics (L)")
+                button("chevron.left.forwardslash.chevron.right", 15, on: settings.lyricsCodeMode && !settings.lyricsCodeWorkspace && settings.nowPlayingScreenLyrics) {
+                    if !settings.nowPlayingScreenLyrics { settings.nowPlayingScreenLyrics = true }
+                    if settings.lyricsCodeMode && !settings.lyricsCodeWorkspace {
+                        settings.lyricsCodeMode = false
+                    } else {
+                        settings.lyricsCodeMode = true
+                        settings.lyricsCodeWorkspace = false
+                    }
+                }
+                .help("Floating source code lyrics (K)")
+                button("macwindow", 15, on: settings.lyricsCodeMode && settings.lyricsCodeWorkspace) {
+                    if settings.lyricsCodeMode && settings.lyricsCodeWorkspace {
+                        settings.lyricsCodeWorkspace = false
+                    } else {
+                        settings.nowPlayingScreenLyrics = true
+                        settings.lyricsCodeMode = true
+                        settings.lyricsCodeWorkspace = true
+                    }
+                }
+                .help("Full IDE Workspace CodeLyric (K)")
+                button(settings.lyricsAnimation.icon, 15, on: settings.lyricsAnimation != .smooth) {
+                    settings.lyricsAnimation = settings.lyricsAnimation.next
+                }
+                .help("Lyrics animation: \(settings.lyricsAnimation.displayName) (A)")
                 button("character.bubble", 15, on: settings.lyricsTranslate) { settings.lyricsTranslate.toggle() }
                     .help("Translate lyrics (T)")
                 button(settings.nowPlayingScreenBackground.icon, 15) {
@@ -796,26 +859,43 @@ private struct NowPlayingScreenView: View {
     @ViewBuilder
     private func lyricsColumn(_ info: NowPlayingInfo) -> some View {
         if lyrics.state == .synced, !lyrics.lines.isEmpty {
-            TimelineView(.periodic(from: .now, by: 0.2)) { ctx in
-                let current = lyrics.currentIndex(at: info.position(at: ctx.date)) ?? -1
-                ScrollViewReader { proxy in
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 26) {
-                            Color.clear.frame(height: 200)
-                            ForEach(lyrics.lines) { line in
-                                lyricLine(line, distance: line.id - current)
-                                    .id(line.id)
+            if settings.lyricsCodeMode {
+                FullScreenCodeLyricsView(
+                    info: info,
+                    tint: tint,
+                    textScale: settings.nowPlayingScreenTextScale
+                )
+            } else {
+                let anim = settings.lyricsAnimation
+                let interval: TimeInterval = anim == .typewriter ? (1.0 / 24.0) : 0.2
+                TimelineView(.periodic(from: .now, by: interval)) { ctx in
+                    let pos = info.position(at: ctx.date)
+                    let current = lyrics.currentIndex(at: pos) ?? -1
+                    ScrollViewReader { proxy in
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(alignment: .leading, spacing: 26) {
+                                Color.clear.frame(height: 200)
+                                ForEach(Array(lyrics.lines.enumerated()), id: \.element.id) { idx, line in
+                                    let nextTime = (idx + 1 < lyrics.lines.count) ? lyrics.lines[idx + 1].time : nil
+                                    lyricLine(line, distance: idx - current, pos: pos, nextStart: nextTime, now: ctx.date, isPlaying: info.isPlaying)
+                                        .id(line.id)
+                                        .onTapGesture { media.seek(to: line.time) }
+                                }
+                                Color.clear.frame(height: 300)
                             }
-                            Color.clear.frame(height: 300)
+                        }
+                        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.2),
+                                                     .init(color: .black, location: 0.75), .init(color: .clear, location: 1)],
+                                             startPoint: .top, endPoint: .bottom))
+                        .onChange(of: current) { _, new in
+                            let targetId = lyrics.lines.indices.contains(new) ? lyrics.lines[new].id : 0
+                            withAnimation(.spring(response: 0.7, dampingFraction: 0.85)) { proxy.scrollTo(targetId, anchor: UnitPoint(x: 0, y: 0.35)) }
+                        }
+                        .onAppear {
+                            let targetId = lyrics.lines.indices.contains(current) ? lyrics.lines[current].id : 0
+                            proxy.scrollTo(targetId, anchor: UnitPoint(x: 0, y: 0.35))
                         }
                     }
-                    .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.2),
-                                                 .init(color: .black, location: 0.75), .init(color: .clear, location: 1)],
-                                         startPoint: .top, endPoint: .bottom))
-                    .onChange(of: current) { _, new in
-                        withAnimation(.spring(response: 0.7, dampingFraction: 0.85)) { proxy.scrollTo(max(0, new), anchor: UnitPoint(x: 0, y: 0.35)) }
-                    }
-                    .onAppear { proxy.scrollTo(max(0, current), anchor: UnitPoint(x: 0, y: 0.35)) }
                 }
             }
         } else if let plain = lyrics.plainText, !plain.isEmpty {
@@ -830,13 +910,45 @@ private struct NowPlayingScreenView: View {
         }
     }
 
-    private func lyricLine(_ line: LyricLine, distance: Int) -> some View {
+    private func lyricLine(_ line: LyricLine, distance: Int, pos: Double, nextStart: Double?, now: Date, isPlaying: Bool) -> some View {
         let isCurrent = distance == 0
         let translation = settings.lyricsTranslate ? lyrics.translations[line.text] : nil
         let k = settings.nowPlayingScreenTextScale
+        let anim = settings.lyricsAnimation
+        let rawText = line.text.isEmpty ? "♪" : line.text
+        let lineScale: CGFloat = {
+            if !isCurrent { return anim == .kineticPop ? 0.90 : 0.97 }
+            return anim == .kineticPop ? 1.04 : 1.0
+        }()
+        let lineBlur: CGFloat = {
+            if isCurrent { return 0 }
+            let mult = anim == .blurReveal ? 1.4 : 0.6
+            return min(anim == .blurReveal ? 6 : 3, CGFloat(abs(distance)) * mult)
+        }()
+        let lineAnim: Animation = {
+            switch anim {
+            case .kineticPop: return .spring(response: 0.36, dampingFraction: 0.54)
+            case .glowWave: return .spring(response: 0.60, dampingFraction: 0.78)
+            case .blurReveal: return .easeOut(duration: 0.42)
+            case .smooth, .typewriter: return .spring(response: 0.5, dampingFraction: 0.8)
+            }
+        }()
+
         return VStack(alignment: .leading, spacing: 6) {
-            Text(line.text.isEmpty ? "♪" : line.text)
-                .font(.system(size: (isCurrent ? 40 : 32) * k, weight: .bold))
+            if isCurrent && anim == .typewriter {
+                let split = CodeLyricsStyle.typingSplit(text: rawText, lineStart: line.time, nextStart: nextStart, position: pos)
+                let cursorOn = CodeLyricsStyle.cursorVisible(at: now, isPlaying: isPlaying)
+                (
+                    Text(split.typed).foregroundColor(.white)
+                    + Text("▋").foregroundColor(cursorOn ? tint : tint.opacity(0.15))
+                    + Text(split.ghost).foregroundColor(.white.opacity(0.24))
+                )
+                .font(.system(size: 40 * k, weight: .bold))
+            } else {
+                Text(rawText)
+                    .font(.system(size: (isCurrent ? 40 : 32) * k, weight: .bold))
+                    .shadow(color: (isCurrent && anim == .glowWave) ? tint.opacity(0.85) : .clear, radius: (isCurrent && anim == .glowWave) ? 18 : 0)
+            }
             if let translation, !line.text.isEmpty {
                 Text(translation)
                     .font(.system(size: (isCurrent ? 22 : 19) * k, weight: .semibold))
@@ -844,9 +956,10 @@ private struct NowPlayingScreenView: View {
             }
         }
         .opacity(isCurrent ? 1 : (distance < 0 ? 0.3 : max(0.25, 0.55 - Double(distance) * 0.06)))
-        .blur(radius: isCurrent ? 0 : min(3, Double(abs(distance)) * 0.6))
-        .scaleEffect(isCurrent ? 1 : 0.97, anchor: .leading)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isCurrent)
+        .blur(radius: lineBlur)
+        .scaleEffect(lineScale, anchor: .leading)
+        .offset(y: (isCurrent && anim == .glowWave) ? -3 : 0)
+        .animation(lineAnim, value: isCurrent)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

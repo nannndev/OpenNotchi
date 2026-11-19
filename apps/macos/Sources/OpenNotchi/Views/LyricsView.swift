@@ -12,7 +12,11 @@ struct LyricsContent: View {
             case .idle, .loading:
                 ProgressView().controlSize(.small)
             case .synced:
-                SyncedLyricsView(info: info)
+                if settings.lyricsCodeMode {
+                    NotchCodeLyricsView(info: info)
+                } else {
+                    SyncedLyricsView(info: info)
+                }
             case .plain:
                 PlainLyricsView(info: info, text: lyrics.plainText ?? "")
                     .overlay(alignment: .bottom) {
@@ -31,6 +35,10 @@ struct LyricsContent: View {
         .safeAreaInset(edge: .trailing, spacing: 6) {
             if lyrics.state == .synced || lyrics.state == .plain {
                 VStack(spacing: 6) {
+                    PlayerChip(icon: "chevron.left.forwardslash.chevron.right", isOn: settings.lyricsCodeMode,
+                               help: settings.lyricsCodeMode ? "Standard lyrics style" : "Source code typing style") {
+                        settings.lyricsCodeMode.toggle()
+                    }
                     PlayerChip(icon: "translate", isOn: settings.lyricsTranslate,
                                help: lyrics.translationIssue ?? (settings.lyricsTranslate ? "Stop translating" : "Translate lyrics")) {
                         settings.lyricsTranslate.toggle()

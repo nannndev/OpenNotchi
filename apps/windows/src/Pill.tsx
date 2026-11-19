@@ -2,14 +2,18 @@ import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import {
   Activity,
+  Calculator,
   Camera,
   ClipboardList,
+  Code2,
   Coffee,
+  Disc3,
   LayoutGrid,
   Mic,
   ScrollText,
   Search,
   Terminal,
+  TrendingUp,
   Video,
   Music2,
   Pause,
@@ -24,6 +28,7 @@ import {
   Timer,
 } from "lucide-react"
 import { useEffect, useRef, useState, type CSSProperties } from "react"
+import { PillCodeLyrics } from "./CodeLyrics"
 import { currentIndex } from "./lyrics"
 import { control, currentLine, formatTime, positionAt, useLyrics, useNowPlaying, useTick, type NowPlaying } from "./media"
 import { closedMeter, formatTokens, type UsageReport } from "./ai"
@@ -35,7 +40,9 @@ import { filterRecentAgentStates, notchiMood, playPetPopSound, type NotchiMood }
 import { useAccent } from "./palette"
 import { resolveAccentColor, useSettings, type AppSettings } from "./settings"
 import { AITab, useAgents, useUsage, type AiSection } from "./tabs/AITab"
+import { CalcTab } from "./tabs/CalcTab"
 import { DevTab } from "./tabs/DevTab"
+import { MarketsTab } from "./tabs/MarketsTab"
 import { useIdleNowPlaying } from "./NowPlayingScreen"
 import { ClipboardTab } from "./tabs/ClipboardTab"
 import { MirrorTab } from "./tabs/MirrorTab"
@@ -52,9 +59,9 @@ import { playBannerSound, type Banner } from "./banner"
 const CLOSED = { width: 340, height: 38 }
 const PEEKING = { width: 380, height: 38 }
 const BANNER_SIZE = { width: 420, height: 96 }
-const OPEN = { width: 600, height: 210 }
+const OPEN = { width: 620, height: 232 }
 /** The AI tab needs room for chat messages above the composer (macOS uses 340 too). */
-const OPEN_AI = { width: 600, height: 340 }
+const OPEN_AI = { width: 620, height: 344 }
 /** How long the cursor must rest on the closed pill before it opens, so passing by doesn't open it. */
 const OPEN_DELAY_MS = 150
 /** Gap above the floating pill. */
@@ -64,7 +71,7 @@ const REVEAL_STRIP = 4
 const PEEK_MS = 3000
 
 type Privacy = { camera: boolean; mic: boolean }
-type TabKey = "music" | "clipboard" | "timer" | "notes" | "prompter" | "mirror" | "dev" | "ai"
+type TabKey = "music" | "clipboard" | "timer" | "notes" | "calc" | "markets" | "prompter" | "mirror" | "dev" | "ai"
 type ClosedSlot = "timer" | "music" | "aiMeter"
 type SystemStats = { cpuPercent: number; memUsedBytes: number; memTotalBytes: number; netDownBps: number; netUpBps: number }
 
@@ -76,13 +83,15 @@ const TAB_DEFS: {
   Icon: typeof Music2
 }[] = [
   { key: "music", label: "Music", settingKey: "tabMusic", title: "Music", Icon: Music2 },
-  { key: "clipboard", label: "Clipboard", settingKey: "tabClipboard", title: "Clipboard", Icon: ClipboardList },
+  { key: "ai", label: "AI", settingKey: "aiEnabled", title: "AI agents, usage and Ask AI", Icon: Sparkles },
+  { key: "calc", label: "Calc", settingKey: "tabCalc", title: "Calculator & unit converter", Icon: Calculator },
   { key: "timer", label: "Timer", settingKey: "tabTimer", title: "Timer", Icon: Timer },
   { key: "notes", label: "Notes", settingKey: "tabNotes", title: "Notes", Icon: Coffee },
+  { key: "clipboard", label: "Clipboard", settingKey: "tabClipboard", title: "Clipboard", Icon: ClipboardList },
+  { key: "markets", label: "Markets", settingKey: "tabMarkets", title: "Live crypto markets", Icon: TrendingUp },
+  { key: "dev", label: "Dev", settingKey: "tabDev", title: "Ports, system stats and CI builds", Icon: Terminal },
   { key: "prompter", label: "Prompter", settingKey: "tabPrompter", title: "Teleprompter", Icon: ScrollText },
   { key: "mirror", label: "Mirror", settingKey: "tabMirror", title: "Mirror & photobox", Icon: Video },
-  { key: "dev", label: "Dev", settingKey: "tabDev", title: "Ports, system stats and CI builds", Icon: Terminal },
-  { key: "ai", label: "AI", settingKey: "aiEnabled", title: "AI agents, usage and Ask AI", Icon: Sparkles },
 ]
 
 export function Pill() {
@@ -215,7 +224,16 @@ export function Pill() {
   const closeTimerRef = useRef<number | undefined>(undefined)
   const openTimerRef = useRef<number | undefined>(undefined)
   const { updateInfo } = useUpdateChecker()
-  useTick(250)
+  const [headerStats, setHeaderStats] = useState<SystemStats | null>(null)
+  useTick(open && activeTab === "music" && lyricsMode && settings.lyricsCodeMode ? 42 : 250)
+
+  useEffect(() => {
+    if (!open || !settings.showStatsInHeader) return
+    const load = () => invoke<SystemStats>("system_stats").then(setHeaderStats).catch(() => {})
+    load()
+    const id = window.setInterval(load, 3000)
+    return () => window.clearInterval(id)
+  }, [open, settings.showStatsInHeader])
 
   const onMirror = activeTab === "mirror" && settings.tabMirror
   const onAi = activeTab === "ai" && settings.aiEnabled
@@ -416,7 +434,12 @@ export function Pill() {
   return (
     <div
       className={`stage mode-${mode}`}
-      style={{ ["--accent" as string]: resolvedAccent, ["--float-gap" as string]: `${FLOAT_GAP}px` } as CSSProperties}
+      style={{
+        ["--accent" as string]: resolvedAccent,
+        ["--float-gap" as string]: `${FLOAT_GAP}px`,
+        ["--custom-theme-top" as string]: settings.customThemeTop || "#1A0B2E",
+        ["--custom-theme-bottom" as string]: settings.customThemeBottom || "#7A1E5A",
+      } as CSSProperties}
     >
       {/* Dynamic ambient aura blur behind open pill when music is playing (or non-white accent) */}
       {open && settings.auraGlow !== "off" && (np?.artwork || (settings.accentChoice !== "artwork" && settings.accentChoice !== "white" && resolvedAccent !== "#ffffff")) && (
@@ -589,6 +612,22 @@ export function Pill() {
             </div>
 
             <div className="pill-header-actions">
+              {settings.showStatsInHeader && headerStats && (
+                <button
+                  type="button"
+                  className="header-stats-pill"
+                  onClick={() => {
+                    setOverflowOpen(false)
+                    setPaletteOpen(false)
+                    setStatusOpen((v) => !v)
+                  }}
+                  title={`CPU ${Math.round(headerStats.cpuPercent)}% · RAM ${formatBytes(headerStats.memUsedBytes)}`}
+                >
+                  <span>{Math.round(headerStats.cpuPercent)}%</span>
+                  <i>·</i>
+                  <span>{Math.round((headerStats.memUsedBytes / Math.max(1, headerStats.memTotalBytes)) * 100)}%</span>
+                </button>
+              )}
               <button
                 type="button"
                 className={`header-action-btn ${paletteOpen ? "on" : ""}`}
@@ -772,7 +811,23 @@ export function Pill() {
             {currentTabSafe === "music" && (
               <div className="music-content">
                 <div className="deck">
-                  <Vinyl src={np?.artwork ?? null} size={118} playing={!!np?.isPlaying} tonearm />
+                  {settings.artworkStyle === "vinyl" ? (
+                    <div
+                      className="artwork-switch-wrap"
+                      onClick={() => setSettings({ artworkStyle: "cover" })}
+                      title="Click to switch to Cover Art"
+                    >
+                      <Vinyl src={np?.artwork ?? null} size={118} playing={!!np?.isPlaying} tonearm />
+                    </div>
+                  ) : (
+                    <div
+                      className={`cover-art-box ${np?.isPlaying ? "playing" : "paused"}`}
+                      onClick={() => setSettings({ artworkStyle: "vinyl" })}
+                      title="Click to switch to Spinning Vinyl"
+                    >
+                      {np?.artwork ? <img src={np.artwork} alt="" /> : <div className="cover-art-empty"><Disc3 size={34} /></div>}
+                    </div>
+                  )}
                   {hasSynced && (
                     <div className="deck-controls-stack">
                       <button
@@ -785,12 +840,15 @@ export function Pill() {
                         <Quote size={11} fill="currentColor" />
                       </button>
                       <button
-                        className="lyrics-share-toggle"
-                        onClick={openShare}
-                        aria-label="Share lyric card"
-                        title="Share lyric card"
+                        className={`lyrics-share-toggle ${settings.lyricsCodeMode ? "on" : ""}`}
+                        onClick={() => {
+                          if (!lyricsMode) setLyricsMode(true)
+                          setSettings({ lyricsCodeMode: !settings.lyricsCodeMode })
+                        }}
+                        aria-label="Toggle source code lyrics"
+                        title={settings.lyricsCodeMode ? "Standard lyrics style" : "Source code live-typing lyrics"}
                       >
-                        <Share2 size={11} />
+                        <Code2 size={11} />
                       </button>
                     </div>
                   )}
@@ -798,7 +856,11 @@ export function Pill() {
 
                 {showLyrics && np ? (
                   <>
-                    <LyricsScroller np={np} lines={synced} />
+                    {settings.lyricsCodeMode ? (
+                      <PillCodeLyrics np={np} lines={synced} />
+                    ) : (
+                      <LyricsScroller np={np} lines={synced} />
+                    )}
                     <MiniPlayer np={np} />
                   </>
                 ) : (
@@ -812,6 +874,10 @@ export function Pill() {
             {currentTabSafe === "timer" && <TimerTab />}
 
             {currentTabSafe === "notes" && <NotesTab awake={awake} onToggleAwake={setAwake} />}
+
+            {currentTabSafe === "calc" && <CalcTab />}
+
+            {currentTabSafe === "markets" && <MarketsTab />}
 
             {currentTabSafe === "prompter" && <PrompterTab />}
 

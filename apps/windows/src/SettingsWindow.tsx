@@ -1,9 +1,11 @@
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import {
+  Calculator,
   Check,
   ChevronRight,
   ClipboardList,
+  Code2,
   Coffee,
   Download,
   ExternalLink,
@@ -20,6 +22,7 @@ import {
   ScrollText,
   Timer,
   Terminal,
+  TrendingUp,
   Video,
   Wand2,
   Bot,
@@ -609,14 +612,86 @@ export function SettingsWindow() {
                   onChange={(e) => setSettings({ tabDev: e.target.checked })}
                 />
               </div>
+
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">
+                    <Calculator size={16} /> Calculator & Unit Converter
+                  </div>
+                  <div className="toggle-desc">Instant math expression evaluator, percentages, and unit conversions with history.</div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={settings.tabCalc}
+                  onChange={(e) => setSettings({ tabCalc: e.target.checked })}
+                />
+              </div>
+
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">
+                    <TrendingUp size={16} /> Live Markets
+                  </div>
+                  <div className="toggle-desc">Real-time crypto watchlist with 24h change and range indicators.</div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={settings.tabMarkets}
+                  onChange={(e) => setSettings({ tabMarkets: e.target.checked })}
+                />
+              </div>
             </div>
 
-            <h2 className="section-title" style={{ marginTop: 28 }}>Full-screen Player</h2>
+            <h2 className="section-title" style={{ marginTop: 28 }}>Lyrics & Full-screen Player</h2>
             <p className="section-desc">
-              Big cover, an album-colored background and synced lyrics. Space plays or pauses, ← → skip, T translates, L shows lyrics,
-              B switches the background, Esc closes. It also opens from the ⤢ button in the pill header.
+              Big cover, album-colored background, live source-code typing lyrics, or Full IDE Workspace.
+              Shortcuts: Space play/pause, ← → skip, T translate, L lyrics, K cycle code / IDE workspace, B background, Esc close.
             </p>
             <div className="toggle-list">
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">
+                    <Code2 size={16} /> Source code typing style (no background box)
+                  </div>
+                  <div className="toggle-desc">Render synced lyrics as varied live-typing source code in the pill, desktop overlay, and full-screen.</div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={settings.lyricsCodeMode}
+                  onChange={(e) => setSettings({ lyricsCodeMode: e.target.checked })}
+                />
+              </div>
+
+              {settings.lyricsCodeMode && (
+                <div className="toggle-row">
+                  <div className="toggle-info">
+                    <div className="toggle-title">Full-Screen IDE Workspace CodeLyric</div>
+                    <div className="toggle-desc">Turn the entire full-screen player into an IDE workspace with Explorer, Editor, Output & Status Bar.</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="switch"
+                    checked={settings.lyricsCodeWorkspace}
+                    onChange={(e) => setSettings({ lyricsCodeWorkspace: e.target.checked })}
+                  />
+                </div>
+              )}
+
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">Show upcoming next line on desktop widget</div>
+                  <div className="toggle-desc">Preview the next lyric line below the active line in the floating desktop overlay.</div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={settings.lyricsOverlayNextLine}
+                  onChange={(e) => setSettings({ lyricsOverlayNextLine: e.target.checked })}
+                />
+              </div>
               <div className="toggle-row">
                 <div className="toggle-info">
                   <div className="toggle-title">Full-screen player when the PC sits idle</div>
@@ -748,6 +823,40 @@ export function SettingsWindow() {
                 />
               </div>
 
+
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <div className="toggle-title">Show CPU / RAM mini-pill in Header</div>
+                  <div className="toggle-desc">Display compact live CPU and memory percentages in the open pill header.</div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={settings.showStatsInHeader}
+                  onChange={(e) => setSettings({ showStatsInHeader: e.target.checked })}
+                />
+              </div>
+
+              <div className="toggle-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
+                <div className="toggle-info">
+                  <div className="toggle-title">Music Artwork Style</div>
+                  <div className="toggle-desc">Choose between sleek rounded album cover or spinning vinyl record in the pill.</div>
+                </div>
+                <div className="monitor-select-group">
+                  {([
+                    ["cover", "Album Cover"],
+                    ["vinyl", "Spinning Vinyl"],
+                  ] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      className={`monitor-btn ${(settings.artworkStyle ?? "cover") === id ? "active" : ""}`}
+                      onClick={() => setSettings({ artworkStyle: id })}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="toggle-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
                 <div className="toggle-info">

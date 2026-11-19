@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 
 /// What Ask AI knows about OpenNotchi, and the settings it may change for the user.
 /// The model asks for changes with a ```notchi {...}``` block at the end of its answer; the app applies
@@ -49,8 +50,21 @@ enum NotchiBrain {
                 })
     }
 
+    static func hexColor(_ key: String, _ kp: ReferenceWritableKeyPath<AppSettings, String>, _ info: String) -> Setting {
+        Setting(key: key, info: info, values: "#RRGGBB hex color",
+                get: { $0[keyPath: kp] }, set: { s, v in
+                    let trimmed = v.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let normalized = trimmed.hasPrefix("#") ? trimmed : "#\(trimmed)"
+                    guard normalized.count == 7, Color(hexString: normalized) != nil else { return false }
+                    s[keyPath: kp] = normalized.uppercased()
+                    return true
+                })
+    }
+
     static let settings: [Setting] = [
-        choice("theme", \.theme, "Notch look", name: \.displayName),
+        choice("theme", \.theme, "Notch look (use 'custom' with customThemeTop/customThemeBottom hex colors for bespoke AI themes)", name: \.displayName),
+        hexColor("customThemeTop", \.customThemeTopHex, "Top gradient #RRGGBB hex color when theme is custom"),
+        hexColor("customThemeBottom", \.customThemeBottomHex, "Bottom gradient #RRGGBB hex color when theme is custom"),
         choice("accent", \.accent, "Accent color", name: \.displayName),
         choice("borderStyle", \.borderStyle, "Outline around the open notch", name: \.displayName),
         number("borderWidth", \.borderWidth, 0.5...4, "Outline width in points"),
@@ -72,6 +86,9 @@ enum NotchiBrain {
         bool("videoPreview", \.videoPreviewEnabled, "Video thumbnail preview for YouTube"),
         bool("lyrics", \.lyricsEnabled, "Synced lyrics"),
         bool("lyricsOverlay", \.lyricsOverlayEnabled, "Floating desktop lyrics window"),
+        bool("lyricsCodeMode", \.lyricsCodeMode, "Source code live-typing style for lyrics"),
+        bool("lyricsCodeWorkspace", \.lyricsCodeWorkspace, "Dedicated full-screen IDE Workspace layout for code lyrics"),
+        choice("lyricsAnimation", \.lyricsAnimation, "Lyrics animation style (overlay & full-screen)", name: \.displayName),
         bool("nowPlayingScreen", \.nowPlayingScreenEnabled, "Full-screen player with lyrics when the Mac sits idle while music plays"),
         number("nowPlayingScreenIdleMinutes", \.nowPlayingScreenIdleMinutes, 0.5...30, "Idle minutes before the full-screen player shows"),
         choice("nowPlayingScreenBackground", \.nowPlayingScreenBackground, "Full-screen player background", name: \.displayName),
